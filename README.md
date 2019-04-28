@@ -29,7 +29,8 @@ view model =
 subscriptions : Model -> Sub Msg
 subscriptions _ = Sub.none
 
--- The above lines are just business as usual. 
+-- The above lines are just business as usual. The only real difference is
+-- in the init, update, and main calls.
 
 init : Flags -> Init Model Msg          -- [1]
 init _ = initial {}                     -- [2]
