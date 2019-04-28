@@ -1,5 +1,7 @@
 # Update Pointfree
 
+## How to use this library
+
 ```elm
 module Main exposing (..)
 
@@ -13,31 +15,29 @@ type Msg
   | OtherMsg
   
 type alias Model =
-  { 
-  -- ... 
+  {
+--  ... 
   }
 
 view : Model -> Document Msg
 view model =
   { title = ""
-  , body  = [ div [] [] ] }
+  , body  = [ text "" ] }
 
 subscriptions : Model -> Sub Msg
 subscriptions _ = Sub.none
-```
 
-then
+-- The above lines are just business as usual. 
 
-```elm
-init : () -> Init Model Msg
-init _ = initial {}
+init : () -> Init Model Msg             -- [1]
+init _ = initial {}                     -- [2]
 
-update : Msg -> Update Model Msg ()
-update msg = copy
+update : Msg -> Update Model Msg ()     -- [3]
+update msg = copy                       -- [4]
 
 main : Program () Model Msg
 main =
-  Update.document
+  Update.document                       -- [5]
     { init          = init
     , update        = update
     , subscriptions = subscriptions
