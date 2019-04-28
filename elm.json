@@ -1,7 +1,7 @@
 {
     "type": "package",
     "name": "laserpants/update-pointfree",
-    "summary": "A library for managing deep models in Elm code.",
+    "summary": "A library for managing nested models in Elm code.",
     "license": "BSD-3-Clause",
     "version": "0.0.1",
     "exposed-modules": [
