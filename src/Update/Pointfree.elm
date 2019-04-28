@@ -55,7 +55,10 @@ initCmd f init { model, cmd } =
   { model = model
   , cmd   = Cmd.batch [ cmd, Cmd.map f init.cmd ] }
 
-runInit : ({ flags : flags, key : key, url : url } -> Init a msg) -> flags -> url -> key -> ( a, Cmd msg )
-runInit init flags url key =
+applicationInit : ({ flags : flags, key : key, url : url } -> Init a msg) -> flags -> url -> key -> ( a, Cmd msg )
+applicationInit init flags url key =
   let initd = init { flags = flags, url = url, key = key }
    in ( initd.model, initd.cmd )
+
+documentInit : (flags -> Init a msg) -> flags -> ( a, Cmd msg )
+documentInit init flags = let initd = init flags in ( initd.model, initd.cmd )
