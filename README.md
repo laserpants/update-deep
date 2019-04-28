@@ -31,7 +31,7 @@ subscriptions _ = Sub.none
 
 -- The above lines are just business as usual. 
 
-init : Flags -> Init Model Msg             -- [1]
+init : Flags -> Init Model Msg          -- [1]
 init _ = initial {}                     -- [2]
 
 update : Msg -> Update Model Msg ()     -- [3]
