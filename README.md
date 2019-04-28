@@ -19,6 +19,8 @@ type alias Model =
 --  ... 
   }
 
+type alias Flags = ()
+
 view : Model -> Document Msg
 view model =
   { title = ""
@@ -29,13 +31,13 @@ subscriptions _ = Sub.none
 
 -- The above lines are just business as usual. 
 
-init : () -> Init Model Msg             -- [1]
+init : Flags -> Init Model Msg             -- [1]
 init _ = initial {}                     -- [2]
 
 update : Msg -> Update Model Msg ()     -- [3]
 update msg = copy                       -- [4]
 
-main : Program () Model Msg
+main : Program Flags Model Msg
 main =
   Update.document                       -- [5]
     { init          = init
