@@ -9,7 +9,7 @@ module Main exposing (..)
 
 import Browser exposing (Document)
 import Html exposing (..)
-import Update.Pointfree exposing (Update, Init, copy, initial)
+import Update.Pointfree exposing (Update, copy, initial)
 import Update.Pointfree.Browser as Update
 
 -- You create your Msg type, Model, views, and subscriptions just as you'd normally do:
@@ -36,7 +36,7 @@ subscriptions _ = Sub.none
 -- The above code is just business as usual. The only real difference is in the init, update, and
 -- main calls below.
 
-init : Flags -> Model -> Init Model Msg          -- [2]
+init : Flags -> Model -> Update Model Msg ()     -- [2]
 init _ model = initial {}                        -- [3]
 
 update : Msg -> Model -> Update Model Msg ()     -- [4]
