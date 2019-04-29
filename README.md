@@ -61,7 +61,7 @@ main =
 
 ### How to `Update`
 
-The function `copy` (like `return` in Haskell) lifts a value into the `Update` context.
+The function `save` (like `return` in Haskell) lifts a value into the `Update` context.
 
 ### How to use events
 
