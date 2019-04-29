@@ -9,7 +9,7 @@ module Main exposing (..)
 
 import Browser exposing (Document)
 import Html exposing (..)
-import Update.Pointfree exposing (Update, copy, initial)
+import Update.Pointfree exposing (Update, copy)
 import Update.Pointfree.Browser as Update
 
 -- You create your Msg type, Model, views, and subscriptions just as you'd normally do:
