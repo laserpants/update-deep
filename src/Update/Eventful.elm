@@ -1,4 +1,4 @@
-module Update.Pointfree exposing (..)
+module Update.Eventful exposing (..)
 
 type alias Update a msg e = ( a, Cmd msg, List e )
 

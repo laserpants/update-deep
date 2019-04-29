@@ -1,4 +1,4 @@
-module Update.Pointfree.Browser exposing (document, application)
+module Update.Eventful.Browser exposing (document, application)
 
 import Browser exposing (Document, UrlRequest)
 import Browser.Navigation as Navigation
