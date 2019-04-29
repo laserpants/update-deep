@@ -2,7 +2,7 @@ module Update.Eventful.Browser exposing (document, application)
 
 import Browser exposing (Document, UrlRequest)
 import Browser.Navigation as Navigation
-import Update.Pointfree exposing (Update, documentInit, applicationInit, runUpdate)
+import Update.Eventful exposing (Update, documentInit, applicationInit, runUpdate)
 import Url exposing (Url)
 
 document : { a | init : flags -> Update m c f
