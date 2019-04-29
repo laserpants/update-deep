@@ -10,7 +10,7 @@ module Main exposing (..)
 import Browser exposing (Document)
 import Html exposing (..)
 import Update.Eventful exposing (Update, copy)
-import Update.Eventful.Browser as Update
+import Update.Eventful.Browser as Eventful
 
 -- You create your Msg type, Model, views, and subscriptions just as you'd normally do:
 
@@ -44,7 +44,7 @@ update msg = copy                                -- [5]
 
 main : Program Flags Model Msg
 main =
-  Update.document                                -- [1]
+  Eventful.document                              -- [1]
     { init          = init
     , update        = update
     , subscriptions = subscriptions
