@@ -36,8 +36,8 @@ subscriptions _ = Sub.none
 -- The above code is just business as usual. The only real difference is in the init, update, and
 -- main calls below.
 
-init : Flags -> Model -> Update Model Msg ()     -- [2]
-init _ model = initial {}                        -- [3]
+init : Flags -> Update Model Msg ()              -- [2]
+init _ = copy {}                                 -- [3]
 
 update : Msg -> Model -> Update Model Msg ()     -- [4]
 update msg model = copy model                    -- [5]
