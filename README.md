@@ -40,7 +40,7 @@ init : Flags -> Update Model Msg ()              -- [2]
 init _ = copy {}                                 -- [3]
 
 update : Msg -> Model -> Update Model Msg ()     -- [4]
-update msg model = copy model                    -- [5]
+update msg = copy                                -- [5]
 
 main : Program Flags Model Msg
 main =
