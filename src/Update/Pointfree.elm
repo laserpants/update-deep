@@ -1,64 +1,51 @@
 module Update.Pointfree exposing (..)
 
-type alias Update a msg e = (a -> ( a, Cmd msg, List e ))
+type alias Update a msg e = ( a, Cmd msg, List e )
 
-copy : Update a msg e
-copy model = ( model, Cmd.none, [] )
+m : Update a c e -> a
+m ( state, _, _ ) = state
 
-map : (msga -> msgb) -> Update a msga e -> Update a msgb e
-map f u a =
-  let ( model, cmd, events ) = u a
-   in ( model, Cmd.map f cmd, events )
+copy : a -> Update a c e
+copy state = ( state, Cmd.none, [] )
 
-runCmd : Cmd msg -> Update a msg e
-runCmd cmd model = ( model, cmd, [] )
+map : (a -> b) -> Update a c e -> Update b c e
+map f ( state, cmd, events ) = ( f state, cmd, events )
 
-andThen : Update a msg e -> Update a msg e -> Update a msg e
-andThen u t a =
-  let ( b, c, e ) = u a
-      ( q, d, f ) = t b
-   in ( q, Cmd.batch [ c, d ], e ++ f )
+join : Update (Update a c e) c e -> Update a c e
+join ( ( state, c, e ), d, f ) = ( state, Cmd.batch [ c, d ], e ++ f )
 
-andRunCmd : Cmd msg -> Update a msg e -> Update a msg e
+mapCmd : (c -> d) -> Update a c e -> Update a d e
+mapCmd f ( state, cmd, events )  = ( state, Cmd.map f cmd, events )
+
+runCmd : Cmd c -> a -> Update a c e
+runCmd cmd state = ( state, cmd, [] )
+
+andThen : (a -> Update b c e) -> Update a c e -> Update b c e
+andThen f = join << map f
+
+kleisli : (b -> Update d c e) -> (a -> Update b c e) -> a -> Update d c e
+kleisli f g = andThen f << g
+
+andRunCmd : Cmd c -> Update a c e -> Update a c e
 andRunCmd = andThen << runCmd
 
-postEvent : e -> Update a msg e
-postEvent event model = ( model, Cmd.none, [ event ] )
+postEvent : e -> a -> Update a c e
+postEvent event state = ( state, Cmd.none, [ event ] )
 
-andPostEvent : e -> Update a msg e -> Update a msg e
+andPostEvent : e -> Update a c e -> Update a c e
 andPostEvent = andThen << postEvent
 
-within : { get : (b -> c), set : (c -> Update b a e) } -> Update c a e -> Update b a e
-within { get, set } u a =
-  let ( b, c, e ) = u (get a)
-      ( q, d, f ) = set b a
-   in ( q, Cmd.batch [ c, d ], e ++ f )
+processEvents : (e -> a -> Update a c e) -> Update a c e -> Update a c e
+processEvents process ( state, cmd, events ) =
+  List.foldr (andThen << process) ( state, cmd, [] ) events
 
-withinMap : { get : (b -> c), set : (c -> Update b a e) } -> (a -> d) -> Update c a e -> Update b d e
-withinMap access msg = within access >> map msg
+runUpdate : (c -> a -> Update a c e) -> c -> a -> ( a, Cmd c )
+runUpdate f msg state = let ( a, c, _ ) = f msg state in ( a, c )
 
-processEvents : (e -> Update b a e) -> Update b a e -> Update b a e
-processEvents f u a =
-  let ( model, cmd, events ) = u a
-   in List.foldr (andThen << f) (\_ -> ( model, cmd, [] )) events a
-
-runUpdate : Update a msg e -> a -> ( a, Cmd msg )
-runUpdate u a = let ( model, cmds, _ ) = u a in ( model, cmds )
-
-type alias Init m msg = { model : m, cmd : Cmd msg }
-
-initial : m -> Init m msg
-initial model = { model = model, cmd = Cmd.none }
-
-initCmd : (msga -> msgb) -> { a | cmd : Cmd msga } -> Init m msgb -> Init m msgb
-initCmd f init { model, cmd } =
-  { model = model
-  , cmd   = Cmd.batch [ cmd, Cmd.map f init.cmd ] }
-
-applicationInit : ({ flags : flags, key : key, url : url } -> Init a msg) -> flags -> url -> key -> ( a, Cmd msg )
+applicationInit : (flags -> url -> key -> Update a msg e) -> flags -> url -> key -> ( a, Cmd msg )
 applicationInit init flags url key =
-  let initd = init { flags = flags, url = url, key = key }
-   in ( initd.model, initd.cmd )
+  let ( state, cmd, _ ) = init flags url key in ( state, cmd )
 
-documentInit : (flags -> Init a msg) -> flags -> ( a, Cmd msg )
-documentInit init flags = let initd = init flags in ( initd.model, initd.cmd )
+documentInit : (flags -> Update a c e) -> flags -> ( a, Cmd c )
+documentInit init flags =
+  let ( state, cmd, _ ) = init flags in ( state, cmd )
