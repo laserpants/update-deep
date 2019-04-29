@@ -9,7 +9,7 @@ module Main exposing (..)
 
 import Browser exposing (Document)
 import Html exposing (..)
-import Update.Eventful exposing (Update, copy)
+import Update.Eventful exposing (Update, save)
 import Update.Eventful.Browser as Update
 
 -- You create your Msg type, Model, views, and subscriptions just as you'd normally do:
@@ -37,10 +37,10 @@ subscriptions _ = Sub.none
 -- main calls below.
 
 init : Flags -> Update Model Msg ()              -- [2]
-init _ = copy {}                                 -- [3]
+init _ = save {}                                 -- [3]
 
 update : Msg -> Model -> Update Model Msg ()     -- [4]
-update msg model = copy model                    -- [5]
+update msg model = save model                    -- [5]
 
 main : Program Flags Model Msg
 main =
@@ -55,7 +55,7 @@ main =
 2. The type of `init` is now `Flags -> Update Model Msg ()`. The `Update` type is explained below.
 3. In this example, the model is initialized without running any commands.
 4. The type of `update` has become `Msg -> Update Model Msg e`. This return value is a type alias for `( Model, Cmd Msg, List e )`. The `e` parameter represents an *event* type. Events are not used in this example; hence the `()` unit type.
-5. Calling `copy` will result in an `Update` that leaves the state unchanged.
+5. Calling `save` will result in an `Update` that leaves the state unchanged.
 
 
 

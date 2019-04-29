@@ -5,8 +5,8 @@ type alias Update a msg e = ( a, Cmd msg, List e )
 m : Update a c e -> a
 m ( state, _, _ ) = state
 
-copy : a -> Update a c e
-copy state = ( state, Cmd.none, [] )
+save : a -> Update a c e
+save state = ( state, Cmd.none, [] )
 
 map : (a -> b) -> Update a c e -> Update b c e
 map f ( state, cmd, events ) = ( f state, cmd, events )
