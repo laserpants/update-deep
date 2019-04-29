@@ -36,15 +36,15 @@ subscriptions _ = Sub.none
 -- The above code is just business as usual. The only real difference is in the init, update, and
 -- main calls below.
 
-init : Flags -> Init Model Msg          -- [2]
-init _ = initial {}                     -- [3]
+init : Flags -> Model -> Init Model Msg          -- [2]
+init _ model = initial {}                        -- [3]
 
-update : Msg -> Update Model Msg ()     -- [4]
-update msg = copy                       -- [5]
+update : Msg -> Model -> Update Model Msg ()     -- [4]
+update msg model = copy model                    -- [5]
 
 main : Program Flags Model Msg
 main =
-  Update.document                       -- [1]
+  Update.document                                -- [1]
     { init          = init
     , update        = update
     , subscriptions = subscriptions
