@@ -44,7 +44,7 @@ update msg model = save model                    -- [5]
 
 main : Program Flags Model Msg
 main =
-  Update.document                                -- [1]
+  Eventful.document                              -- [1]
     { init          = init
     , update        = update
     , subscriptions = subscriptions
@@ -61,11 +61,7 @@ main =
 
 ### How to `Update`
 
-TODO
-
-### How to `Init`
-
-TODO
+The function `copy` (like `return` in Haskell) lifts a value into the `Update` context.
 
 ### How to use events
 
