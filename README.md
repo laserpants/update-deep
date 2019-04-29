@@ -61,7 +61,7 @@ main =
 
 ### How to `Update`
 
-TODO
+The function `copy` (like `return`, or `pure` in Haskell) lifts a value into the `Update` enchilada.
 
 ### How to use events
 
