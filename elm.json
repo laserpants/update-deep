@@ -1,6 +1,6 @@
 {
     "type": "package",
-    "name": "laserpants/update-pointfree",
+    "name": "laserpants/update-eventful",
     "summary": "A library for managing nested models in Elm code.",
     "license": "BSD-3-Clause",
     "version": "0.0.1",
