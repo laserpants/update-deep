@@ -63,10 +63,6 @@ main =
 
 TODO
 
-### How to `Init`
-
-TODO
-
 ### How to use events
 
 TODO
