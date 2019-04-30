@@ -1,21 +1,18 @@
 module Update.Eventful exposing (..)
 
-type alias Update a msg e = ( a, Cmd msg, List e )
-
-m : Update a c e -> a
-m ( state, _, _ ) = state
+type alias Update a c e = ( a, Cmd c, List e )
 
 save : a -> Update a c e
 save state = ( state, Cmd.none, [] )
 
 map : (a -> b) -> Update a c e -> Update b c e
-map f ( state, cmd, events ) = ( f state, cmd, events )
+map f ( state, cmd, handlers ) = ( f state, cmd, handlers )
 
 join : Update (Update a c e) c e -> Update a c e
 join ( ( state, c, e ), d, f ) = ( state, Cmd.batch [ c, d ], e ++ f )
 
 mapCmd : (c -> d) -> Update a c e -> Update a d e
-mapCmd f ( state, cmd, events )  = ( state, Cmd.map f cmd, events )
+mapCmd f ( state, cmd, handlers )  = ( state, Cmd.map f cmd, handlers )
 
 runCmd : Cmd c -> a -> Update a c e
 runCmd cmd state = ( state, cmd, [] )
@@ -29,23 +26,33 @@ kleisli f g = andThen f << g
 andRunCmd : Cmd c -> Update a c e -> Update a c e
 andRunCmd = andThen << runCmd
 
-postEvent : e -> a -> Update a c e
-postEvent event state = ( state, Cmd.none, [ event ] )
+invoke : e -> a -> Update a c e
+invoke handler state = ( state, Cmd.none, [ handler ] )
 
-andPostEvent : e -> Update a c e -> Update a c e
-andPostEvent = andThen << postEvent
+andInvoke : e -> Update a c e -> Update a c e
+andInvoke = andThen << invoke
 
-processEvents : (e -> a -> Update a c e) -> Update a c e -> Update a c e
-processEvents process ( state, cmd, events ) =
-  List.foldr (andThen << process) ( state, cmd, [] ) events
+runEvents : Update a c (a -> Update a c e) -> Update a c e
+runEvents ( a, c, list ) = List.foldr andThen ( a, c, [] ) list
+
+runEventsAnd : (b -> Update a c (a -> Update a c e)) -> Update b c (a -> Update a c e) -> Update a c e
+runEventsAnd f = runEvents << andThen f
 
 runUpdate : (c -> a -> Update a c e) -> c -> a -> ( a, Cmd c )
 runUpdate f msg state = let ( a, c, _ ) = f msg state in ( a, c )
 
-applicationInit : (flags -> url -> key -> Update a msg e) -> flags -> url -> key -> ( a, Cmd msg )
-applicationInit init flags url key =
-  let ( state, cmd, _ ) = init flags url key in ( state, cmd )
+type alias Init a c = { state : a, cmd : Cmd c }
 
-documentInit : (flags -> Update a c e) -> flags -> ( a, Cmd c )
+initial : a -> Init a c
+initial state = { state = state, cmd = Cmd.none }
+
+initCmd : (c -> d) -> Init a c -> Init b d -> Init b d
+initCmd msg a b = { state = b.state, cmd = Cmd.batch [ Cmd.map msg a.cmd, b.cmd ] }
+
+applicationInit : (flags -> url -> key -> Init a c) -> flags -> url -> key -> ( a, Cmd c )
+applicationInit init flags url key =
+  let { state, cmd } = init flags url key in ( state, cmd )
+
+documentInit : (flags -> Init a c) -> flags -> ( a, Cmd c )
 documentInit init flags =
-  let ( state, cmd, _ ) = init flags in ( state, cmd )
+  let { state, cmd } = init flags in ( state, cmd )
