@@ -1,4 +1,4 @@
-module Update.Eventful exposing (..)
+module Update.Deep exposing (..)
 
 type alias Update a c e = ( a, Cmd c, List e )
 

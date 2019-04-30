@@ -1,12 +1,12 @@
 {
     "type": "package",
-    "name": "laserpants/update-eventful",
-    "summary": "A library for managing nested models in Elm code.",
+    "name": "laserpants/update-deep",
+    "summary": "A library for managing nested state in Elm code.",
     "license": "BSD-3-Clause",
     "version": "0.0.1",
     "exposed-modules": [
-        "Update.Pointfree",
-        "Update.Pointfree.Browser"
+        "Update.Deep",
+        "Update.Deep.Browser"
     ],
     "elm-version": "0.19.0 <= v < 0.20.0",
     "dependencies": {

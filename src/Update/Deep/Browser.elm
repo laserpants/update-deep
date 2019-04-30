@@ -1,8 +1,8 @@
-module Update.Eventful.Browser exposing (document, application)
+module Update.Deep.Browser exposing (document, application)
 
 import Browser exposing (Document, UrlRequest)
 import Browser.Navigation as Navigation
-import Update.Eventful exposing (Init, Update, documentInit, applicationInit, runUpdate)
+import Update.Deep exposing (Init, Update, documentInit, applicationInit, runUpdate)
 import Url exposing (Url)
 
 document : { a | init : flags -> Init m c

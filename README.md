@@ -1,4 +1,4 @@
-# Update Eventful
+# Update Deep
 
 TODO
 
@@ -9,8 +9,8 @@ module Main exposing (..)
 
 import Browser exposing (Document)
 import Html exposing (..)
-import Update.Eventful exposing (Update, save)
-import Update.Eventful.Browser as Update
+import Update.Deep exposing (Update, save)
+import Update.Deep.Browser as Update
 
 -- You create your Msg type, Model, views, and subscriptions just as you'd normally do:
 
@@ -44,14 +44,14 @@ update msg model = save model                    -- [5]
 
 main : Program Flags Model Msg
 main =
-  Eventful.document                              -- [1]
+  Deep.document                              -- [1]
     { init          = init
     , update        = update
     , subscriptions = subscriptions
     , view          = view }
 ```
 
-1. Instead of `Browser.document`, a function of the same name from `Update.Eventful.Browser` is used. This module also exposes its own version of `application`.
+1. Instead of `Browser.document`, a function of the same name from `Update.Deep.Browser` is used. This module also exposes its own version of `application`.
 2. The type of `init` is now `Flags -> Update Model Msg ()`. The `Update` type is explained below.
 3. In this example, the model is initialized without running any commands.
 4. The type of `update` has become `Msg -> Update Model Msg e`. This return value is a type alias for `( Model, Cmd Msg, List e )`. The `e` parameter represents an *event* type. Events are not used in this example; hence the `()` unit type.
