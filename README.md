@@ -44,7 +44,7 @@ update msg model = save model                    -- [5]
 
 main : Program Flags Model Msg
 main =
-  Deep.document                              -- [1]
+  Deep.document                                  -- [1]
     { init          = init
     , update        = update
     , subscriptions = subscriptions
