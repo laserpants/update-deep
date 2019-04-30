@@ -54,7 +54,7 @@ main =
 1. Instead of `Browser.document`, a function of the same name from `Update.Deep.Browser` is used. This module also exposes its own version of `application`.
 2. The type of `init` is now `Flags -> Init Model Msg`. The `Init` type is explained below.
 3. In this example, the model is initialized without running any commands. Normally, you'd have returned `( {}, Cmd.none )` to achieve the same thing.
-4. The type of `update` has become `Msg -> Model -> Update Model Msg a`. This return value is a type alias for `( Model, Cmd Msg, List a )`. The purpose of the `a` parameter is to enable for callbacks to be passed down through the update hierarchy.
+4. The type of `update` has become `Msg -> Model -> Update Model Msg a`. This return value is a type alias for `( Model, Cmd Msg, List a )`. The purpose of the last element of this tuple, and the `a` parameter, is to make it possible for callbacks to be passed down through the update hierarchy.
 5. Calling `save` here takes the model and wraps it in an `Update`.
 
 
