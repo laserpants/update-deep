@@ -36,15 +36,15 @@ subscriptions _ = Sub.none
 -- The above code is just business as usual. The only real difference is in the init, update, and
 -- main calls below.
 
-init : Flags -> Update Model Msg ()              -- [2]
-init _ = save {}                                 -- [3]
+init : Flags -> Init Model Msg                   -- [2]
+init _ = initial {}                              -- [3]
 
-update : Msg -> Model -> Update Model Msg ()     -- [4]
+update : Msg -> Model -> Update Model Msg a      -- [4]
 update msg model = save model                    -- [5]
 
 main : Program Flags Model Msg
 main =
-  Deep.document                              -- [1]
+  Deep.document                                  -- [1]
     { init          = init
     , update        = update
     , subscriptions = subscriptions
@@ -52,10 +52,10 @@ main =
 ```
 
 1. Instead of `Browser.document`, a function of the same name from `Update.Deep.Browser` is used. This module also exposes its own version of `application`.
-2. The type of `init` is now `Flags -> Update Model Msg ()`. The `Update` type is explained below.
-3. In this example, the model is initialized without running any commands.
-4. The type of `update` has become `Msg -> Update Model Msg e`. This return value is a type alias for `( Model, Cmd Msg, List e )`. The `e` parameter represents an *event* type. Events are not used in this example; hence the `()` unit type.
-5. Calling `save` will result in an `Update` that leaves the state unchanged.
+2. The type of `init` is now `Flags -> Init Model Msg`. The `Init` type is explained below.
+3. In this example, the model is initialized without running any commands. Normally, you'd have returned `( {}, Cmd.none )`.
+4. The type of `update` has become `Msg -> Model -> Update Model Msg a`. This return value is a type alias for `( Model, Cmd Msg, List a )`.
+5. Calling `save` here takes the model and just wraps it in an `Update`.
 
 
 
