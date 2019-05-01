@@ -71,13 +71,13 @@ andInvoke = andThen << invoke
 {-| Collapses the list of monadic functions (events) produced by a nested update
 call, merging them into the current context.
 -}
-runEvents : Update a c (a -> Update a c e) -> Update a c e
-runEvents ( a, c, list ) = List.foldr andThen ( a, c, [] ) list
+consumeEvents : Update a c (a -> Update a c e) -> Update a c e
+consumeEvents ( a, c, list ) = List.foldr andThen ( a, c, [] ) list
 
-{-| Shortcut for `\f -> runEvents << andThen f`
+{-| Shortcut for `\f -> consumeEvents << andThen f`
 -}
-runEventsAnd : (b -> Update a c (a -> Update a c e)) -> Update b c (a -> Update a c e) -> Update a c e
-runEventsAnd f = runEvents << andThen f
+consumeEventsAnd : (b -> Update a c (a -> Update a c e)) -> Update b c (a -> Update a c e) -> Update a c e
+consumeEventsAnd f = consumeEvents << andThen f
 
 runUpdate : (c -> a -> Update a c e) -> c -> a -> ( a, Cmd c )
 runUpdate f msg state = let ( a, c, _ ) = f msg state in ( a, c )
