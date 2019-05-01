@@ -5,6 +5,7 @@ import Browser.Navigation as Navigation
 import Update.Deep exposing (Init, Update, documentInit, applicationInit, runUpdate)
 import Url exposing (Url)
 
+{-| -}
 document : { a | init : flags -> Init m c
                , subscriptions : m -> Sub c
                , update : c -> m -> Update m c e
@@ -16,6 +17,7 @@ document { init, update, subscriptions, view } =
     , subscriptions = subscriptions
     , view          = view }
 
+{-| -}
 application : { a | init : flags -> Url -> Navigation.Key -> Init m c
                   , onUrlChange : Url -> c
                   , onUrlRequest : UrlRequest -> c
