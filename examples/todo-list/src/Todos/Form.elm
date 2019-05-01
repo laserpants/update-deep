@@ -39,10 +39,12 @@ init = initial { text = "" }
 view : State -> Html Msg
 view form =
   div []
-    [ div [] [ input [ onFocus OnFocus
+    [ h3 [ style "margin" ".5em 0" ] [ text "New task" ]
+    , div [] [ input [ onFocus OnFocus
                      , onBlur  OnBlur
                      , onInput OnChange
                      , Html.Attributes.value form.text
                      ] [] ]
-    , div [] [ button [ disabled (String.isEmpty form.text)
-                      , onClick OnSubmit ] [ text "Submit" ] ] ]
+    , div [ style "margin" ".5em 0" ]
+        [ button [ disabled (String.isEmpty form.text)
+                 , onClick OnSubmit ] [ text "Submit" ] ] ]

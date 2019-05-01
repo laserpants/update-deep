@@ -24,8 +24,9 @@ view { todos, notifications } =
   , body  =
     [ div []
       [ Html.map (TodosMsg << Todos.FormMsg) (Todos.Form.view todos.form)
-      , Html.map TodosMsg (Todos.listView todos) ]
+      , hr [] []
       , Html.map (NotificationsMsg) (Notifications.listView notifications)
+      , Html.map TodosMsg (Todos.listView todos) ]
     ]
   }
 

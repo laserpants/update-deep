@@ -64,10 +64,10 @@ listView { list } =
   let indexed = List.indexedMap Tuple.pair
       item ix todo =
         li [] [ a [ href "#", onClick (TaskDone ix) ] [ text "Done" ]
-              , text " "
+              , text " | "
               , a [ href "#", onClick (DeleteItem ix) ] [ text "Delete" ]
-              , text " "
-              , text (String.fromInt ix)
-              , text ": "
+              , text " | "
               , text todo.text ]
-   in ul [] (List.map (uncurry item) (indexed list))
+   in div []
+        [ if not (List.isEmpty list) then h3 [] [ text "Todos" ] else text ""
+        , ul [] (List.map (uncurry item) (indexed list)) ]
