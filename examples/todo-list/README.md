@@ -1,6 +1,6 @@
 # To Do-List Tutorial
 
-Run this application in the browser [here](https://laserpants.github.io/update-deep/examples/todo-list).
+#### Run this application in the browser [here](https://laserpants.github.io/update-deep/examples/todo-list).
 
 The application consists of the following modules:
 
