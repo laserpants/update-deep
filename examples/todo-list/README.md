@@ -1,6 +1,6 @@
 # To Do-List Tutorial
 
-#### Run this application in the browser [here](https://laserpants.github.io/update-deep/examples/todo-list).
+#### Run this example in the browser [here](https://laserpants.github.io/update-deep/examples/todo-list).
 
 The application consists of the following modules:
 
@@ -111,6 +111,13 @@ We then use `consumeEvents` to apply these actions in the context of `State.upda
         |> consumeEvents
     AddItem item ->
       -- etc.
+```
+
+```elm
+      state
+        |> save
+        |> andThen doStuff
+        |> andThen doMoreStuff
 ```
 
 Then, when the item is added, `onItemAdded` is invoked to pass the word to `Main`.
