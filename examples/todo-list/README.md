@@ -1,4 +1,4 @@
-# To Do-List Tutorial
+# To Do-List Example
 
 #### Run this example in the browser [here](https://laserpants.github.io/update-deep/examples/todo-list).
 
