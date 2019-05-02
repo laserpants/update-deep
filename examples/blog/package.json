@@ -1,0 +1,15 @@
+{
+  "description": "",
+  "scripts": {
+    "dev": "npx webpack-dev-server"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "dotenv": "^7.0.0",
+    "elm-webpack-loader": "^5.0.0",
+    "file-loader": "^3.0.1",
+    "webpack": "^4.29.6",
+    "webpack-cli": "^3.3.0",
+    "webpack-dev-server": "^3.2.1"
+  }
+}
