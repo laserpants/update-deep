@@ -20,11 +20,11 @@ In the following, we are mostly concerned with the four modules on the left side
 Each one of these specifies its own `Msg` and `State` type, as well as `update` and `init` functions. 
 Most of this is implemented as usual, but the return types of `update` and `init` are a bit different, and `update` takes an extra `EventHandlers` argument:
 
-```elm`
+```elm
 update : EventHandlers t a c e  -> Msg -> State -> Update State Msg (a -> Update a c e)
 ```
 
-```elm`
+```elm
 init : Flags -> Init State Msg
 ```
 
