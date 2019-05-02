@@ -2,6 +2,25 @@
 
 TODO
 
+```
+                                               ||             ┌────────────┐
+                                               ||             │    Main    │
+                ┌────────────┐                 ||             └── ▲ ─ ▲ ───┘
+           ┌────│    Main    │────┐            ||                 │   │
+           │    └────────────┘    │            ||                 │   │--- onItemAdded
+           │                      │            ||   onTaskDone ---│   │
+  ┌─────── ▼ ───────┐       ┌──── ▼ ────┐      ||                 │   │   ┌───────────┐
+  │  Notifications  │       │   Todos   │      ||                 └───┴───│   Todos   │
+  └─────────────────┘       └─────┬─────┘      ||                         └──── ▲ ────┘
+                                  │            ||                               │
+                                  │            ||                               │--- onSubmit
+                          ┌────── ▼ ──────┐    ||                               │
+                          │   TodosForm   │    ||                       ┌───────┴───────┐
+                          └───────────────┘    ||                       │   TodosForm   │
+                                               ||                       └───────────────┘
+```
+
+<!--
 ## How to use this library
 
 ```elm
@@ -56,13 +75,4 @@ main =
 3. In this example, the model is initialized without running any commands. Normally, you'd have returned `( {}, Cmd.none )` to achieve the same thing.
 4. The type of `update` has become `Msg -> Model -> Update Model Msg a`. This return value is a type alias for `( Model, Cmd Msg, List a )`. The purpose of the last element of this tuple, and the `a` parameter, is to make it possible for callbacks to be passed down through the update hierarchy.
 5. Calling `save` here takes the model and wraps it in an `Update`.
-
-
-
-### How to `Update`
-
-The function `save` lifts a value into the `Update` context  (just like `return` in Haskell) .
-
-### How to use events
-
-TODO
+-->

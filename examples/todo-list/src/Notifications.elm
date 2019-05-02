@@ -50,8 +50,8 @@ update msg state =
 init : Init State Msg
 init = initial { list = [] }
 
-listView : State -> Html Msg
-listView { list } =
+view : State -> Html Msg
+view { list } =
   let len = length list
       item text = Html.text text
    in div []

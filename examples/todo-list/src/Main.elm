@@ -25,8 +25,8 @@ view { todos, notifications } =
     [ div []
       [ Html.map (TodosMsg << Todos.FormMsg) (Todos.Form.view todos.form)
       , hr [] []
-      , Html.map (NotificationsMsg) (Notifications.listView notifications)
-      , Html.map TodosMsg (Todos.listView todos) ]
+      , Html.map (NotificationsMsg) (Notifications.view notifications)
+      , Html.map TodosMsg (Todos.view todos) ]
     ]
   }
 
@@ -51,10 +51,10 @@ insertAsNotificationsIn state notifications = save { state | notifications = not
 
 update : Msg -> State -> Update State Msg a
 update msg state =
-  let notify text = update (NotificationsMsg (Notifications.Add text))
-   in case msg of
+  case msg of
     TodosMsg todosMsg ->
-      let events = { onItemAdded = notify "A new task was added to your list."
+      let notify text = update (NotificationsMsg (Notifications.Add text))
+          events = { onItemAdded = notify "A new task was added to your list."
                    , onTaskDone  = \item -> notify ("The following task was completed: " ++ item.text) }
        in state.todos
         |> Todos.update events todosMsg

@@ -33,21 +33,26 @@ removeItem { onDelete } ix ({ list } as state) =
         |> save
         |> andInvoke (onDelete item)
 
-update : { t | onItemAdded : a -> Update a c e, onTaskDone : TodoItem -> a -> Update a c e } -> Msg -> State -> Update State Msg (a -> Update a c e)
-update ({ onItemAdded, onTaskDone } as events) msg state =
+type alias EventHandlers t a c e =
+  { t | onItemAdded : a -> Update a c e
+      , onTaskDone  : TodoItem -> a -> Update a c e }
+
+update : EventHandlers t a c e  -> Msg -> State -> Update State Msg (a -> Update a c e)
+update events msg state =
   case msg of
     FormMsg formMsg ->
       state.form
-        |> Form.update { onSubmit = update events << AddItem } formMsg
+        |> Form.update { onSubmit = \todo -> update events (AddItem todo) } formMsg
         |> mapCmd FormMsg
-        |> consumeEventsAnd (\form -> save { state | form = form})
+        |> andThen (\form -> save { state | form = form})
+        |> consumeEvents
     AddItem item ->
       state
         |> pushItem item
-        |> andInvoke onItemAdded
+        |> andInvoke events.onItemAdded
     TaskDone ix ->
       state
-        |> removeItem { onDelete = onTaskDone } ix
+        |> removeItem { onDelete = events.onTaskDone } ix
     DeleteItem ix ->
       state
         |> removeItem { onDelete = const save } ix
@@ -59,8 +64,8 @@ init =
         |> initial
         |> initCmd FormMsg form
 
-listView : State -> Html Msg
-listView { list } =
+view : State -> Html Msg
+view { list } =
   let indexed = List.indexedMap Tuple.pair
       item ix todo =
         li [] [ a [ href "#", onClick (TaskDone ix) ] [ text "Done" ]

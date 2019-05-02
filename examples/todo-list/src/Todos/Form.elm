@@ -18,7 +18,10 @@ type alias State =
 setText : String -> State -> Update State Msg a
 setText text state = save { state | text = text }
 
-update : { t | onSubmit : TodoItem -> a -> Update a c e } -> Msg -> State -> Update State Msg (a -> Update a c e)
+type alias EventHandlers t a c e =
+  { t | onSubmit : TodoItem -> a -> Update a c e }
+
+update : EventHandlers t a c e -> Msg -> State -> Update State Msg (a -> Update a c e)
 update { onSubmit } msg state =
   case msg of
     OnSubmit ->
