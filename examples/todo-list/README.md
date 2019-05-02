@@ -104,7 +104,6 @@ We then use `consumeEvents` to apply these actions in the context of `State.upda
 
 ```elm
 -- src/Todos.elm (line 46)
-
         |> mapCmd FormMsg
         |> andThen (\form -> save { state | form = form})
         |> consumeEvents
@@ -116,7 +115,6 @@ Then, when the item is added, `onItemAdded` is invoked to pass the word to `Main
 
 ```elm
 -- src/Todos.elm (line 49)
-
     AddItem item ->
       state
         |> pushItem item
