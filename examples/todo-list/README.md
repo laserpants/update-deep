@@ -120,7 +120,7 @@ We then use `consumeEvents` to apply these actions in the context of `State.upda
         |> andThen doMoreStuff
 ```
 
-Then, when the item is added, `onItemAdded` is invoked to pass the word to `Main`.
+Finally, when the item is added, `onItemAdded` is invoked to pass the word to `Main`.
 
 ```elm
 -- src/Todos.elm (line 49)
