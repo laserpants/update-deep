@@ -9,7 +9,7 @@ import Html.Attributes exposing (..)
 import Html.Events exposing (..)
 import Http
 import Json.Decode as Json
-import LoginForm exposing (..)
+import LoginForm exposing (LoginForm)
 import Update.Deep exposing (..)
 
 type Msg
@@ -25,7 +25,7 @@ init { flags } =
   let user = Api.init { endpoint = flags.api ++ "/auth/login"
                       , method   = Post
                       , decoder  = Json.field "user" User.decoder }
-      login = FormState.init fields { login = "", password = "" }
+      login = FormState.init LoginForm.fields { login = "", password = "" }
    in { user  = user.state
       , login = login.state }
         |> initial
@@ -56,4 +56,4 @@ subscriptions : State -> Sub Msg
 subscriptions _ = Sub.none
 
 loginForm : State -> Html Msg
-loginForm state = Html.map FormMsg (FormState.view state.login)
+loginForm { login } = Html.map FormMsg (FormState.view login)
