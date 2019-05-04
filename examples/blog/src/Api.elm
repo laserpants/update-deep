@@ -1,7 +1,7 @@
 module Api exposing (..)
 
 import Http exposing (emptyBody)
-import Json.Decode as Json exposing (Decoder)
+import Json.Decode as Json exposing (Decoder, Value)
 import Update.Deep exposing (..)
 import Util exposing (const)
 
@@ -74,3 +74,6 @@ update events msg state =
     Reset ->
       state
         |> setResource NotRequested
+
+jsonRequest : Value -> Msg a
+jsonRequest = Request << Just << Http.jsonBody

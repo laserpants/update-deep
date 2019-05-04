@@ -8,30 +8,44 @@ import FormState exposing (..)
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (..)
+import Http
 import Json.Decode as Json
 import Update.Deep exposing (..)
 import Url exposing (Url)
 
 type Msg
   = ApiPostsMsg (Api.Msg (List Post))
+  | ApiCreatePostMsg (Api.Msg Post)
   | FormMsg (FormState.Msg Form)
   | FetchPosts
 
 type alias State =
   { collection : Api (List Post)
+  , post       : Api Post
   , form       : FormState Form }
 
 init : Config -> Init State Msg
 init { flags } =
-  let form = FormState.init PostsForm.fields { title = "", body = "" }
+  let form       = FormState.init PostsForm.fields { title = "", body = "" }
+      post       = Api.init { endpoint = flags.api ++ "/posts"
+                            , method   = Api.Post
+                            , decoder  = Json.field "post" Data.Post.decoder }
       collection = Api.init { endpoint = flags.api ++ "/posts"
                             , method   = Get
                             , decoder  = Json.field "posts" (Json.list Data.Post.decoder) }
    in { collection = collection.state
+      , post       = post.state
       , form       = form.state }
         |> initial
         |> initCmd ApiPostsMsg collection
+        |> initCmd ApiCreatePostMsg post
         |> initCmd FormMsg form
+
+sendCreatePostRequest : Json.Value -> State -> Update State Msg a
+sendCreatePostRequest json = update (ApiCreatePostMsg (Api.jsonRequest json))
+
+resetCreatePostForm : State -> Update State Msg a
+resetCreatePostForm = update (FormMsg (FormState.Reset))
 
 update : Msg -> State -> Update State Msg a
 update msg state =
@@ -42,9 +56,17 @@ update msg state =
         |> andThen (\posts -> save { state | collection = posts })
         |> mapCmd ApiPostsMsg
         |> consumeEvents
+    ApiCreatePostMsg apiMsg ->
+      state.post
+        |> Api.update { onSuccess = resetCreatePostForm
+                      , onError   = \error -> resetCreatePostForm }
+                      apiMsg
+        |> andThen (\post -> save { state | post = post })
+        |> mapCmd ApiCreatePostMsg
+        |> consumeEvents
     FormMsg formMsg ->
       state.form
-        |> FormState.update { onSubmit = \form -> save } formMsg
+        |> FormState.update { onSubmit = \form -> sendCreatePostRequest (PostsForm.toJson form) } formMsg
         |> andThen (\form -> save { state | form = form })
         |> mapCmd FormMsg
         |> consumeEvents

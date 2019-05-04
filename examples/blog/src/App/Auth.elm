@@ -25,10 +25,10 @@ type alias State =
 
 init : Config -> Init State Msg
 init { flags } =
-  let user = Api.init { endpoint = flags.api ++ "/auth/login"
-                      , method   = Post
-                      , decoder  = Json.field "user" User.decoder }
-      login = FormState.init LoginForm.fields { login = "", password = "" }
+  let user         = Api.init { endpoint = flags.api ++ "/auth/login"
+                              , method   = Post
+                              , decoder  = Json.field "user" User.decoder }
+      login        = FormState.init LoginForm.fields { login = "", password = "" }
       registration = FormState.init RegistrationForm.fields { login = "", password = "" }
    in { user         = user.state
       , login        = login.state
@@ -39,9 +39,7 @@ init { flags } =
         |> initCmd RegistrationFormMsg registration
 
 sendAuthRequest : Json.Value -> State -> Update State Msg a
-sendAuthRequest json =
-  let request = Api.Request (Just (Http.jsonBody json))
-   in update (ApiUserMsg request)
+sendAuthRequest json = update (ApiUserMsg (Api.jsonRequest json))
 
 resetLoginForm : State -> Update State Msg a
 resetLoginForm = update (LoginFormMsg FormState.Reset)
@@ -51,7 +49,9 @@ update msg state =
   case msg of
     ApiUserMsg apiMsg ->
       state.user
-        |> Api.update { onSuccess = resetLoginForm, onError = \error -> resetLoginForm } apiMsg
+        |> Api.update { onSuccess = resetLoginForm
+                      , onError   = \error -> resetLoginForm }
+                      apiMsg
         |> andThen (\user -> save { state | user = user })
         |> mapCmd ApiUserMsg
         |> consumeEvents

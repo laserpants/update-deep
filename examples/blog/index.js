@@ -34,6 +34,8 @@ var posts =
   }
 ];
 
+var postsId = 1;
+
 xhook.before(function(request, callback) {
 
   if (request.url.endsWith('auth/login') && 'POST' === request.method) {
@@ -59,14 +61,28 @@ xhook.before(function(request, callback) {
         });
       }
     }, 800);
-  } else if (request.url.endsWith('posts') && 'GET' === request.method) {
-    setTimeout(function() {
-      callback({
-        status: 200,
-        data: JSON.stringify({ posts: posts }),
-        headers: { 'Content-Type': 'application/json' }
-      });
-    }, 800);
+  } else if (request.url.endsWith('posts')) {
+    if ('GET' === request.method) {
+      setTimeout(function() {
+        callback({
+          status: 200,
+          data: JSON.stringify({ posts: posts }),
+          headers: { 'Content-Type': 'application/json' }
+        });
+      }, 800);
+    } else if ('POST' === request.method) {
+      setTimeout(function() {
+        var post = JSON.parse(request.body);
+        post.id = ++postsId;
+        post.comments = [];
+        posts.push(post);
+        callback({
+          status: 200,
+          data: JSON.stringify({ post: post }),
+          headers: { 'Content-Type': 'application/json' }
+        });
+      }, 800);
+    }
   } else {
 
     callback();
