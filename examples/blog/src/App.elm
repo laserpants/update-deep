@@ -80,6 +80,8 @@ pageOutlet { auth, router } =
   case router.route of
     Just Login ->
       Html.map AuthMsg (Auth.loginForm auth)
+    Just Register ->
+      Html.map AuthMsg (Auth.registrationForm auth)
     _ ->
       div [] [ text (Debug.toString router.route) ]
 

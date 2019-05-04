@@ -2,6 +2,7 @@ module App.Auth exposing (..)
 
 import Api exposing (Api, HttpMethod(..))
 import App.Auth.LoginForm as LoginForm exposing (LoginForm)
+import App.Auth.RegistrationForm as RegistrationForm exposing (RegistrationForm)
 import App.Config exposing (..)
 import Data.User as User exposing (User)
 import FormState exposing (..)
@@ -14,11 +15,13 @@ import Update.Deep exposing (..)
 
 type Msg
   = ApiUserMsg (Api.Msg User)
-  | FormMsg (FormState.Msg LoginForm)
+  | LoginFormMsg (FormState.Msg LoginForm)
+  | RegistrationFormMsg (FormState.Msg RegistrationForm)
 
 type alias State =
-  { user  : Api User
-  , login : FormState LoginForm }
+  { user         : Api User
+  , login        : FormState LoginForm
+  , registration : FormState RegistrationForm }
 
 init : Config -> Init State Msg
 init { flags } =
@@ -26,11 +29,14 @@ init { flags } =
                       , method   = Post
                       , decoder  = Json.field "user" User.decoder }
       login = FormState.init LoginForm.fields { login = "", password = "" }
-   in { user  = user.state
-      , login = login.state }
+      registration = FormState.init RegistrationForm.fields { login = "", password = "" }
+   in { user         = user.state
+      , login        = login.state
+      , registration = registration.state }
         |> initial
         |> initCmd ApiUserMsg user
-        |> initCmd FormMsg login
+        |> initCmd LoginFormMsg login
+        |> initCmd RegistrationFormMsg registration
 
 sendAuthRequest : Json.Value -> State -> Update State Msg a
 sendAuthRequest json =
@@ -45,15 +51,24 @@ update msg state =
         |> Api.update apiMsg
         |> andThen (\user -> save { state | user = user })
         |> mapCmd ApiUserMsg
-    FormMsg formMsg ->
+    LoginFormMsg formMsg ->
       state.login
         |> FormState.update { onSubmit = \form -> sendAuthRequest (LoginForm.toJson form) } formMsg
         |> andThen (\form -> save { state | login = form })
-        |> mapCmd FormMsg
+        |> mapCmd LoginFormMsg
+        |> consumeEvents
+    RegistrationFormMsg formMsg ->
+      state.registration
+        |> FormState.update { onSubmit = \form -> sendAuthRequest (RegistrationForm.toJson form) } formMsg
+        |> andThen (\form -> save { state | registration = form })
+        |> mapCmd RegistrationFormMsg
         |> consumeEvents
 
 subscriptions : State -> Sub Msg
 subscriptions _ = Sub.none
 
 loginForm : State -> Html Msg
-loginForm { login } = Html.map FormMsg (FormState.view login)
+loginForm { login } = Html.map LoginFormMsg (FormState.view login)
+
+registrationForm : State -> Html Msg
+registrationForm { registration } = Html.map RegistrationFormMsg (FormState.view registration)
