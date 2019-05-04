@@ -20,7 +20,7 @@ type alias State =
 
 init : Config -> Init State Msg
 init config =
-  { route = Nothing 
+  { route = fromUrl config.url
   , key   = config.key }
     |> initial
 

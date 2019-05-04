@@ -28,7 +28,7 @@ type alias State =
 
 init : Flags -> Url -> Navigation.Key -> Init State Msg
 init flags url key =
-  let config = { flags = flags, key = key }
+  let config = { flags = flags, url = url, key = key }
       auth   = Auth.init config
       posts  = Posts.init config
       router = Router.init config
@@ -84,10 +84,17 @@ pageOutlet { auth, posts, router } =
       Html.map AuthMsg (Auth.registrationForm auth)
     Just NewPost ->
       Html.map PostsMsg (Posts.formView posts)
+    Just Home ->
+      Html.map PostsMsg (Posts.listView posts)
     Just About ->
       div [] [ text "About" ]
+    Just (ShowPost id) ->
+      div [] []
+    Just (NewComment postId) ->
+      div [] []
     _ ->
-      div [] [ hr [] [], text (Debug.toString router.route) ]
+      div [] [ hr [] []
+             , text (Debug.toString router.route) ]
 
 view : State -> Document Msg
 view state =

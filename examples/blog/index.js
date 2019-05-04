@@ -24,6 +24,16 @@ var users =
   }
 ];
 
+var posts =
+[
+  {
+    id: 1,
+    title: '1',
+    body: 'hello',
+    comments: []
+  }
+];
+
 xhook.before(function(request, callback) {
 
   if (request.url.endsWith('auth/login') && 'POST' === request.method) {
@@ -48,6 +58,14 @@ xhook.before(function(request, callback) {
           headers: { 'Content-Type': 'application/json' }
         });
       }
+    }, 800);
+  } else if (request.url.endsWith('posts') && 'GET' === request.method) {
+    setTimeout(function() {
+      callback({
+        status: 200,
+        data: JSON.stringify({ posts: posts }),
+        headers: { 'Content-Type': 'application/json' }
+      });
     }, 800);
   } else {
 
