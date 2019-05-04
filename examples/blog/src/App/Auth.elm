@@ -43,14 +43,18 @@ sendAuthRequest json =
   let request = Api.Request (Just (Http.jsonBody json))
    in update (ApiUserMsg request)
 
+resetLoginForm : State -> Update State Msg a
+resetLoginForm = update (LoginFormMsg FormState.Reset)
+
 update : Msg -> State -> Update State Msg a
 update msg state =
   case msg of
     ApiUserMsg apiMsg ->
       state.user
-        |> Api.update apiMsg
+        |> Api.update { onSuccess = resetLoginForm, onError = \error -> resetLoginForm } apiMsg
         |> andThen (\user -> save { state | user = user })
         |> mapCmd ApiUserMsg
+        |> consumeEvents
     LoginFormMsg formMsg ->
       state.login
         |> FormState.update { onSubmit = \form -> sendAuthRequest (LoginForm.toJson form) } formMsg

@@ -76,14 +76,18 @@ subscriptions state =
     , Sub.map UiMsg (Ui.subscriptions state.ui) ]
 
 pageOutlet : State -> Html Msg
-pageOutlet { auth, router } =
+pageOutlet { auth, posts, router } =
   case router.route of
     Just Login ->
       Html.map AuthMsg (Auth.loginForm auth)
     Just Register ->
       Html.map AuthMsg (Auth.registrationForm auth)
+    Just NewPost ->
+      Html.map PostsMsg (Posts.formView posts)
+    Just About ->
+      div [] [ text "About" ]
     _ ->
-      div [] [ text (Debug.toString router.route) ]
+      div [] [ hr [] [], text (Debug.toString router.route) ]
 
 view : State -> Document Msg
 view state =

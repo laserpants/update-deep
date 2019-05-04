@@ -53,8 +53,8 @@ init config =
   , request  = initRequest config }
     |> initial
 
-update : Msg a -> Api a -> Update (Api a) (Msg a) b
-update msg state =
+update : { t | onSuccess : a -> Update a c e, onError : Http.Error -> a -> Update a c e } -> Msg b -> Api b -> Update (Api b) (Msg b) (a -> Update a c e)
+update events msg state =
   case msg of
     Request maybeBody ->
       state
@@ -62,13 +62,15 @@ update msg state =
         |> andRunCmd (state.request maybeBody)
     SimpleRequest ->
       state
-        |> update (Request Nothing)
+        |> update events (Request Nothing)
     Response (Ok response) ->
       state
         |> setResource (Available response)
+        |> andInvoke events.onSuccess
     Response (Err error) ->
       state
         |> setResource (Error error)
+        |> andInvoke (events.onError error)
     Reset ->
       state
         |> setResource NotRequested
