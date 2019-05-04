@@ -1,4 +1,4 @@
-module LoginForm exposing (..)
+module App.Auth.LoginForm exposing (..)
 
 import Form exposing (Form)
 import FormState exposing (..)

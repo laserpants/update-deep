@@ -1,6 +1,7 @@
 module App.Auth exposing (..)
 
 import Api exposing (Api, HttpMethod(..))
+import App.Auth.LoginForm as LoginForm exposing (LoginForm)
 import App.Config exposing (..)
 import Data.User as User exposing (User)
 import FormState exposing (..)
@@ -9,7 +10,6 @@ import Html.Attributes exposing (..)
 import Html.Events exposing (..)
 import Http
 import Json.Decode as Json
-import LoginForm exposing (LoginForm)
 import Update.Deep exposing (..)
 
 type Msg
