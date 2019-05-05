@@ -29,12 +29,12 @@ update msg state =
     LoginMsg loginMsg ->
       state.loginPage
         |> LoginPage.update loginMsg
-        |> andThen (\loginPage -> save { state | loginPage = loginPage })
+        |> andThen (\page -> save { state | loginPage = page })
         |> mapCmd LoginMsg
     RegisterMsg registerMsg ->
       state.registerPage
         |> RegisterPage.update registerMsg
-        |> andThen (\registerPage -> save { state | registerPage = registerPage })
+        |> andThen (\page -> save { state | registerPage = page })
         |> mapCmd RegisterMsg
 
 subscriptions : State -> Sub Msg

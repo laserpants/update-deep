@@ -56,17 +56,19 @@ init flags url key =
 onRouteChange : Maybe Route -> State -> Update State Msg a
 onRouteChange route state =
   case route of
-    Just Home ->
-      state
-        |> update (PostsMsg (Posts.fetchCollectionMsg))
-    Just (ShowPost id) ->
-      state
-        |> update (PostsMsg (Posts.fetchPostMsg id))
-    Just (NewComment postId) ->
-      state
-        |> update (PostsMsg (Posts.fetchPostMsg postId))
     _ ->
       save state
+--    Just Home ->
+--      state
+--        |> update (PostsMsg (Posts.fetchCollectionMsg))
+--    Just (ShowPost id) ->
+--      state
+--        |> update (PostsMsg (Posts.fetchPostMsg id))
+--    Just (NewComment postId) ->
+--      state
+--        |> update (PostsMsg (Posts.fetchPostMsg postId))
+--    _ ->
+--      save state
 
 update : Msg -> State -> Update State Msg a
 update msg state =
@@ -109,15 +111,19 @@ pageOutlet { auth, posts, router } =
     Just Register ->
       Html.map (AuthMsg << Auth.RegisterMsg) (App.Auth.Register.Page.view auth.registerPage)
     Just NewPost ->
-      Html.map PostsMsg (Posts.formView posts)
+      div [] []
+--      Html.map PostsMsg (Posts.formView posts)
     Just Home ->
-      Html.map PostsMsg (Posts.listView posts)
+      div [] []
+--      Html.map PostsMsg (Posts.listView posts)
     Just (ShowPost id) ->
-      Html.map PostsMsg (Posts.itemView posts)
+      div [] []
+--      Html.map PostsMsg (Posts.itemView posts)
     Just About ->
       div [] [ text "About" ]
     Just (NewComment postId) ->
-      Html.map PostsMsg (Posts.addCommentView posts)
+      div [] []
+--      Html.map PostsMsg (Posts.addCommentView posts)
     Nothing ->
       div [] [ text "Don't know that page" ]
 
