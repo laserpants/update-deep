@@ -10,14 +10,19 @@ The application consists of the following modules:
           │    └────────────┘    │          |   ┌─────────────────┐
  ┌─────── ▼ ───────┐       ┌──── ▼ ────┐    |   │  Data.TodoItem  │
  │  Notifications  │       │   Todos   │    |   └─────────────────┘
- └─────────────────┘       └─────┬─────┘    |   ┌────────┐
-                                 │          |   │  Util  │
-                         ┌────── ▼ ─────┐   |   └────────┘
+ └─────────────────┘       └─────┬─────┘    |             
+                                 │          |             
+                         ┌────── ▼ ─────┐   |             
                          │  Todos.Form  │   |
                          └──────────────┘   |
 ```
 
-The two modules on the right are auxiliary. In `Data.TodoItem`, we define the `TodoItem` type; and `Util` contains a few helper functions, like `flip` and `const`.
+The `Data.TodoItem` module defines the `TodoItem` type:
+
+```elm
+type alias TodoItem = { text : String }
+```
+
 In the following, we are mostly concerned with the four modules on the left side of the diagram; `Main`, `Notifications`, `Todos`, and `Todos.Form`.
 Each one of these specifies its own `Msg` and `State` type, as well as `update` and `init` functions.
 Most of this is implemented as usual, but the return types of `update` and `init` are a bit different, and `update` takes an extra `EventHandlers` argument:
