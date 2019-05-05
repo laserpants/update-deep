@@ -16,29 +16,37 @@ import Url exposing (Url)
 type Msg
   = ApiPostsMsg (Api.Msg (List Post))
   | ApiCreatePostMsg (Api.Msg Post)
+  | ApiFetchPostMsg (Api.Msg Post)
   | FormMsg (FormState.Msg Form)
   | FetchPosts
 
 type alias State =
   { collection : Api (List Post)
-  , post       : Api Post
+  , postCreate : Api Post
+  , postFetch  : Api Post
   , form       : FormState Form }
 
 init : Config -> Init State Msg
 init { flags } =
-  let form       = FormState.init PostsForm.fields { title = "", body = "" }
-      post       = Api.init { endpoint = flags.api ++ "/posts"
-                            , method   = Api.Post
+  let endpoint   = flags.api ++ "/posts"
+      form       = FormState.init PostsForm.fields { title = "", body = "" }
+      postCreate = Api.init { endpoint = endpoint
+                            , method   = HttpPost
                             , decoder  = Json.field "post" Data.Post.decoder }
-      collection = Api.init { endpoint = flags.api ++ "/posts"
-                            , method   = Get
+      postFetch  = Api.init { endpoint = endpoint
+                            , method   = HttpGet
+                            , decoder  = Json.field "post" Data.Post.decoder }
+      collection = Api.init { endpoint = endpoint
+                            , method   = HttpGet
                             , decoder  = Json.field "posts" (Json.list Data.Post.decoder) }
    in { collection = collection.state
-      , post       = post.state
+      , postCreate = postCreate.state
+      , postFetch  = postFetch.state
       , form       = form.state }
         |> initial
         |> initCmd ApiPostsMsg collection
-        |> initCmd ApiCreatePostMsg post
+        |> initCmd ApiCreatePostMsg postCreate
+        |> initCmd ApiFetchPostMsg postFetch
         |> initCmd FormMsg form
 
 sendCreatePostRequest : Json.Value -> State -> Update State Msg a
@@ -46,6 +54,12 @@ sendCreatePostRequest json = update (ApiCreatePostMsg (Api.jsonRequest json))
 
 resetCreatePostForm : State -> Update State Msg a
 resetCreatePostForm = update (FormMsg (FormState.Reset))
+
+fetchCollectionMsg : Msg
+fetchCollectionMsg = ApiPostsMsg (Api.Request Nothing)
+
+fetchPostMsg : Int -> Msg
+fetchPostMsg id = ApiFetchPostMsg (Api.RequestResource ("/" ++ String.fromInt id) Nothing)
 
 update : Msg -> State -> Update State Msg a
 update msg state =
@@ -57,12 +71,17 @@ update msg state =
         |> mapCmd ApiPostsMsg
         |> consumeEvents
     ApiCreatePostMsg apiMsg ->
-      state.post
+      state.postCreate
         |> Api.update { onSuccess = resetCreatePostForm
-                      , onError   = \error -> resetCreatePostForm }
-                      apiMsg
-        |> andThen (\post -> save { state | post = post })
+                      , onError   = \error -> resetCreatePostForm } apiMsg
+        |> andThen (\post -> save { state | postCreate = post })
         |> mapCmd ApiCreatePostMsg
+        |> consumeEvents
+    ApiFetchPostMsg apiMsg ->
+      state.postFetch
+        |> Api.update { onSuccess = save, onError = \error -> save } apiMsg
+        |> andThen (\post -> save { state | postFetch = post })
+        |> mapCmd ApiFetchPostMsg
         |> consumeEvents
     FormMsg formMsg ->
       state.form
@@ -72,7 +91,7 @@ update msg state =
         |> consumeEvents
     FetchPosts ->
       state
-        |> update (ApiPostsMsg Api.SimpleRequest)
+        |> update (ApiPostsMsg (Api.Request Nothing))
 
 subscriptions : State -> Sub Msg
 subscriptions _ = Sub.none
@@ -82,10 +101,13 @@ formView { form } = Html.map FormMsg (FormState.view form)
 
 postView : Post -> Html Msg
 postView { id, title, body } =
-  div []
+  let postUrl = "posts/" ++ String.fromInt id
+   in div []
     [ h2 [] [ text title ]
     , p [] [ text body ]
-    , a [ href ("posts/" ++ String.fromInt id ++ "/comments/new") ]
+    , a [ href postUrl ] [ text "Show" ]
+    , text " | "
+    , a [ href (postUrl ++ "/comments/new") ]
         [ text "Comment" ] ]
 
 listView : State -> Html Msg
@@ -95,8 +117,24 @@ listView { collection } =
       div [] [ text "Not requested"
              , button [ onClick FetchPosts ] [ text "Fetch" ] ]
     Requested ->
-      div [] [ text "Requested" ]
+      div [] [ text "Requested..." ]
     Error error ->
       div [] [ text "Error" ]
     Available posts ->
       div [] (List.map postView posts)
+
+itemView : State -> Html Msg
+itemView { postFetch } =
+  case postFetch.resource of
+    NotRequested ->
+      div [] [ text "Not requested" ]
+    Requested ->
+      div [] [ text "Fetching..." ]
+    Error (Http.BadStatus 404) ->
+      div [] [ text "That post was not found" ]
+    Error error ->
+      div [] [ text "Error", text (Debug.toString error) ]
+    Available post ->
+      div []
+        [ div [] [ text "Post item" ]
+        , div [] [ a [ href ("/posts/" ++ String.fromInt post.id ++ "/comments/new") ] [ text "Comment" ] ] ]

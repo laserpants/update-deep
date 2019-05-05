@@ -19,16 +19,19 @@ type alias State =
   , key   : Navigation.Key }
 
 init : Config -> Init State Msg
-init config =
-  { route = fromUrl config.url
-  , key   = config.key }
+init { key } =
+  { route = Nothing
+  , key   = key }
     |> initial
 
-update : Msg -> State -> Update State Msg a
-update msg state =
+update : { onRouteChange : Maybe Route -> a -> Update a c e } -> Msg -> State -> Update State Msg (a -> Update a c e)
+update events msg state =
   case msg of
     UrlChange url ->
-      save { state | route = fromUrl url }
+      let route = fromUrl url
+       in { state | route = route }
+        |> save
+        |> andInvoke (events.onRouteChange route)
     UrlRequest urlRequest ->
       case urlRequest of
         Browser.Internal url ->

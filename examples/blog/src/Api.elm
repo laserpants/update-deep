@@ -7,7 +7,7 @@ import Util exposing (const)
 
 type Msg a
   = Request (Maybe Http.Body)
-  | SimpleRequest
+  | RequestResource String (Maybe Http.Body)
   | Response (Result Http.Error a)
   | Reset
 
@@ -17,7 +17,7 @@ type Resource a
   | Error Http.Error
   | Available a
 
-type alias Request a = Maybe Http.Body -> Cmd (Msg a)
+type alias Request a = String -> Maybe Http.Body -> Cmd (Msg a)
 
 type alias Api a =
   { resource : Resource a
@@ -27,8 +27,8 @@ setResource : Resource a -> Api a -> Update (Api a) (Msg a) e
 setResource resource state = save { state | resource = resource }
 
 type HttpMethod
-  = Get
-  | Post
+  = HttpGet
+  | HttpPost
 
 type alias RequestConfig a =
   { endpoint : String
@@ -36,15 +36,18 @@ type alias RequestConfig a =
   , decoder  : Json.Decoder a }
 
 initRequest : RequestConfig a -> Request a
-initRequest { endpoint, method, decoder } body =
-  let jsonResponse = Http.expectJson Response
+initRequest { endpoint, method, decoder } suffix body =
+  let expect = Http.expectJson Response decoder
+      url = endpoint ++ suffix
    in case method of
-        Get ->
-          Http.get { url = endpoint, expect = jsonResponse decoder }
-        Post ->
+        HttpGet ->
+          Http.get
+            { url    = url
+            , expect = expect }
+        HttpPost ->
           Http.post
-            { url    = endpoint
-            , expect = jsonResponse decoder
+            { url    = url
+            , expect = expect
             , body   = Maybe.withDefault emptyBody body }
 
 init : RequestConfig a -> Init (Api a) (Msg a)
@@ -58,11 +61,11 @@ update events msg state =
   case msg of
     Request maybeBody ->
       state
-        |> setResource Requested
-        |> andRunCmd (state.request maybeBody)
-    SimpleRequest ->
+        |> update events (RequestResource "" maybeBody)
+    RequestResource endpoint maybeBody ->
       state
-        |> update events (Request Nothing)
+        |> setResource Requested
+        |> andRunCmd (state.request endpoint maybeBody)
     Response (Ok response) ->
       state
         |> setResource (Available response)

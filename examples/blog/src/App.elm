@@ -26,6 +26,13 @@ type alias State =
   , router : Router.State
   , ui     : Ui.State }
 
+initUrl : Url -> Init State Msg -> Init State Msg
+initUrl url initState =
+  let msg = RouterMsg (Router.UrlChange url)
+   in initToUpdate initState
+    |> andThen (update msg)
+    |> updateToInit
+
 init : Flags -> Url -> Navigation.Key -> Init State Msg
 init flags url key =
   let config = { flags = flags, url = url, key = key }
@@ -42,6 +49,19 @@ init flags url key =
         |> initCmd PostsMsg posts
         |> initCmd RouterMsg router
         |> initCmd UiMsg ui
+        |> initUrl url
+
+onRouteChange : Maybe Route -> State -> Update State Msg a
+onRouteChange route state =
+  case route of
+    Just Home ->
+      state
+        |> update (PostsMsg (Posts.fetchCollectionMsg))
+    Just (ShowPost id) ->
+      state
+        |> update (PostsMsg (Posts.fetchPostMsg id))
+    _ ->
+      save state
 
 update : Msg -> State -> Update State Msg a
 update msg state =
@@ -58,9 +78,10 @@ update msg state =
         |> mapCmd PostsMsg
     RouterMsg routerMsg ->
       state.router
-        |> Router.update routerMsg
+        |> Router.update { onRouteChange = onRouteChange } routerMsg
         |> andThen (\router -> save { state | router = router })
         |> mapCmd RouterMsg
+        |> consumeEvents
     UiMsg uiMsg ->
       state.ui
         |> Ui.update uiMsg
@@ -79,22 +100,21 @@ pageOutlet : State -> Html Msg
 pageOutlet { auth, posts, router } =
   case router.route of
     Just Login ->
-      Html.map AuthMsg (Auth.loginForm auth)
+      Html.map AuthMsg (Auth.loginFormView auth)
     Just Register ->
-      Html.map AuthMsg (Auth.registrationForm auth)
+      Html.map AuthMsg (Auth.registerFormView auth)
     Just NewPost ->
       Html.map PostsMsg (Posts.formView posts)
     Just Home ->
       Html.map PostsMsg (Posts.listView posts)
+    Just (ShowPost id) ->
+      Html.map PostsMsg (Posts.itemView posts)
     Just About ->
       div [] [ text "About" ]
-    Just (ShowPost id) ->
-      div [] []
     Just (NewComment postId) ->
       div [] []
-    _ ->
-      div [] [ hr [] []
-             , text (Debug.toString router.route) ]
+    Nothing ->
+      div [] [ text "Don't know that page" ]
 
 view : State -> Document Msg
 view state =
@@ -111,7 +131,7 @@ view state =
         , li [] [ a [ href "/posts/1/comments/new" ] [ text "New comment" ] ]
         , li [] [ a [ href "#" ] [ text "#" ] ]
         , pageOutlet state
-        , text (Debug.toString state)
+--        , text (Debug.toString state.posts)
         ]
       ]
     ]
