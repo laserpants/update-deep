@@ -20,8 +20,7 @@ type alias State =
 
 responseDecoder : Json.Decoder { status : String }
 responseDecoder =
-  field "status" Json.string
-    |> Json.map (\status -> { status = status })
+  field "status" Json.string |> Json.map (\status -> { status = status })
 
 init : Config -> Init State Msg
 init { flags } =
@@ -36,6 +35,34 @@ init { flags } =
         |> initial
         |> initCmd ApiMsg response
         |> initCmd FormMsg form
+
+onSubmit : RegisterForm -> State -> Update State Msg a
+onSubmit form =
+  RegisterForm.toJson form
+    |> Api.jsonRequest
+    |> ApiMsg
+    |> update
+
+update : Msg -> State -> Update State Msg a
+update msg state =
+  let resetForm = update (FormMsg FormState.Reset)
+      default = Api.defaultHandlers
+   in case msg of
+        ApiMsg apiMsg ->
+          state.response
+            |> Api.update { default | onSuccess = resetForm } apiMsg
+            |> andThen (\response -> save { state | response = response })
+            |> mapCmd ApiMsg
+            |> consumeEvents
+        FormMsg formMsg ->
+          state.form
+            |> FormState.update { onSubmit = onSubmit } formMsg
+            |> andThen (\form -> save { state | form = form })
+            |> mapCmd FormMsg
+            |> consumeEvents
+
+subscriptions : State -> Sub Msg
+subscriptions _ = Sub.none
 
 view : State -> Html Msg
 view state = div [] []

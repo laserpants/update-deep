@@ -1,6 +1,8 @@
 module App exposing (..)
 
 import App.Auth as Auth
+import App.Auth.Login.Page
+import App.Auth.Register.Page
 import App.Posts as Posts
 import App.Route exposing (..)
 import App.Router as Router
@@ -103,9 +105,9 @@ pageOutlet : State -> Html Msg
 pageOutlet { auth, posts, router } =
   case router.route of
     Just Login ->
-      Html.map AuthMsg (Auth.loginFormView auth)
+      Html.map (AuthMsg << Auth.LoginMsg) (App.Auth.Login.Page.view auth.loginPage)
     Just Register ->
-      Html.map AuthMsg (Auth.registerFormView auth)
+      Html.map (AuthMsg << Auth.RegisterMsg) (App.Auth.Register.Page.view auth.registerPage)
     Just NewPost ->
       Html.map PostsMsg (Posts.formView posts)
     Just Home ->
