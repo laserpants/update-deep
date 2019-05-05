@@ -7,6 +7,7 @@ import App.Comments.Page
 import App.Posts as Posts
 import App.Posts.Create.Page
 import App.Posts.Item.Page
+import App.Posts.Item.Page
 import App.Posts.List.Page
 import App.Route exposing (..)
 import App.Router as Router
@@ -123,7 +124,7 @@ pageOutlet { auth, posts, router } =
     Just About ->
       div [] [ text "About" ]
     Just (NewComment postId) ->
-      Html.map (PostsMsg << Posts.CommentsMsg) (App.Comments.Page.view posts.commentsPage)
+      Html.map (PostsMsg << Posts.ItemMsg << App.Posts.Item.Page.CommentsMsg) (App.Comments.Page.view posts.itemPage.commentsPage)
     Nothing ->
       div [] [ text "Don't know that page" ]
 

@@ -1,6 +1,7 @@
 module App.Posts.Item.Page exposing (..)
 
 import Api exposing (Api, HttpMethod(..))
+import App.Comments.Page as CommentsPage
 import App.Config exposing (..)
 import Data.Post exposing (Post)
 import Html exposing (..)
@@ -11,19 +12,23 @@ import Update.Deep exposing (..)
 
 type Msg
   = ApiMsg (Api.Msg Post)
+  | CommentsMsg CommentsPage.Msg
 
 type alias State =
-  { item : Api Post }
+  { item         : Api Post
+  , commentsPage : CommentsPage.State }
 
 init : Config -> Init State Msg
-init { flags } =
-  let item = Api.init { endpoint = flags.api ++ "/posts"
+init config =
+  let item = Api.init { endpoint = config.flags.api ++ "/posts"
                       , method   = HttpGet
                       , decoder  = Json.field "post" Data.Post.decoder }
-
-   in { item = item.state }
+      commentsPage = CommentsPage.init config
+   in { item         = item.state
+      , commentsPage = commentsPage.state }
         |> initial
         |> initCmd ApiMsg item
+        |> initCmd CommentsMsg commentsPage
 
 update : Msg -> State -> Update State Msg a
 update msg state =
@@ -34,9 +39,15 @@ update msg state =
         |> andThen (\item -> save { state | item = item })
         |> mapCmd ApiMsg
         |> consumeEvents
+    CommentsMsg commentsPageMsg ->
+      state.commentsPage
+        |> CommentsPage.update commentsPageMsg
+        |> andThen (\page -> save { state | commentsPage = page })
+        |> mapCmd CommentsMsg
 
 subscriptions : State -> Sub Msg
-subscriptions _ = Sub.none
+subscriptions { commentsPage } =
+  Sub.map CommentsMsg (CommentsPage.subscriptions commentsPage)
 
 view : State -> Html Msg
 view { item } = div [] []

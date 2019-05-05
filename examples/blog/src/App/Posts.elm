@@ -1,6 +1,5 @@
 module App.Posts exposing (..)
 
-import App.Comments.Page as CommentsPage
 import App.Config exposing (..)
 import App.Posts.Create.Page as CreatePage
 import App.Posts.Item.Page as ItemPage
@@ -11,29 +10,24 @@ type Msg
   = ListMsg ListPage.Msg
   | CreateMsg CreatePage.Msg
   | ItemMsg ItemPage.Msg
-  | CommentsMsg CommentsPage.Msg
 
 type alias State =
   { listPage     : ListPage.State
   , createPage   : CreatePage.State
-  , itemPage     : ItemPage.State
-  , commentsPage : CommentsPage.State }
+  , itemPage     : ItemPage.State }
 
 init : Config -> Init State Msg
 init config =
   let listPage     = ListPage.init config
       createPage   = CreatePage.init config
       itemPage     = ItemPage.init config
-      commentsPage = CommentsPage.init config
    in { listPage     = listPage.state
       , createPage   = createPage.state
-      , itemPage     = itemPage.state
-      , commentsPage = commentsPage.state }
+      , itemPage     = itemPage.state }
         |> initial
         |> initCmd ListMsg listPage
         |> initCmd CreateMsg createPage
         |> initCmd ItemMsg itemPage
-        |> initCmd CommentsMsg commentsPage
 
 update : Msg -> State -> Update State Msg a
 update msg state =
@@ -53,19 +47,13 @@ update msg state =
         |> ItemPage.update itemPageMsg
         |> andThen (\page -> save { state | itemPage = page })
         |> mapCmd ItemMsg
-    CommentsMsg commentsPageMsg ->
-      state.commentsPage
-        |> CommentsPage.update commentsPageMsg
-        |> andThen (\page -> save { state | commentsPage = page })
-        |> mapCmd CommentsMsg
 
 subscriptions : State -> Sub Msg
-subscriptions { listPage, createPage, itemPage, commentsPage } =
+subscriptions { listPage, createPage, itemPage } =
   Sub.batch
     [ Sub.map ListMsg (ListPage.subscriptions listPage)
     , Sub.map CreateMsg (CreatePage.subscriptions createPage)
-    , Sub.map ItemMsg (ItemPage.subscriptions itemPage)
-    , Sub.map CommentsMsg (CommentsPage.subscriptions commentsPage) ]
+    , Sub.map ItemMsg (ItemPage.subscriptions itemPage) ]
 
 --formView : State -> Html Msg
 --formView { form } = Html.map FormMsg (FormState.view form)
