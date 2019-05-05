@@ -6,20 +6,20 @@ The application consists of the following modules:
 
 ```
                ┌────────────┐               |
-          ┌────│    Main    │────┐          |   
+          ┌────│    Main    │────┐          |
           │    └────────────┘    │          |   ┌─────────────────┐
  ┌─────── ▼ ───────┐       ┌──── ▼ ────┐    |   │  Data.TodoItem  │
  │  Notifications  │       │   Todos   │    |   └─────────────────┘
- └─────────────────┘       └─────┬─────┘    |   ┌────────┐     
+ └─────────────────┘       └─────┬─────┘    |   ┌────────┐
                                  │          |   │  Util  │
                          ┌────── ▼ ─────┐   |   └────────┘
-                         │  Todos.Form  │   | 
-                         └──────────────┘   |  
+                         │  Todos.Form  │   |
+                         └──────────────┘   |
 ```
 
-In `Data.TodoItem`, we just define the `TodoItem` type; and `Util` contains a few helper functions, like `flip` and `const`. 
-In the following, we are mostly concerned with the four modules on the left side of the diagram; `Main`, `Notifications`, `Todos`, and `Todos.Form`. 
-Each one of these specifies its own `Msg` and `State` type, as well as `update` and `init` functions. 
+The two modules on the right are auxiliary. In `Data.TodoItem`, we define the `TodoItem` type; and `Util` contains a few helper functions, like `flip` and `const`.
+In the following, we are mostly concerned with the four modules on the left side of the diagram; `Main`, `Notifications`, `Todos`, and `Todos.Form`.
+Each one of these specifies its own `Msg` and `State` type, as well as `update` and `init` functions.
 Most of this is implemented as usual, but the return types of `update` and `init` are a bit different, and `update` takes an extra `EventHandlers` argument:
 
 ```elm
@@ -32,16 +32,16 @@ init : Flags -> Init State Msg
 
 > Note that *state* is used here to refer to (what the Elm architecture calls) a *model*, and that these two terms are used more or less interchangeably in the following.
 
-As usual, messages move down in the update tree. To pass information in the opposite direction, this library introduces a simple, callback-based event handling mechanism. 
+As usual, messages move down in the update tree. To pass information in the opposite direction, this library introduces a simple, callback-based event handling mechanism.
 In this example, there are three event handlers involved:
 
 ```
                ┌────────────┐
-               │    Main    │      
-               └── ▲ ─ ▲ ───┘      
-                   │   │                   
+               │    Main    │
+               └── ▲ ─ ▲ ───┘
+                   │   │
                    │   │--- onItemAdded
-     onTaskDone ---│   │               
+     onTaskDone ---│   │
                    │   │   ┌───────────┐
                    └───┴───│   Todos   │
                            └──── ▲ ────┘
@@ -88,9 +88,9 @@ update events msg state =
 
 ```
              ┌──────────┐
-             │          │ 
-          AddTodo       │ 
-             │          │ 
+             │          │
+          AddTodo       │
+             │          │
        ┌──── ▼ ────┐    │
        │   Todos   │────┘
        └──── ▲ ────┘
@@ -101,7 +101,7 @@ update events msg state =
 ```
 
 The subsequent lines are mostly boilerplate to insert the updated `Todos.Form` state back into the `Todo` model again, and to map the `FormMsg` constructor over the command value (so that it becomes a `Cmd Todos.Msg`).
-Calling the event handlers from within `Todos.Form` produces a list of monadic functions, which is what the third type parameter in `Update` is for. 
+Calling the event handlers from within `Todos.Form` produces a list of monadic functions, which is what the third type parameter in `Update` is for.
 We then use `consumeEvents` to apply these actions in the context of `State.update`.
 
 ```elm
