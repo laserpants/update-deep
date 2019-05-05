@@ -60,6 +60,9 @@ onRouteChange route state =
     Just (ShowPost id) ->
       state
         |> update (PostsMsg (Posts.fetchPostMsg id))
+    Just (NewComment postId) ->
+      state
+        |> update (PostsMsg (Posts.fetchPostMsg postId))
     _ ->
       save state
 
@@ -112,7 +115,7 @@ pageOutlet { auth, posts, router } =
     Just About ->
       div [] [ text "About" ]
     Just (NewComment postId) ->
-      div [] []
+      Html.map PostsMsg (Posts.addCommentView posts)
     Nothing ->
       div [] [ text "Don't know that page" ]
 

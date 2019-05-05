@@ -60,7 +60,7 @@ xhook.before(function(request, callback) {
       setTimeout(function() {
         callback({
           status: 200,
-          data: JSON.stringify({ posts: posts }),
+          data: JSON.stringify({ posts: posts.slice().reverse() }),
           headers: { 'Content-Type': 'application/json' }
         });
       }, 800);

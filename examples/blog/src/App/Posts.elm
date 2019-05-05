@@ -66,7 +66,7 @@ update msg state =
   case msg of
     ApiPostsMsg apiMsg ->
       state.collection
-        |> Api.update { onSuccess = save, onError = \error -> save } apiMsg
+        |> Api.update Api.defaultHandlers apiMsg
         |> andThen (\posts -> save { state | collection = posts })
         |> mapCmd ApiPostsMsg
         |> consumeEvents
@@ -79,7 +79,7 @@ update msg state =
         |> consumeEvents
     ApiFetchPostMsg apiMsg ->
       state.postFetch
-        |> Api.update { onSuccess = save, onError = \error -> save } apiMsg
+        |> Api.update Api.defaultHandlers apiMsg
         |> andThen (\post -> save { state | postFetch = post })
         |> mapCmd ApiFetchPostMsg
         |> consumeEvents
@@ -138,3 +138,7 @@ itemView { postFetch } =
       div []
         [ div [] [ text "Post item" ]
         , div [] [ a [ href ("/posts/" ++ String.fromInt post.id ++ "/comments/new") ] [ text "Comment" ] ] ]
+
+addCommentView : State -> Html Msg
+addCommentView state =
+  div [] [ itemView state ]

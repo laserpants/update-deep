@@ -56,6 +56,9 @@ init config =
   , request  = initRequest config }
     |> initial
 
+defaultHandlers : { onSuccess : a -> Update a c e, onError : Http.Error -> a -> Update a c e }
+defaultHandlers = { onSuccess = save, onError = const save }
+
 update : { t | onSuccess : a -> Update a c e, onError : Http.Error -> a -> Update a c e } -> Msg b -> Api b -> Update (Api b) (Msg b) (a -> Update a c e)
 update events msg state =
   case msg of

@@ -6,6 +6,7 @@ import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (..)
 import Update.Deep exposing (..)
+import Util exposing (const)
 
 type Msg a
   = FormChanged (Form.View.Model a)
@@ -25,6 +26,9 @@ init form values =
     { model   = Form.View.idle values
     , form    = form
     , initial = values }
+
+defaultHandlers : { onSubmit : b -> a -> Update a c e }
+defaultHandlers = { onSubmit = const save }
 
 update : { t | onSubmit : b -> a -> Update a c e } -> Msg b -> FormState b -> Update (FormState b) (Msg b) (a -> Update a c e)
 update { onSubmit } msg state =
