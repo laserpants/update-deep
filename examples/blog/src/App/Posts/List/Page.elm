@@ -1,8 +1,11 @@
 module App.Posts.List.Page exposing (..)
 
-import Api exposing (Api, HttpMethod(..))
+import Api exposing (Api, HttpMethod(..), Resource(..))
 import App.Config exposing (..)
 import Data.Post exposing (Post)
+import Html exposing (..)
+import Html.Attributes exposing (..)
+import Html.Events exposing (..)
 import Json.Decode as Json
 import Update.Deep exposing (..)
 
@@ -33,3 +36,15 @@ update msg state =
 
 subscriptions : State -> Sub Msg
 subscriptions _ = Sub.none
+
+view : State -> Html Msg
+view { collection } =
+  case collection.resource of
+    NotRequested ->
+      div [] [ text "Not requested" ]
+    Requested ->
+      div [] [ text "Requested..." ]
+    Error error ->
+      div [] [ text "Error" ]
+    Available posts ->
+      div [] (List.map (\_ -> div [] [ text "item" ]) posts)

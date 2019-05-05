@@ -5,6 +5,9 @@ import App.Config exposing (..)
 import App.Posts.Create.Form as CreateForm exposing (Form)
 import Data.Post exposing (Post)
 import FormState exposing (..)
+import Html exposing (..)
+import Html.Attributes exposing (..)
+import Html.Events exposing (..)
 import Json.Decode as Json
 import Update.Deep exposing (..)
 
@@ -55,3 +58,6 @@ update msg state =
 
 subscriptions : State -> Sub Msg
 subscriptions _ = Sub.none
+
+view : State -> Html Msg
+view { form } = div [] []

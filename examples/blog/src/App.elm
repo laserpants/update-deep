@@ -4,6 +4,9 @@ import App.Auth as Auth
 import App.Auth.Login.Page
 import App.Auth.Register.Page
 import App.Posts as Posts
+import App.Posts.Create.Page
+import App.Posts.Item.Page
+import App.Posts.List.Page
 import App.Route exposing (..)
 import App.Router as Router
 import App.Ui as Ui
@@ -111,14 +114,11 @@ pageOutlet { auth, posts, router } =
     Just Register ->
       Html.map (AuthMsg << Auth.RegisterMsg) (App.Auth.Register.Page.view auth.registerPage)
     Just NewPost ->
-      div [] []
---      Html.map PostsMsg (Posts.formView posts)
+      Html.map (PostsMsg << Posts.CreateMsg) (App.Posts.Create.Page.view posts.createPage)
     Just Home ->
-      div [] []
---      Html.map PostsMsg (Posts.listView posts)
+      Html.map (PostsMsg << Posts.ListMsg) (App.Posts.List.Page.view posts.listPage)
     Just (ShowPost id) ->
-      div [] []
---      Html.map PostsMsg (Posts.itemView posts)
+      Html.map (PostsMsg << Posts.ItemMsg) (App.Posts.Item.Page.view posts.itemPage)
     Just About ->
       div [] [ text "About" ]
     Just (NewComment postId) ->
