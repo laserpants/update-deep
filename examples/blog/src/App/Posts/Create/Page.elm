@@ -60,4 +60,4 @@ subscriptions : State -> Sub Msg
 subscriptions _ = Sub.none
 
 view : State -> Html Msg
-view { form } = div [] []
+view { form } = Html.map FormMsg (FormState.view form)
