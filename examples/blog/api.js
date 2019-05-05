@@ -97,7 +97,7 @@ xhook.before(function(request, callback) {
         });
       }
     }, 800);
-  } else if (request.url.endsWith('comments') && 'POST' === request.method) {
+  } else if (/posts\/d+\/comments\/new$/.test(request.url) && 'POST' === request.method) {
 
     callback();
 
