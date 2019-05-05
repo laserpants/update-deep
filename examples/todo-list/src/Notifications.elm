@@ -7,7 +7,6 @@ import Process
 import Task
 import List exposing (isEmpty, length, reverse, take)
 import Update.Deep exposing (..)
-import Util exposing (const)
 
 type Msg
   = Add String
@@ -29,7 +28,7 @@ dismissAll state = save { state | list = [] }
 dismissAfterSeconds : Int -> State -> Update State Msg a
 dismissAfterSeconds n =
   let secs = toFloat n
-   in runCmd (Task.perform (const DismissOne) (Process.sleep (secs * 1000)))
+   in runCmd (Task.perform (always DismissOne) (Process.sleep (secs * 1000)))
 
 update : Msg -> State -> Update State Msg a
 update msg state =

@@ -1,4 +1,4 @@
-module App.Posts.Form exposing (..)
+module App.Posts.Create.Form exposing (..)
 
 import Form exposing (Form)
 import FormState exposing (..)

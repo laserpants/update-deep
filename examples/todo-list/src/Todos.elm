@@ -6,7 +6,6 @@ import Html.Attributes exposing (..)
 import Html.Events exposing (..)
 import Todos.Form as Form
 import Update.Deep exposing (..)
-import Util exposing (const, uncurry)
 
 type alias Index = Int
 
@@ -55,7 +54,7 @@ update events msg state =
         |> removeItem { onDelete = events.onTaskDone } ix
     DeleteItem ix ->
       state
-        |> removeItem { onDelete = const save } ix
+        |> removeItem { onDelete = always save } ix
 
 init : Init State Msg
 init =
@@ -67,7 +66,7 @@ init =
 view : State -> Html Msg
 view { list } =
   let indexed = List.indexedMap Tuple.pair
-      item ix todo =
+      item (ix, todo) =
         li [] [ a [ href "#", onClick (TaskDone ix) ] [ text "Done" ]
               , text " | "
               , a [ href "#", onClick (DeleteItem ix) ] [ text "Delete" ]
@@ -75,4 +74,4 @@ view { list } =
               , text todo.text ]
    in div []
         [ if not (List.isEmpty list) then h3 [] [ text "Todos" ] else text ""
-        , ul [] (List.map (uncurry item) (indexed list)) ]
+        , ul [] (List.map item (indexed list)) ]

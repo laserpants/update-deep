@@ -2,7 +2,7 @@ module App.Posts exposing (..)
 
 import Api exposing (Api, HttpMethod(..), Resource(..))
 import App.Config exposing (..)
-import App.Posts.Form as PostsForm exposing (Form)
+import App.Posts.Create.Form as PostsForm exposing (Form)
 import Data.Post exposing (Post)
 import FormState exposing (..)
 import Html exposing (..)

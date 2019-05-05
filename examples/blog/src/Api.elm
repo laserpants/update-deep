@@ -3,7 +3,6 @@ module Api exposing (..)
 import Http exposing (emptyBody)
 import Json.Decode as Json exposing (Decoder, Value)
 import Update.Deep exposing (..)
-import Util exposing (const)
 
 type Msg a
   = Request (Maybe Http.Body)
@@ -56,7 +55,7 @@ init config =
   , request  = initRequest config } |> initial
 
 defaultHandlers : { onSuccess : a -> Update a c e, onError : Http.Error -> a -> Update a c e }
-defaultHandlers = { onSuccess = save, onError = const save }
+defaultHandlers = { onSuccess = save, onError = always save }
 
 update : { t | onSuccess : a -> Update a c e, onError : Http.Error -> a -> Update a c e } -> Msg b -> Api b -> Update (Api b) (Msg b) (a -> Update a c e)
 update events msg state =
