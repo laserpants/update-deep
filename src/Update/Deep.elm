@@ -137,3 +137,13 @@ applicationInit init flags url key =
 documentInit : (flags -> Init a c) -> flags -> ( a, Cmd c )
 documentInit init flags =
   let { state, cmd } = init flags in ( state, cmd )
+
+{-| Convert an `Update` to an `Init`
+-}
+updateToInit : Update a c e -> Init a c
+updateToInit ( state, cmd, _ ) = { state = state, cmd = cmd }
+
+{-| Convert an `Init` to an `Update`
+-}
+initToUpdate : Init a c -> Update a c e
+initToUpdate { state, cmd } = ( state, cmd, [] )
