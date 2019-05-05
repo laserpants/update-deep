@@ -22,10 +22,9 @@ type alias Fields a = Form a (Msg a)
 
 init : Form a (Msg a) -> a -> Init (FormState a) (Msg a)
 init form values =
-  initial
-    { model   = Form.View.idle values
-    , form    = form
-    , initial = values }
+  { model   = Form.View.idle values
+  , form    = form
+  , initial = values } |> initial
 
 defaultHandlers : { onSubmit : b -> a -> Update a c e }
 defaultHandlers = { onSubmit = const save }

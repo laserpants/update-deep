@@ -53,8 +53,7 @@ initRequest { endpoint, method, decoder } suffix body =
 init : RequestConfig a -> Init (Api a) (Msg a)
 init config =
   { resource = NotRequested
-  , request  = initRequest config }
-    |> initial
+  , request  = initRequest config } |> initial
 
 defaultHandlers : { onSuccess : a -> Update a c e, onError : Http.Error -> a -> Update a c e }
 defaultHandlers = { onSuccess = save, onError = const save }
