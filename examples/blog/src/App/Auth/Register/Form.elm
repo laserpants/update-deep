@@ -1,14 +1,14 @@
-module App.Auth.LoginForm exposing (..)
+module App.Auth.Register.Form exposing (..)
 
 import Form exposing (Form)
 import FormState exposing (..)
 import Json.Encode as Encode exposing (Value, object)
 
-type alias LoginForm =
+type alias RegisterForm =
   { login    : String
   , password : String }
 
-fields : Fields LoginForm
+fields : Fields RegisterForm
 fields =
 
   let loginField =
@@ -17,8 +17,8 @@ fields =
           , value  = .login
           , update = \value values -> { values | login = value }
           , attributes =
-            { label       = "Login"
-            , placeholder = "Login" } }
+            { label       = "Email"
+            , placeholder = "Email" } }
 
       passwordField =
         Form.passwordField
@@ -29,12 +29,12 @@ fields =
             { label       = "Password"
             , placeholder = "Your password" } }
 
-   in Form.succeed LoginForm
+   in Form.succeed RegisterForm
     |> Form.append loginField
     |> Form.append passwordField
     |> Form.map Submit
 
-toJson : LoginForm -> Value
+toJson : RegisterForm -> Value
 toJson { login, password } =
   object [ ( "login"    , Encode.string login )
          , ( "password" , Encode.string password ) ]

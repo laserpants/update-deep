@@ -1,8 +1,10 @@
 module App.Auth exposing (..)
 
 import Api exposing (Api, HttpMethod(..))
-import App.Auth.LoginForm as LoginForm exposing (LoginForm)
-import App.Auth.RegisterForm as RegisterForm exposing (RegisterForm)
+import App.Auth.Login.Form as LoginForm exposing (LoginForm)
+import App.Auth.Login.Page as LoginPage
+import App.Auth.Register.Form as RegisterForm exposing (RegisterForm)
+import App.Auth.Register.Page as RegisterPage
 import App.Config exposing (..)
 import Data.User as User exposing (User)
 import FormState exposing (..)
