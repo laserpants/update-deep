@@ -3,6 +3,7 @@ module App exposing (..)
 import App.Auth as Auth
 import App.Auth.Login.Page
 import App.Auth.Register.Page
+import App.Comments.Page
 import App.Posts as Posts
 import App.Posts.Create.Page
 import App.Posts.Item.Page
@@ -122,8 +123,7 @@ pageOutlet { auth, posts, router } =
     Just About ->
       div [] [ text "About" ]
     Just (NewComment postId) ->
-      div [] []
---      Html.map PostsMsg (Posts.addCommentView posts)
+      Html.map (PostsMsg << Posts.CommentsMsg) (App.Comments.Page.view posts.commentsPage)
     Nothing ->
       div [] [ text "Don't know that page" ]
 
