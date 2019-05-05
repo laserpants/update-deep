@@ -35,7 +35,7 @@ initUrl url initState =
 
 init : Flags -> Url -> Navigation.Key -> Init State Msg
 init flags url key =
-  let config = { flags = flags, url = url, key = key }
+  let config = { flags = flags, key = key }
       auth   = Auth.init config
       posts  = Posts.init config
       router = Router.init config
