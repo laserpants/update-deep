@@ -75,62 +75,54 @@ onRouteChange route state =
   case route of
     Just Home ->
       state.posts
-        |> updatePosts (Posts.FetchAll)
+        |> updateSubstate postsState (Posts.FetchAll)
         |> andThen (insertAsPostsIn state)
     Just (ShowPost id) ->
       state.posts
-        |> updatePosts (Posts.SetPage id)
+        |> updateSubstate postsState (Posts.SetPage id)
         |> andThen (insertAsPostsIn state)
     Just (NewComment postId) ->
       state.posts
-        |> updatePosts (Posts.SetPage postId)
+        |> updateSubstate postsState (Posts.SetPage postId)
         |> andThen (insertAsPostsIn state)
     _ ->
       save state
 
-updateAuth : Auth.Msg -> Auth.State -> Update Auth.State Msg a
-updateAuth msg state =
-  state
-    |> Auth.update msg
-    |> mapCmd AuthMsg
+type alias AppSubstate c a e = Substate Msg c a e
 
-updatePosts : Posts.Msg -> Posts.State -> Update Posts.State Msg a
-updatePosts msg state =
-  state
-    |> Posts.update msg
-    |> mapCmd PostsMsg
+authState : AppSubstate Auth.Msg Auth.State a
+authState = { update = Auth.update, msgCons = AuthMsg }
 
-updateRouter : Router.Msg -> Router.State -> Update Router.State Msg (State -> Update State Msg a)
-updateRouter msg state =
-  state
-    |> Router.update { onRouteChange = onRouteChange } msg
-    |> mapCmd RouterMsg
+postsState : AppSubstate Posts.Msg Posts.State a
+postsState = { update = Posts.update, msgCons = PostsMsg }
 
-updateUi : Ui.Msg -> Ui.State -> Update Ui.State Msg a
-updateUi msg state =
-  state
-    |> Ui.update msg
-    |> mapCmd UiMsg
+routerState : AppSubstate Router.Msg Router.State (State -> Update State Msg e)
+routerState =
+  { update  = Router.update { onRouteChange = onRouteChange }
+  , msgCons = RouterMsg }
+
+uiState : AppSubstate Ui.Msg Ui.State a
+uiState = { update = Ui.update, msgCons = UiMsg }
 
 update : Msg -> State -> Update State Msg a
 update msg state =
   case msg of
     AuthMsg authMsg ->
       state.auth
-        |> updateAuth authMsg
+        |> updateSubstate authState authMsg
         |> andThen (insertAsAuthIn state)
     PostsMsg postsMsg ->
       state.posts
-        |> updatePosts postsMsg
+        |> updateSubstate postsState postsMsg
         |> andThen (insertAsPostsIn state)
     RouterMsg routerMsg ->
       state.router
-        |> updateRouter routerMsg
+        |> updateSubstate routerState routerMsg
         |> andThen (insertAsRouterIn state)
         |> consumeEvents
     UiMsg uiMsg ->
       state.ui
-        |> updateUi uiMsg
+        |> updateSubstate uiState uiMsg
         |> andThen (insertAsUiIn state)
 
 subscriptions : State -> Sub Msg
