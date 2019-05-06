@@ -25,13 +25,20 @@ init { flags } =
                          , method   = HttpPost
                          , decoder  = Json.field "comment" Data.Comment.decoder }
       form = FormState.init CommentsForm.fields
-                 { email   = ""
-                 , comment = "" }
+                         { email   = ""
+                         , comment = "" }
    in { comment = comment.state
       , form    = form.state }
         |> initial
         |> initCmd FormMsg form
         |> initCmd ApiMsg comment
+
+onSubmit : Form -> State -> Update State Msg a
+onSubmit form =
+  CommentsForm.toJson form
+    |> Api.jsonRequest
+    |> ApiMsg
+    |> update
 
 update : Msg -> State -> Update State Msg a
 update msg state =
@@ -46,7 +53,7 @@ update msg state =
             |> consumeEvents
         FormMsg formMsg ->
           state.form
-            |> FormState.update defaultHandlers formMsg
+            |> FormState.update { onSubmit = onSubmit } formMsg
             |> andThen (\form -> save { state | form = form })
             |> mapCmd FormMsg
             |> consumeEvents
