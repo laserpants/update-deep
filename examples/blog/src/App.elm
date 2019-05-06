@@ -33,20 +33,22 @@ type alias State =
   , router : Router.State
   , ui     : Ui.State }
 
-initUrl : Url -> Init State Msg -> Init State Msg
-initUrl url initState =
-  let msg = RouterMsg (Router.UrlChange url)
-   in initToUpdate initState
-    |> andThen (update msg)
-    |> updateToInit
-
 init : Flags -> Url -> Navigation.Key -> Init State Msg
 init flags url key =
+
   let config = { flags = flags, key = key }
       auth   = Auth.init config
       posts  = Posts.init config
       router = Router.init config
       ui     = Ui.init config
+
+      initUrl : Init State Msg -> Init State Msg
+      initUrl initState =
+        let msg = RouterMsg (Router.UrlChange url)
+         in initToUpdate initState
+          |> andThen (update msg)
+          |> updateToInit
+
    in { auth   = auth.state
       , posts  = posts.state
       , router = router.state
@@ -56,7 +58,7 @@ init flags url key =
         |> initCmd PostsMsg posts
         |> initCmd RouterMsg router
         |> initCmd UiMsg ui
-        |> initUrl url
+        |> initUrl
 
 insertAsAuthIn : State -> Auth.State -> Update State Msg a
 insertAsAuthIn state auth = save { state | auth = auth }
@@ -91,18 +93,18 @@ onRouteChange route state =
 type alias AppSubstate c a e = Substate Msg c a e
 
 authState : AppSubstate Auth.Msg Auth.State a
-authState = { update = Auth.update, msgCons = AuthMsg }
+authState = { update = Auth.update, messages = AuthMsg }
 
 postsState : AppSubstate Posts.Msg Posts.State a
-postsState = { update = Posts.update, msgCons = PostsMsg }
+postsState = { update = Posts.update, messages = PostsMsg }
 
 routerState : AppSubstate Router.Msg Router.State (State -> Update State Msg e)
 routerState =
-  { update  = Router.update { onRouteChange = onRouteChange }
-  , msgCons = RouterMsg }
+  { update   = Router.update { onRouteChange = onRouteChange }
+  , messages = RouterMsg }
 
 uiState : AppSubstate Ui.Msg Ui.State a
-uiState = { update = Ui.update, msgCons = UiMsg }
+uiState = { update = Ui.update, messages = UiMsg }
 
 update : Msg -> State -> Update State Msg a
 update msg state =

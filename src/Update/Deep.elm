@@ -151,13 +151,13 @@ initToUpdate { state, cmd } = ( state, cmd, [] )
 {-| A type that represents a substate.
 -}
 type alias Substate msgb msga state a =
-  { update  : msga -> state -> Update state msga a
-  , msgCons : msga -> msgb }
+  { update   : msga -> state -> Update state msga a
+  , messages : msga -> msgb }
 
 {-| Update a substate
 -}
 updateSubstate : Substate msgb msga a e -> msga -> a -> Update a msgb e
-updateSubstate { update, msgCons } msg state =
+updateSubstate { update, messages } msg state =
   state
     |> update msg
-    |> mapCmd msgCons
+    |> mapCmd messages
