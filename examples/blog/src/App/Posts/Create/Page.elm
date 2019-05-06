@@ -28,19 +28,20 @@ init { flags } =
    in { post = post.state
       , form = form.state }
         |> initial
-        |> initCmd ApiMsg post 
+        |> initCmd ApiMsg post
         |> initCmd FormMsg form
 
-onSubmit : Form -> State -> Update State Msg a
-onSubmit form =
-  CreateForm.toJson form
+onSubmit : { onPostAdded : Post -> a -> Update a c e } -> Form -> State -> Update State Msg (a -> Update a c e)
+onSubmit events form =
+  form
+    |> CreateForm.toJson
     |> Api.jsonRequest
     |> ApiMsg
-    |> update
+    |> update events
 
-update : Msg -> State -> Update State Msg a
-update msg state =
-  let resetForm = update (FormMsg FormState.Reset)
+update : { onPostAdded : Post -> a -> Update a c e } -> Msg -> State -> Update State Msg (a -> Update a c e)
+update events msg state =
+  let resetForm = update events (FormMsg FormState.Reset)
       default = Api.defaultHandlers
    in case msg of
         ApiMsg apiMsg ->
@@ -51,7 +52,7 @@ update msg state =
             |> consumeEvents
         FormMsg formMsg ->
           state.form
-            |> FormState.update { onSubmit = onSubmit } formMsg
+            |> FormState.update { onSubmit = onSubmit events } formMsg
             |> andThen (\form -> save { state | form = form })
             |> mapCmd FormMsg
             |> consumeEvents

@@ -42,9 +42,10 @@ update msg state =
         |> mapCmd ListMsg
     CreateMsg createPageMsg ->
       state.createPage
-        |> CreatePage.update createPageMsg
+        |> CreatePage.update { onPostAdded = always save } createPageMsg
         |> andThen (\page -> save { state | createPage = page })
         |> mapCmd CreateMsg
+        |> consumeEvents
     ItemMsg itemPageMsg ->
       state.itemPage
         |> ItemPage.update itemPageMsg
