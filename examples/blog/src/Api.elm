@@ -6,7 +6,7 @@ import Update.Deep exposing (..)
 
 type Msg a
   = Request (Maybe Http.Body)
-  | RequestResource String (Maybe Http.Body)
+  | RequestUrl String (Maybe Http.Body)
   | Response (Result Http.Error a)
   | Reset
 
@@ -62,8 +62,8 @@ update events msg state =
   case msg of
     Request maybeBody ->
       state
-        |> update events (RequestResource "" maybeBody)
-    RequestResource endpoint maybeBody ->
+        |> update events (RequestUrl "" maybeBody)
+    RequestUrl endpoint maybeBody ->
       state
         |> setResource Requested
         |> andRunCmd (state.request endpoint maybeBody)

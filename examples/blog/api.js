@@ -1,3 +1,5 @@
+var xhook = require('./js/xhook.min.js');
+
 var users =
 [
   {

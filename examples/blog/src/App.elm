@@ -58,47 +58,80 @@ init flags url key =
         |> initCmd UiMsg ui
         |> initUrl url
 
+insertAsAuthIn : State -> Auth.State -> Update State Msg a
+insertAsAuthIn state auth = save { state | auth = auth }
+
+insertAsPostsIn : State -> Posts.State -> Update State Msg a
+insertAsPostsIn state posts = save { state | posts = posts }
+
+insertAsRouterIn : State -> Router.State -> Update State Msg a
+insertAsRouterIn state router = save { state | router = router }
+
+insertAsUiIn : State -> Ui.State -> Update State Msg a
+insertAsUiIn state ui = save { state | ui = ui }
+
 onRouteChange : Maybe Route -> State -> Update State Msg a
 onRouteChange route state =
   case route of
+    Just Home ->
+      state.posts
+        |> updatePosts (Posts.FetchAll)
+        |> andThen (insertAsPostsIn state)
+    Just (ShowPost id) ->
+      state.posts
+        |> updatePosts (Posts.SetPage id)
+        |> andThen (insertAsPostsIn state)
+    Just (NewComment postId) ->
+      state.posts
+        |> updatePosts (Posts.SetPage postId)
+        |> andThen (insertAsPostsIn state)
     _ ->
       save state
---    Just Home ->
---      state
---        |> update (PostsMsg (Posts.fetchCollectionMsg))
---    Just (ShowPost id) ->
---      state
---        |> update (PostsMsg (Posts.fetchPostMsg id))
---    Just (NewComment postId) ->
---      state
---        |> update (PostsMsg (Posts.fetchPostMsg postId))
---    _ ->
---      save state
+
+updateAuth : Auth.Msg -> Auth.State -> Update Auth.State Msg a
+updateAuth msg state =
+  state
+    |> Auth.update msg
+    |> mapCmd AuthMsg
+
+updatePosts : Posts.Msg -> Posts.State -> Update Posts.State Msg a
+updatePosts msg state =
+  state
+    |> Posts.update msg
+    |> mapCmd PostsMsg
+
+updateRouter : Router.Msg -> Router.State -> Update Router.State Msg (State -> Update State Msg a)
+updateRouter msg state =
+  state
+    |> Router.update { onRouteChange = onRouteChange } msg
+    |> mapCmd RouterMsg
+
+updateUi : Ui.Msg -> Ui.State -> Update Ui.State Msg a
+updateUi msg state =
+  state
+    |> Ui.update msg
+    |> mapCmd UiMsg
 
 update : Msg -> State -> Update State Msg a
 update msg state =
   case msg of
     AuthMsg authMsg ->
       state.auth
-        |> Auth.update authMsg
-        |> andThen (\auth -> save { state | auth = auth })
-        |> mapCmd AuthMsg
+        |> updateAuth authMsg
+        |> andThen (insertAsAuthIn state)
     PostsMsg postsMsg ->
       state.posts
-        |> Posts.update postsMsg
-        |> andThen (\posts -> save { state | posts = posts })
-        |> mapCmd PostsMsg
+        |> updatePosts postsMsg
+        |> andThen (insertAsPostsIn state)
     RouterMsg routerMsg ->
       state.router
-        |> Router.update { onRouteChange = onRouteChange } routerMsg
-        |> andThen (\router -> save { state | router = router })
-        |> mapCmd RouterMsg
+        |> updateRouter routerMsg
+        |> andThen (insertAsRouterIn state)
         |> consumeEvents
     UiMsg uiMsg ->
       state.ui
-        |> Ui.update uiMsg
-        |> andThen (\ui -> save { state | ui = ui })
-        |> mapCmd UiMsg
+        |> updateUi uiMsg
+        |> andThen (insertAsUiIn state)
 
 subscriptions : State -> Sub Msg
 subscriptions state =
@@ -143,7 +176,7 @@ view state =
         , li [] [ a [ href "/posts/1/comments/new" ] [ text "New comment" ] ]
         , li [] [ a [ href "#" ] [ text "#" ] ]
         , pageOutlet state
---        , text (Debug.toString state.posts)
+        , text (Debug.toString state)
         ]
       ]
     ]
