@@ -55,7 +55,7 @@ update msg state =
         |> update (ItemMsg (ItemPage.SetPost id))
     FetchAll ->
       state
-        |> update (ListMsg (ListPage.ApiMsg (Api.Request Nothing)))
+        |> update (ListMsg ListPage.FetchAll)
 
 subscriptions : State -> Sub Msg
 subscriptions { listPage, createPage, itemPage } =

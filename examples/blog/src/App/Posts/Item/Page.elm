@@ -38,14 +38,15 @@ setPost id state =
   let url = "/" ++ String.fromInt id
       requestPost = update (ApiMsg (Api.RequestUrl url Nothing))
    in
-      if Just id == state.postId
+      if state.postId == Just id
           then
             case state.post.resource of
               Requested ->
                 save state
               Available _ ->
                 save state
-              _ -> state |> requestPost
+              _ ->
+                state |> requestPost
           else
             { state | postId = Just id } |> requestPost
 

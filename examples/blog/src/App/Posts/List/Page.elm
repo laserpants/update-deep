@@ -11,6 +11,7 @@ import Update.Deep exposing (..)
 
 type Msg
   = ApiMsg (Api.Msg (List Post))
+  | FetchAll
 
 type alias State =
   { collection : Api (List Post) }
@@ -26,13 +27,24 @@ init { flags } =
 
 update : Msg -> State -> Update State Msg a
 update msg state =
-  case msg of
-    ApiMsg apiMsg ->
-      state.collection
-        |> Api.update Api.defaultHandlers apiMsg
-        |> andThen (\collection -> save { state | collection = collection })
-        |> mapCmd ApiMsg
-        |> consumeEvents
+  let requestCollection = update (ApiMsg (Api.Request Nothing))
+   in case msg of
+        ApiMsg apiMsg ->
+          state.collection
+            |> Api.update Api.defaultHandlers apiMsg
+            |> andThen (\collection -> save { state | collection = collection })
+            |> mapCmd ApiMsg
+            |> consumeEvents
+        FetchAll ->
+          case state.collection.resource of
+            Requested ->
+              save state
+            Available _ ->
+              save state
+            NotRequested ->
+              state |> requestCollection
+            Error error ->
+              state |> requestCollection
 
 subscriptions : State -> Sub Msg
 subscriptions _ = Sub.none
