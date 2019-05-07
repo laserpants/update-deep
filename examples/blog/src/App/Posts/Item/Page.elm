@@ -7,6 +7,7 @@ import Data.Post exposing (Post)
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (..)
+import Http
 import Json.Decode as Json
 import Update.Deep exposing (..)
 
@@ -79,6 +80,8 @@ view { post } =
       div [] [ text "Not requested" ]
     Requested ->
       div [] [ text "Requested..." ]
+    Error (Http.BadStatus 404) ->
+      div [] [ text "Not found" ]
     Error error ->
       div [] [ text "Error" ]
     Available item ->

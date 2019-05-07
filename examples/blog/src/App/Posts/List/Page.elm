@@ -56,7 +56,8 @@ view { collection } =
       item post =
         div [ ] 
           [ h2 [] [ text post.title ]
-          , p [] [ text post.body ] ]
+          , p [] [ text post.body ] 
+          , p [] [ a [ href ("posts/" ++ String.fromInt post.id) ] [ text "Show" ] ] ]
 
    in case collection.resource of
         NotRequested ->
