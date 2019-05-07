@@ -52,12 +52,12 @@ subscriptions _ = Sub.none
 view : State -> Html Msg
 view { collection } =
 
-  let item : Post -> Html Msg 
-      item post =
-        div [ ] 
-          [ h2 [] [ text post.title ]
-          , p [] [ text post.body ] 
-          , p [] [ a [ href ("posts/" ++ String.fromInt post.id) ] [ text "Show" ] ] ]
+  let item : Post -> Html Msg
+      item { id, title, body } =
+        div [ ]
+          [ h2 [] [ text title ]
+          , p [] [ text body ]
+          , p [] [ a [ href ("/posts/" ++ String.fromInt id) ] [ text "Show" ] ] ]
 
    in case collection.resource of
         NotRequested ->

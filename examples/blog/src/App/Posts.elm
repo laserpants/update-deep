@@ -7,6 +7,7 @@ import App.Posts.Item.Page as ItemPage
 import App.Posts.List.Page as ListPage
 import Data.Post exposing (Post)
 import Update.Deep exposing (..)
+import Browser.Navigation as Navigation
 
 type Msg
   = ListMsg ListPage.Msg
@@ -33,11 +34,14 @@ init config =
         |> initCmd CreateMsg createPage
         |> initCmd ItemMsg itemPage
 
-onPostAdded : Post -> State -> Update State Msg a
-onPostAdded post = update (ListMsg (ListPage.FetchAll True))
+onPostAdded : { redirect : String -> a -> Update a c e } -> Post -> State -> Update State Msg (a -> Update a c e)
+onPostAdded events post state =
+  state
+    |> update events (ListMsg (ListPage.FetchAll True))
+    |> andThen (invoke (events.redirect "/"))
 
-update : Msg -> State -> Update State Msg a
-update msg state =
+update : { redirect : String -> a -> Update a c e } -> Msg -> State -> Update State Msg (a -> Update a c e)
+update events msg state =
   case msg of
     ListMsg listPageMsg ->
       state.listPage
@@ -46,7 +50,7 @@ update msg state =
         |> mapCmd ListMsg
     CreateMsg createPageMsg ->
       state.createPage
-        |> CreatePage.update { onPostAdded = onPostAdded } createPageMsg
+        |> CreatePage.update { onPostAdded = onPostAdded events } createPageMsg
         |> andThen (\page -> save { state | createPage = page })
         |> mapCmd CreateMsg
         |> consumeEvents
@@ -57,10 +61,10 @@ update msg state =
         |> mapCmd ItemMsg
     SetPage id ->
       state
-        |> update (ItemMsg (ItemPage.SetPost id))
+        |> update events (ItemMsg (ItemPage.SetPost id))
     FetchAll ->
       state
-        |> update (ListMsg (ListPage.FetchAll False))
+        |> update events (ListMsg (ListPage.FetchAll False))
 
 subscriptions : State -> Sub Msg
 subscriptions { listPage, createPage, itemPage } =

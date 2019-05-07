@@ -80,24 +80,36 @@ onRouteChange route state =
       state.posts
         |> updateSubstate postsState (Posts.FetchAll)
         |> andThen (insertAsPostsIn state)
+        |> consumeEvents
     Just (ShowPost id) ->
       state.posts
         |> updateSubstate postsState (Posts.SetPage id)
         |> andThen (insertAsPostsIn state)
+        |> consumeEvents
     Just (NewComment postId) ->
       state.posts
         |> updateSubstate postsState (Posts.SetPage postId)
         |> andThen (insertAsPostsIn state)
+        |> consumeEvents
     _ ->
       save state
+
+redirect : String -> State -> Update State Msg a
+redirect url state =
+  state.router
+    |> updateSubstate routerState (Router.Redirect url)
+    |> andThen (insertAsRouterIn state)
+    |> consumeEvents
 
 type alias AppSubstate c a e = Substate Msg c a e
 
 authState : AppSubstate Auth.Msg Auth.State a
 authState = { update = Auth.update, messages = AuthMsg }
 
-postsState : AppSubstate Posts.Msg Posts.State a
-postsState = { update = Posts.update, messages = PostsMsg }
+postsState : AppSubstate Posts.Msg Posts.State (State -> Update State Msg e)
+postsState =
+  { update   = Posts.update { redirect = redirect }
+  , messages = PostsMsg }
 
 routerState : AppSubstate Router.Msg Router.State (State -> Update State Msg e)
 routerState =
@@ -107,7 +119,7 @@ routerState =
 uiState : AppSubstate Ui.Msg Ui.State a
 uiState = { update = Ui.update, messages = UiMsg }
 
-update : Msg -> State -> Update State Msg a
+update : Msg -> State -> Update State Msg (State -> Update State Msg a)
 update msg state =
   case msg of
     AuthMsg authMsg ->
@@ -118,6 +130,7 @@ update msg state =
       state.posts
         |> updateSubstate postsState postsMsg
         |> andThen (insertAsPostsIn state)
+        |> consumeEvents
     RouterMsg routerMsg ->
       state.router
         |> updateSubstate routerState routerMsg
@@ -183,6 +196,6 @@ view state =
         [ Grid.col []
           [ content state ]
         ]
-      ]      
+      ]
     ]
   }

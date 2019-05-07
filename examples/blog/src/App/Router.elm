@@ -13,6 +13,7 @@ import Url exposing (Url)
 type Msg
   = UrlChange Url
   | UrlRequest UrlRequest
+  | Redirect String
 
 type alias State =
   { route : Maybe Route 
@@ -40,6 +41,10 @@ update events msg state =
         Browser.External href ->
           state
             |> runCmd (Navigation.load href)
+    Redirect url ->
+      state
+        |> runCmd (Navigation.replaceUrl state.key url)
+
 
 subscriptions : State -> Sub Msg
 subscriptions _ = Sub.none

@@ -84,7 +84,9 @@ view { post } =
       div [] [ text "Not found" ]
     Error error ->
       div [] [ text "Error" ]
-    Available item ->
-      div [] 
-        [ h1 [] [ text item.title ]
-        , p [] [ text item.body ] ]
+    Available { id, title, body } ->
+      div []
+        [ h1 [] [ text title ]
+        , p [] [ text body ]
+        , p [] [ a [ href ("/posts/" ++ String.fromInt id ++ "/comments/new") ] [ text "Comment" ] ]
+        ]
