@@ -159,25 +159,26 @@ pageOutlet { auth, posts, router } =
 content : State -> Html Msg
 content state =
   div []
-    [ ul []
-      [ li [] [ a [ href "/" ] [ text "Home" ] ]
-      , li [] [ a [ href "/about" ] [ text "About" ] ]
-      , li [] [ a [ href "/login" ] [ text "Login" ] ]
-      , li [] [ a [ href "/register" ] [ text "Register" ] ]
-      , li [] [ a [ href "/posts/1" ] [ text "Show post" ] ]
-      , li [] [ a [ href "/posts/new" ] [ text "New post" ] ]
-      , li [] [ a [ href "/posts/1/comments/new" ] [ text "New comment" ] ]
-      , li [] [ a [ href "#" ] [ text "#" ] ]
-      , pageOutlet state
+    [ --ul []
+      --[ li [] [ a [ href "/" ] [ text "Home" ] ]
+      --, li [] [ a [ href "/about" ] [ text "About" ] ]
+      --, li [] [ a [ href "/login" ] [ text "Login" ] ]
+      --, li [] [ a [ href "/register" ] [ text "Register" ] ]
+      --, li [] [ a [ href "/posts/1" ] [ text "Show post" ] ]
+      --, li [] [ a [ href "/posts/new" ] [ text "New post" ] ]
+      --, li [] [ a [ href "/posts/1/comments/new" ] [ text "New comment" ] ]
+      --, li [] [ a [ href "#" ] [ text "#" ] ]
+        pageOutlet state
   --        , text (Debug.toString state)
-      ]
+      --]
     ]
 
 view : State -> Document Msg
 view state =
   { title = ""
   , body  =
-    [ Grid.container []
+    [ Html.map UiMsg (Ui.navbarView state.ui)
+    , Grid.container []
       [ Grid.row []
         [ Grid.col []
           [ content state ]

@@ -85,4 +85,6 @@ view { post } =
     Error error ->
       div [] [ text "Error" ]
     Available item ->
-      div [] [ text (Debug.toString item) ]
+      div [] 
+        [ h1 [] [ text item.title ]
+        , p [] [ text item.body ] ]

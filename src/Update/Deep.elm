@@ -125,6 +125,9 @@ type alias Init a c = { state : a, cmd : Cmd c }
 initial : a -> Init a c
 initial state = { state = state, cmd = Cmd.none }
 
+initialWithCmd : Cmd c -> a -> Init a c
+initialWithCmd cmd state = { state = state, cmd = cmd }
+
 {-| Apply commands returned by lower-level init calls in the caller context.
 -}
 initCmd : (c -> d) -> Init a c -> Init b d -> Init b d

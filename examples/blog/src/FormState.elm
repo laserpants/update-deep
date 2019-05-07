@@ -6,6 +6,7 @@ import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (..)
 import Update.Deep exposing (..)
+import Ui.Form.View
 
 type Msg a
   = FormChanged (Form.View.Model a)
@@ -42,7 +43,7 @@ update { onSubmit } msg state =
 
 view : FormState a -> Html (Msg a)
 view { form, model } =
-  Form.View.asHtml
+  Ui.Form.View.view
     { onChange   = FormChanged
     , action     = "Submit"
     , loading    = "Submit"
