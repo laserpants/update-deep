@@ -1,4 +1,4 @@
-module FormState exposing (..)
+module Update.Form exposing (..)
 
 import Form exposing (Form)
 import Form.View
@@ -13,14 +13,14 @@ type Msg a
   | Submit a
   | Reset
 
-type alias FormState a =
+type alias State a =
   { model   : Form.View.Model a 
   , form    : Form a (Msg a)
   , initial : a }
 
 type alias Fields a = Form a (Msg a)
 
-init : Form a (Msg a) -> a -> Init (FormState a) (Msg a)
+init : Form a (Msg a) -> a -> Init (State a) (Msg a)
 init form values =
   { model   = Form.View.idle values
   , form    = form
@@ -29,7 +29,7 @@ init form values =
 defaultHandlers : { onSubmit : b -> a -> Update a c e }
 defaultHandlers = { onSubmit = always save }
 
-update : { t | onSubmit : b -> a -> Update a c e } -> Msg b -> FormState b -> Update (FormState b) (Msg b) (a -> Update a c e)
+update : { t | onSubmit : b -> a -> Update a c e } -> Msg b -> State b -> Update (State b) (Msg b) (a -> Update a c e)
 update { onSubmit } msg state =
   case msg of
     Reset ->
@@ -41,7 +41,7 @@ update { onSubmit } msg state =
        in save { state | model = { model | state = Form.View.Loading } }
         |> andInvoke (onSubmit values)
 
-view : FormState a -> Html (Msg a)
+view : State a -> Html (Msg a)
 view { form, model } =
   Ui.Form.View.view
     { onChange   = FormChanged

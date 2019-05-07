@@ -3,20 +3,20 @@ module App.Auth.Register exposing (..)
 import Api exposing (Api, HttpMethod(..))
 import App.Auth.Register.Form as RegisterForm exposing (RegisterForm)
 import App.Config exposing (..)
-import FormState exposing (..)
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (..)
 import Json.Decode as Json exposing (field)
 import Update.Deep exposing (..)
+import Update.Form as Form
 
 type Msg
   = ApiMsg (Api.Msg { status : String })
-  | FormMsg (FormState.Msg RegisterForm)
+  | FormMsg (Form.Msg RegisterForm)
 
 type alias State =
   { response : Api { status : String }
-  , form     : FormState RegisterForm }
+  , form     : Form.State RegisterForm }
 
 responseDecoder : Json.Decoder { status : String }
 responseDecoder =
@@ -27,7 +27,7 @@ init { flags } =
   let response = Api.init { endpoint = flags.api ++ "/auth/register"
                           , method   = HttpPost
                           , decoder  = responseDecoder }
-      form = FormState.init RegisterForm.fields
+      form = Form.init RegisterForm.fields
                           { login    = ""
                           , password = "" }
    in { response = response.state
@@ -45,7 +45,7 @@ onSubmit form =
 
 update : Msg -> State -> Update State Msg a
 update msg state =
-  let resetForm = update (FormMsg FormState.Reset)
+  let resetForm = update (FormMsg Form.Reset)
       default = Api.defaultHandlers
    in case msg of
         ApiMsg apiMsg ->
@@ -56,7 +56,7 @@ update msg state =
             |> consumeEvents
         FormMsg formMsg ->
           state.form
-            |> FormState.update { onSubmit = onSubmit } formMsg
+            |> Form.update { onSubmit = onSubmit } formMsg
             |> andThen (\form -> save { state | form = form })
             |> mapCmd FormMsg
             |> consumeEvents
@@ -65,4 +65,4 @@ subscriptions : State -> Sub Msg
 subscriptions _ = Sub.none
 
 view : State -> Html Msg
-view { form } = Html.map FormMsg (FormState.view form)
+view { form } = Html.map FormMsg (Form.view form)

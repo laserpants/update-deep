@@ -1,8 +1,8 @@
 module App.Auth.Login.Form exposing (..)
 
 import Form exposing (Form)
-import FormState exposing (..)
 import Json.Encode as Encode exposing (Value, object)
+import Update.Form exposing (Fields, Msg(..))
 
 type alias LoginForm =
   { login    : String

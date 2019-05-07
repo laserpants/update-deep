@@ -4,7 +4,7 @@ import Api exposing (Api, HttpMethod(..))
 import App.Comments.Form as CommentsForm exposing (Form)
 import App.Config exposing (..)
 import Data.Comment exposing (Comment)
-import FormState exposing (..)
+import Update.Form as Form
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (..)
@@ -13,18 +13,18 @@ import Update.Deep exposing (..)
 
 type Msg
   = ApiMsg (Api.Msg Comment)
-  | FormMsg (FormState.Msg Form)
+  | FormMsg (Form.Msg Form)
 
 type alias State =
   { comment : Api Comment
-  , form    : FormState Form }
+  , form    : Form.State Form }
 
 init : Config -> Init State Msg
 init { flags } =
   let comment = Api.init { endpoint = flags.api ++ "/posts"
                          , method   = HttpPost
                          , decoder  = Json.field "comment" Data.Comment.decoder }
-      form = FormState.init CommentsForm.fields
+      form = Form.init CommentsForm.fields
                          { email   = ""
                          , comment = "" }
    in { comment = comment.state
@@ -42,7 +42,7 @@ onSubmit form =
 
 update : Msg -> State -> Update State Msg a
 update msg state =
-  let resetForm = update (FormMsg FormState.Reset)
+  let resetForm = update (FormMsg Form.Reset)
       default = Api.defaultHandlers
    in case msg of
         ApiMsg apiMsg ->
@@ -53,7 +53,7 @@ update msg state =
             |> consumeEvents
         FormMsg formMsg ->
           state.form
-            |> FormState.update { onSubmit = onSubmit } formMsg
+            |> Form.update { onSubmit = onSubmit } formMsg
             |> andThen (\form -> save { state | form = form })
             |> mapCmd FormMsg
             |> consumeEvents
@@ -62,4 +62,4 @@ subscriptions : State -> Sub Msg
 subscriptions _ = Sub.none
 
 view : State -> Html Msg
-view { form } = Html.map FormMsg (FormState.view form)
+view { form } = Html.map FormMsg (Form.view form)

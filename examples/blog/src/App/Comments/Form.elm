@@ -1,8 +1,8 @@
 module App.Comments.Form exposing (..)
 
 import Form exposing (Form)
-import FormState exposing (..)
 import Json.Encode as Encode exposing (Value, object)
+import Update.Form exposing (Fields, Msg(..))
 
 type alias Form =
   { email   : String
