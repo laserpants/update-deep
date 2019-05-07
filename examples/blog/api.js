@@ -78,7 +78,7 @@ xhook.before(function(request, callback) {
           headers: { 'Content-Type': 'application/json' }
         });
         console.log(posts);
-      }, 800);
+      }, 4800);
     }
   } else if (/posts\/\d+$/.test(request.url) && 'GET' === request.method) {
     setTimeout(function() {
