@@ -1,4 +1,4 @@
-module App.Auth.Login.Page exposing (..)
+module App.Auth.Login exposing (..)
 
 import Api exposing (Api, HttpMethod(..))
 import App.Auth.Login.Form as LoginForm exposing (LoginForm)

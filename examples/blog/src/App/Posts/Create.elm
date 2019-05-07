@@ -1,4 +1,4 @@
-module App.Posts.Create.Page exposing (..)
+module App.Posts.Create exposing (..)
 
 import Api exposing (Api, HttpMethod(..))
 import App.Config exposing (..)

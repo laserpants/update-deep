@@ -1,14 +1,13 @@
 module App exposing (..)
 
 import App.Auth as Auth
-import App.Auth.Login.Page
-import App.Auth.Register.Page
-import App.Comments.Page
+import App.Auth.Login
+import App.Auth.Register
+import App.Comments
 import App.Posts as Posts
-import App.Posts.Create.Page
-import App.Posts.Item.Page
-import App.Posts.Item.Page
-import App.Posts.List.Page
+import App.Posts.Create
+import App.Posts.Item
+import App.Posts.List
 import App.Route exposing (..)
 import App.Router as Router
 import App.Ui as Ui
@@ -83,12 +82,12 @@ onRouteChange route state =
         |> consumeEvents
     Just (ShowPost id) ->
       state.posts
-        |> updateSubstate postsState (Posts.SetPage id)
+        |> updateSubstate postsState (Posts.SetPost id)
         |> andThen (insertAsPostsIn state)
         |> consumeEvents
     Just (NewComment postId) ->
       state.posts
-        |> updateSubstate postsState (Posts.SetPage postId)
+        |> updateSubstate postsState (Posts.SetPost postId)
         |> andThen (insertAsPostsIn state)
         |> consumeEvents
     _ ->
@@ -153,19 +152,19 @@ pageOutlet : State -> Html Msg
 pageOutlet { auth, posts, router } =
   case router.route of
     Just Login ->
-      Html.map (AuthMsg << Auth.LoginMsg) (App.Auth.Login.Page.view auth.loginPage)
+      Html.map (AuthMsg << Auth.LoginMsg) (App.Auth.Login.view auth.login)
     Just Register ->
-      Html.map (AuthMsg << Auth.RegisterMsg) (App.Auth.Register.Page.view auth.registerPage)
+      Html.map (AuthMsg << Auth.RegisterMsg) (App.Auth.Register.view auth.register)
     Just NewPost ->
-      Html.map (PostsMsg << Posts.CreateMsg) (App.Posts.Create.Page.view posts.createPage)
+      Html.map (PostsMsg << Posts.CreateMsg) (App.Posts.Create.view posts.create)
     Just Home ->
-      Html.map (PostsMsg << Posts.ListMsg) (App.Posts.List.Page.view posts.listPage)
+      Html.map (PostsMsg << Posts.ListMsg) (App.Posts.List.view posts.list)
     Just (ShowPost id) ->
-      Html.map (PostsMsg << Posts.ItemMsg) (App.Posts.Item.Page.view posts.itemPage)
+      Html.map (PostsMsg << Posts.ItemMsg) (App.Posts.Item.view posts.item)
     Just About ->
       div [] [ text "About" ]
     Just (NewComment postId) ->
-      Html.map (PostsMsg << Posts.ItemMsg << App.Posts.Item.Page.CommentsMsg) (App.Comments.Page.view posts.itemPage.commentsPage)
+      Html.map (PostsMsg << Posts.ItemMsg << App.Posts.Item.CommentsMsg) (App.Comments.view posts.item.comments)
     Nothing ->
       div [] [ text "Don't know that page" ]
 

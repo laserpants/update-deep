@@ -2,73 +2,73 @@ module App.Posts exposing (..)
 
 import Api
 import App.Config exposing (..)
-import App.Posts.Create.Page as CreatePage
-import App.Posts.Item.Page as ItemPage
-import App.Posts.List.Page as ListPage
+import App.Posts.Create as Create
+import App.Posts.Item as Item
+import App.Posts.List as List
 import Data.Post exposing (Post)
 import Update.Deep exposing (..)
 import Browser.Navigation as Navigation
 
 type Msg
-  = ListMsg ListPage.Msg
-  | CreateMsg CreatePage.Msg
-  | ItemMsg ItemPage.Msg
-  | SetPage Int
+  = ListMsg List.Msg
+  | CreateMsg Create.Msg
+  | ItemMsg Item.Msg
+  | SetPost Int
   | FetchAll
 
 type alias State =
-  { listPage   : ListPage.State
-  , createPage : CreatePage.State
-  , itemPage   : ItemPage.State }
+  { list   : List.State
+  , create : Create.State
+  , item   : Item.State }
 
 init : Config -> Init State Msg
 init config =
-  let listPage   = ListPage.init config
-      createPage = CreatePage.init config
-      itemPage   = ItemPage.init config
-   in { listPage   = listPage.state
-      , createPage = createPage.state
-      , itemPage   = itemPage.state }
+  let list   = List.init config
+      create = Create.init config
+      item   = Item.init config
+   in { list   = list.state
+      , create = create.state
+      , item   = item.state }
         |> initial
-        |> initCmd ListMsg listPage
-        |> initCmd CreateMsg createPage
-        |> initCmd ItemMsg itemPage
+        |> initCmd ListMsg list
+        |> initCmd CreateMsg create
+        |> initCmd ItemMsg item
 
 onPostAdded : { redirect : String -> a -> Update a c e } -> Post -> State -> Update State Msg (a -> Update a c e)
 onPostAdded events post state =
   state
-    |> update events (ListMsg (ListPage.FetchAll True))
+    |> update events (ListMsg (List.FetchAll True))
     |> andThen (invoke (events.redirect "/"))
 
 update : { redirect : String -> a -> Update a c e } -> Msg -> State -> Update State Msg (a -> Update a c e)
 update events msg state =
   case msg of
-    ListMsg listPageMsg ->
-      state.listPage
-        |> ListPage.update listPageMsg
-        |> andThen (\page -> save { state | listPage = page })
+    ListMsg listMsg ->
+      state.list
+        |> List.update listMsg
+        |> andThen (\page -> save { state | list = page })
         |> mapCmd ListMsg
-    CreateMsg createPageMsg ->
-      state.createPage
-        |> CreatePage.update { onPostAdded = onPostAdded events } createPageMsg
-        |> andThen (\page -> save { state | createPage = page })
+    CreateMsg createMsg ->
+      state.create
+        |> Create.update { onPostAdded = onPostAdded events } createMsg
+        |> andThen (\page -> save { state | create = page })
         |> mapCmd CreateMsg
         |> consumeEvents
-    ItemMsg itemPageMsg ->
-      state.itemPage
-        |> ItemPage.update itemPageMsg
-        |> andThen (\page -> save { state | itemPage = page })
+    ItemMsg itemMsg ->
+      state.item
+        |> Item.update itemMsg
+        |> andThen (\page -> save { state | item = page })
         |> mapCmd ItemMsg
-    SetPage id ->
+    SetPost id ->
       state
-        |> update events (ItemMsg (ItemPage.SetPost id))
+        |> update events (ItemMsg (Item.SetPost id))
     FetchAll ->
       state
-        |> update events (ListMsg (ListPage.FetchAll False))
+        |> update events (ListMsg (List.FetchAll False))
 
 subscriptions : State -> Sub Msg
-subscriptions { listPage, createPage, itemPage } =
+subscriptions { list, create, item } =
   Sub.batch
-    [ Sub.map ListMsg (ListPage.subscriptions listPage)
-    , Sub.map CreateMsg (CreatePage.subscriptions createPage)
-    , Sub.map ItemMsg (ItemPage.subscriptions itemPage) ]
+    [ Sub.map ListMsg (List.subscriptions list)
+    , Sub.map CreateMsg (Create.subscriptions create)
+    , Sub.map ItemMsg (Item.subscriptions item) ]

@@ -1,9 +1,8 @@
-module App.Comments.Page exposing (..)
+module App.Auth.Register exposing (..)
 
 import Api exposing (Api, HttpMethod(..))
-import App.Comments.Form as CommentsForm exposing (Form)
+import App.Auth.Register.Form as RegisterForm exposing (RegisterForm)
 import App.Config exposing (..)
-import Data.Comment exposing (Comment)
 import FormState exposing (..)
 import Html exposing (..)
 import Html.Attributes exposing (..)
@@ -12,30 +11,34 @@ import Json.Decode as Json exposing (field)
 import Update.Deep exposing (..)
 
 type Msg
-  = ApiMsg (Api.Msg Comment)
-  | FormMsg (FormState.Msg Form)
+  = ApiMsg (Api.Msg { status : String })
+  | FormMsg (FormState.Msg RegisterForm)
 
 type alias State =
-  { comment : Api Comment
-  , form    : FormState Form }
+  { response : Api { status : String }
+  , form     : FormState RegisterForm }
+
+responseDecoder : Json.Decoder { status : String }
+responseDecoder =
+  field "status" Json.string |> Json.map (\status -> { status = status })
 
 init : Config -> Init State Msg
 init { flags } =
-  let comment = Api.init { endpoint = flags.api ++ "/posts"
-                         , method   = HttpPost
-                         , decoder  = Json.field "comment" Data.Comment.decoder }
-      form = FormState.init CommentsForm.fields
-                         { email   = ""
-                         , comment = "" }
-   in { comment = comment.state
-      , form    = form.state }
+  let response = Api.init { endpoint = flags.api ++ "/auth/register"
+                          , method   = HttpPost
+                          , decoder  = responseDecoder }
+      form = FormState.init RegisterForm.fields
+                          { login    = ""
+                          , password = "" }
+   in { response = response.state
+      , form     = form.state }
         |> initial
+        |> initCmd ApiMsg response
         |> initCmd FormMsg form
-        |> initCmd ApiMsg comment
 
-onSubmit : Form -> State -> Update State Msg a
+onSubmit : RegisterForm -> State -> Update State Msg a
 onSubmit form =
-  CommentsForm.toJson form
+  RegisterForm.toJson form
     |> Api.jsonRequest
     |> ApiMsg
     |> update
@@ -46,9 +49,9 @@ update msg state =
       default = Api.defaultHandlers
    in case msg of
         ApiMsg apiMsg ->
-          state.comment
+          state.response
             |> Api.update { default | onSuccess = always resetForm } apiMsg
-            |> andThen (\comment -> save { state | comment = comment })
+            |> andThen (\response -> save { state | response = response })
             |> mapCmd ApiMsg
             |> consumeEvents
         FormMsg formMsg ->

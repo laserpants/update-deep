@@ -1,7 +1,7 @@
-module App.Posts.Item.Page exposing (..)
+module App.Posts.Item exposing (..)
 
 import Api exposing (Api, HttpMethod(..), Resource(..))
-import App.Comments.Page as CommentsPage
+import App.Comments as Comments
 import App.Config exposing (..)
 import Data.Post exposing (Post)
 import Html exposing (..)
@@ -13,33 +13,32 @@ import Update.Deep exposing (..)
 
 type Msg
   = ApiMsg (Api.Msg Post)
-  | CommentsMsg CommentsPage.Msg
+  | CommentsMsg Comments.Msg
   | SetPost Int
 
 type alias State =
-  { post         : Api Post
-  , postId       : Maybe Int
-  , commentsPage : CommentsPage.State }
+  { post     : Api Post
+  , postId   : Maybe Int
+  , comments : Comments.State }
 
 init : Config -> Init State Msg
 init config =
   let post = Api.init { endpoint = config.flags.api ++ "/posts"
                       , method   = HttpGet
                       , decoder  = Json.field "post" Data.Post.decoder }
-      commentsPage = CommentsPage.init config
-   in { post         = post.state
-      , postId       = Nothing
-      , commentsPage = commentsPage.state }
+      comments = Comments.init config
+   in { post   = post.state
+      , postId = Nothing
+      , comments = comments.state }
         |> initial
         |> initCmd ApiMsg post
-        |> initCmd CommentsMsg commentsPage
+        |> initCmd CommentsMsg comments
 
 setPost : Int -> State -> Update State Msg a
 setPost id state =
   let url = "/" ++ String.fromInt id
       requestPost = update (ApiMsg (Api.RequestUrl url Nothing))
-   in
-      if state.postId == Just id
+   in if state.postId == Just id
           then
             case state.post.resource of
               Requested ->
@@ -60,18 +59,18 @@ update msg state =
         |> andThen (\post -> save { state | post = post })
         |> mapCmd ApiMsg
         |> consumeEvents
-    CommentsMsg commentsPageMsg ->
-      state.commentsPage
-        |> CommentsPage.update commentsPageMsg
-        |> andThen (\page -> save { state | commentsPage = page })
+    CommentsMsg commentsMsg ->
+      state.comments
+        |> Comments.update commentsMsg
+        |> andThen (\page -> save { state | comments = page })
         |> mapCmd CommentsMsg
     SetPost id ->
       state
         |> setPost id
 
 subscriptions : State -> Sub Msg
-subscriptions { commentsPage } =
-  Sub.map CommentsMsg (CommentsPage.subscriptions commentsPage)
+subscriptions { comments } =
+  Sub.map CommentsMsg (Comments.subscriptions comments)
 
 view : State -> Html Msg
 view { post } =
