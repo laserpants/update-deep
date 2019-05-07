@@ -12,6 +12,7 @@ import App.Posts.List.Page
 import App.Route exposing (..)
 import App.Router as Router
 import App.Ui as Ui
+import Bootstrap.Grid as Grid
 import Browser exposing (Document)
 import Browser.Navigation as Navigation
 import Flags exposing (..)
@@ -155,23 +156,32 @@ pageOutlet { auth, posts, router } =
     Nothing ->
       div [] [ text "Don't know that page" ]
 
+content : State -> Html Msg
+content state =
+  div []
+    [ ul []
+      [ li [] [ a [ href "/" ] [ text "Home" ] ]
+      , li [] [ a [ href "/about" ] [ text "About" ] ]
+      , li [] [ a [ href "/login" ] [ text "Login" ] ]
+      , li [] [ a [ href "/register" ] [ text "Register" ] ]
+      , li [] [ a [ href "/posts/1" ] [ text "Show post" ] ]
+      , li [] [ a [ href "/posts/new" ] [ text "New post" ] ]
+      , li [] [ a [ href "/posts/1/comments/new" ] [ text "New comment" ] ]
+      , li [] [ a [ href "#" ] [ text "#" ] ]
+      , pageOutlet state
+  --        , text (Debug.toString state)
+      ]
+    ]
+
 view : State -> Document Msg
 view state =
   { title = ""
   , body  =
-    [ div []
-      [ ul []
-        [ li [] [ a [ href "/" ] [ text "Home" ] ]
-        , li [] [ a [ href "/about" ] [ text "About" ] ]
-        , li [] [ a [ href "/login" ] [ text "Login" ] ]
-        , li [] [ a [ href "/register" ] [ text "Register" ] ]
-        , li [] [ a [ href "/posts/1" ] [ text "Show post" ] ]
-        , li [] [ a [ href "/posts/new" ] [ text "New post" ] ]
-        , li [] [ a [ href "/posts/1/comments/new" ] [ text "New comment" ] ]
-        , li [] [ a [ href "#" ] [ text "#" ] ]
-        , pageOutlet state
---        , text (Debug.toString state)
+    [ Grid.container []
+      [ Grid.row []
+        [ Grid.col []
+          [ content state ]
         ]
-      ]
+      ]      
     ]
   }
