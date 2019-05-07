@@ -170,7 +170,7 @@ view state =
         , li [] [ a [ href "/posts/1/comments/new" ] [ text "New comment" ] ]
         , li [] [ a [ href "#" ] [ text "#" ] ]
         , pageOutlet state
-        , text (Debug.toString state)
+--        , text (Debug.toString state)
         ]
       ]
     ]
