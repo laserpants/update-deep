@@ -54,10 +54,11 @@ init config =
   { resource = NotRequested
   , request  = initRequest config } |> initial
 
-defaultHandlers : { onSuccess : a -> Update a c e, onError : Http.Error -> a -> Update a c e }
-defaultHandlers = { onSuccess = save, onError = always save }
+defaultHandlers : { onSuccess : b -> a -> Update a c e, onError : Http.Error -> a -> Update a c e }
+defaultHandlers = { onSuccess = always save
+                  , onError   = always save }
 
-update : { t | onSuccess : a -> Update a c e, onError : Http.Error -> a -> Update a c e } -> Msg b -> Api b -> Update (Api b) (Msg b) (a -> Update a c e)
+update : { t | onSuccess : b -> a -> Update a c e, onError : Http.Error -> a -> Update a c e } -> Msg b -> Api b -> Update (Api b) (Msg b) (a -> Update a c e)
 update events msg state =
   case msg of
     Request maybeBody ->
@@ -67,10 +68,10 @@ update events msg state =
       state
         |> setResource Requested
         |> andRunCmd (state.request endpoint maybeBody)
-    Response (Ok response) ->
+    Response (Ok resource) ->
       state
-        |> setResource (Available response)
-        |> andInvoke events.onSuccess
+        |> setResource (Available resource)
+        |> andInvoke (events.onSuccess resource)
     Response (Err error) ->
       state
         |> setResource (Error error)

@@ -50,7 +50,7 @@ update msg state =
    in case msg of
         ApiMsg apiMsg ->
           state.response
-            |> Api.update { default | onSuccess = resetForm } apiMsg
+            |> Api.update { default | onSuccess = always resetForm } apiMsg
             |> andThen (\response -> save { state | response = response })
             |> mapCmd ApiMsg
             |> consumeEvents

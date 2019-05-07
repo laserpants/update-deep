@@ -11,7 +11,7 @@ import Update.Deep exposing (..)
 
 type Msg
   = ApiMsg (Api.Msg (List Post))
-  | FetchAll
+  | FetchAll Bool
 
 type alias State =
   { collection : Api (List Post) }
@@ -35,12 +35,12 @@ update msg state =
             |> andThen (\collection -> save { state | collection = collection })
             |> mapCmd ApiMsg
             |> consumeEvents
-        FetchAll ->
+        FetchAll force ->
           case state.collection.resource of
             Requested ->
-              save state
+              if force then state |> requestCollection else save state
             Available _ ->
-              save state
+              if force then state |> requestCollection else save state
             NotRequested ->
               state |> requestCollection
             Error error ->
@@ -51,12 +51,19 @@ subscriptions _ = Sub.none
 
 view : State -> Html Msg
 view { collection } =
-  case collection.resource of
-    NotRequested ->
-      div [] [ text "Not requested" ]
-    Requested ->
-      div [] [ text "Requested..." ]
-    Error error ->
-      div [] [ text "Error" ]
-    Available posts ->
-      div [] (List.map (\_ -> div [] [ text "item" ]) posts)
+
+  let item : Post -> Html Msg 
+      item post =
+        div [ ] 
+          [ h2 [] [ text post.title ]
+          , p [] [ text post.body ] ]
+
+   in case collection.resource of
+        NotRequested ->
+          div [] [ text "Not requested" ]
+        Requested ->
+          div [] [ text "Requested..." ]
+        Error error ->
+          div [] [ text "Error" ]
+        Available posts ->
+          div [] (List.map item posts)

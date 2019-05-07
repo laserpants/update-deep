@@ -47,7 +47,7 @@ update msg state =
    in case msg of
         ApiMsg apiMsg ->
           state.user
-            |> Api.update { default | onSuccess = resetForm } apiMsg
+            |> Api.update { default | onSuccess = always resetForm } apiMsg
             |> andThen (\user -> save { state | user = user })
             |> mapCmd ApiMsg
             |> consumeEvents

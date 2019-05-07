@@ -39,14 +39,20 @@ onSubmit events form =
     |> ApiMsg
     |> update events
 
+onSuccess : { onPostAdded : Post -> a -> Update a c e } -> Post -> State -> Update State Msg (a -> Update a c e)
+onSuccess events post state =
+  let resetForm = update events (FormMsg FormState.Reset)
+   in state
+    |> invoke (events.onPostAdded post)
+    |> andThen resetForm
+
 update : { onPostAdded : Post -> a -> Update a c e } -> Msg -> State -> Update State Msg (a -> Update a c e)
 update events msg state =
-  let resetForm = update events (FormMsg FormState.Reset)
-      default = Api.defaultHandlers
+  let default = Api.defaultHandlers
    in case msg of
         ApiMsg apiMsg ->
           state.post
-            |> Api.update { default | onSuccess = resetForm } apiMsg
+            |> Api.update { default | onSuccess = onSuccess events } apiMsg
             |> andThen (\post -> save { state | post = post })
             |> mapCmd ApiMsg
             |> consumeEvents

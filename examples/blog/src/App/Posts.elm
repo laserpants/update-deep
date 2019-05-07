@@ -5,6 +5,7 @@ import App.Config exposing (..)
 import App.Posts.Create.Page as CreatePage
 import App.Posts.Item.Page as ItemPage
 import App.Posts.List.Page as ListPage
+import Data.Post exposing (Post)
 import Update.Deep exposing (..)
 
 type Msg
@@ -32,6 +33,9 @@ init config =
         |> initCmd CreateMsg createPage
         |> initCmd ItemMsg itemPage
 
+onPostAdded : Post -> State -> Update State Msg a
+onPostAdded post = update (ListMsg (ListPage.FetchAll True))
+
 update : Msg -> State -> Update State Msg a
 update msg state =
   case msg of
@@ -42,7 +46,7 @@ update msg state =
         |> mapCmd ListMsg
     CreateMsg createPageMsg ->
       state.createPage
-        |> CreatePage.update { onPostAdded = always save } createPageMsg
+        |> CreatePage.update { onPostAdded = onPostAdded } createPageMsg
         |> andThen (\page -> save { state | createPage = page })
         |> mapCmd CreateMsg
         |> consumeEvents
@@ -56,7 +60,7 @@ update msg state =
         |> update (ItemMsg (ItemPage.SetPost id))
     FetchAll ->
       state
-        |> update (ListMsg ListPage.FetchAll)
+        |> update (ListMsg (ListPage.FetchAll False))
 
 subscriptions : State -> Sub Msg
 subscriptions { listPage, createPage, itemPage } =
