@@ -77,17 +77,17 @@ onRouteChange route state =
   case route of
     Just Home ->
       state.posts
-        |> updateSubstate postsState (Posts.FetchAll)
+        |> updateSubstate postsState (Posts.ListMsg (App.Posts.List.FetchAll False))
         |> andThen (insertAsPostsIn state)
         |> consumeEvents
     Just (ShowPost id) ->
       state.posts
-        |> updateSubstate postsState (Posts.SetPost id)
+        |> updateSubstate postsState (Posts.ItemMsg (App.Posts.Item.SetPost id))
         |> andThen (insertAsPostsIn state)
         |> consumeEvents
     Just (NewComment postId) ->
       state.posts
-        |> updateSubstate postsState (Posts.SetPost postId)
+        |> updateSubstate postsState (Posts.ItemMsg (App.Posts.Item.SetPost postId))
         |> andThen (insertAsPostsIn state)
         |> consumeEvents
     _ ->

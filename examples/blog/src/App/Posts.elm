@@ -13,8 +13,6 @@ type Msg
   = ListMsg List.Msg
   | CreateMsg Create.Msg
   | ItemMsg Item.Msg
-  | SetPost Int
-  | FetchAll
 
 type alias State =
   { list   : List.State
@@ -59,12 +57,6 @@ update events msg state =
         |> Item.update itemMsg
         |> andThen (\page -> save { state | item = page })
         |> mapCmd ItemMsg
-    SetPost id ->
-      state
-        |> update events (ItemMsg (Item.SetPost id))
-    FetchAll ->
-      state
-        |> update events (ListMsg (List.FetchAll False))
 
 subscriptions : State -> Sub Msg
 subscriptions { list, create, item } =
