@@ -1,11 +1,13 @@
 module App exposing (..)
 
+import Api
 import App.Auth as Auth
 import App.Auth.Login
 import App.Auth.Register
 import App.Comments
 import App.Posts as Posts
 import App.Posts.Create
+import App.Posts.Create.Form as CreateForm exposing (Form)
 import App.Posts.Item
 import App.Posts.List
 import App.Route exposing (..)
@@ -14,12 +16,15 @@ import App.Ui as Ui
 import Bootstrap.Grid as Grid
 import Browser exposing (Document)
 import Browser.Navigation as Navigation
+import Data.Post
 import Flags exposing (..)
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (..)
+import Json.Decode as Json
 import Update.Deep exposing (..)
 import Url exposing (Url)
+import Update.Form as Form
 
 type Msg
   = AuthMsg Auth.Msg
@@ -27,18 +32,25 @@ type Msg
   | RouterMsg Router.Msg
   | UiMsg Ui.Msg
 
+type Page
+  = AboutPage
+  | HomePage
+  | NewPostPage App.Posts.Create.Model
+
 type alias State =
-  { auth   : Auth.State
-  , posts  : Posts.State
-  , router : Router.State
-  , ui     : Ui.State }
+--  { auth   : Auth.State
+--  , posts  : Posts.State
+  { router : Router.State
+  , ui     : Ui.State 
+  , page   : Page
+  }
 
 init : Flags -> Url -> Navigation.Key -> Init State Msg
 init flags url key =
 
   let config = { flags = flags, key = key }
-      auth   = Auth.init config
-      posts  = Posts.init config
+--      auth   = Auth.init config
+--      posts  = Posts.init config
       router = Router.init config
       ui     = Ui.init config
 
@@ -49,22 +61,23 @@ init flags url key =
           |> andThen (update msg)
           |> updateToInit
 
-   in { auth   = auth.state
-      , posts  = posts.state
-      , router = router.state
-      , ui     = ui.state }
+   in { --auth   = auth.state
+      --, posts  = posts.state
+        router = router.state
+      , ui     = ui.state 
+      , page   = HomePage }
         |> initial
-        |> initCmd AuthMsg auth
-        |> initCmd PostsMsg posts
+--        |> initCmd AuthMsg auth
+--        |> initCmd PostsMsg posts
         |> initCmd RouterMsg router
         |> initCmd UiMsg ui
         |> initUrl
 
-insertAsAuthIn : State -> Auth.State -> Update State Msg a
-insertAsAuthIn state auth = save { state | auth = auth }
+--insertAsAuthIn : State -> Auth.State -> Update State Msg a
+--insertAsAuthIn state auth = save { state | auth = auth }
 
-insertAsPostsIn : State -> Posts.State -> Update State Msg a
-insertAsPostsIn state posts = save { state | posts = posts }
+--insertAsPostsIn : State -> Posts.State -> Update State Msg a
+--insertAsPostsIn state posts = save { state | posts = posts }
 
 insertAsRouterIn : State -> Router.State -> Update State Msg a
 insertAsRouterIn state router = save { state | router = router }
@@ -76,22 +89,39 @@ onRouteChange : Maybe Route -> State -> Update State Msg a
 onRouteChange route state =
   case route of
     Just Home ->
-      state.posts
-        |> updateSubstate postsState (Posts.ListMsg (App.Posts.List.FetchAll False))
-        |> andThen (insertAsPostsIn state)
-        |> consumeEvents
-    Just (ShowPost id) ->
-      state.posts
-        |> updateSubstate postsState (Posts.ItemMsg (App.Posts.Item.SetPost id))
-        |> andThen (insertAsPostsIn state)
-        |> consumeEvents
-    Just (NewComment postId) ->
-      state.posts
-        |> updateSubstate postsState (Posts.ItemMsg (App.Posts.Item.SetPost postId))
-        |> andThen (insertAsPostsIn state)
-        |> consumeEvents
+      save { state | page = HomePage }
+    Just About ->
+      save { state | page = AboutPage }
+    Just NewPost ->
+      let x = Api.init { endpoint = "/posts"
+                       , method   = Api.HttpPost
+                       , decoder  = Json.field "post" Data.Post.decoder }
+          form = Form.init CreateForm.fields { title = "", body = "" }
+
+          model = { post = x.state, form = form.state }
+
+
+       in save { state | page = NewPostPage model }
     _ ->
       save state
+
+--    Just Home ->
+--      state.posts
+--        |> updateSubstate postsState (Posts.ListMsg (App.Posts.List.FetchAll False))
+--        |> andThen (insertAsPostsIn state)
+--        |> consumeEvents
+--    Just (ShowPost id) ->
+--      state.posts
+--        |> updateSubstate postsState (Posts.ItemMsg (App.Posts.Item.SetPost id))
+--        |> andThen (insertAsPostsIn state)
+--        |> consumeEvents
+--    Just (NewComment postId) ->
+--      state.posts
+--        |> updateSubstate postsState (Posts.ItemMsg (App.Posts.Item.SetPost postId))
+--        |> andThen (insertAsPostsIn state)
+--        |> consumeEvents
+--    _ ->
+--      save state
 
 redirect : String -> State -> Update State Msg a
 redirect url state =
@@ -121,15 +151,27 @@ uiState = { update = Ui.update, messages = UiMsg }
 update : Msg -> State -> Update State Msg (State -> Update State Msg a)
 update msg state =
   case msg of
-    AuthMsg authMsg ->
-      state.auth
-        |> updateSubstate authState authMsg
-        |> andThen (insertAsAuthIn state)
+--    AuthMsg authMsg ->
+--      state.auth
+--        |> updateSubstate authState authMsg
+--        |> andThen (insertAsAuthIn state)
+--    PostsMsg postsMsg ->
+--      state.posts
+--        |> updateSubstate postsState postsMsg
+--        |> andThen (insertAsPostsIn state)
+--        |> consumeEvents
     PostsMsg postsMsg ->
-      state.posts
-        |> updateSubstate postsState postsMsg
-        |> andThen (insertAsPostsIn state)
-        |> consumeEvents
+      case postsMsg of
+        Posts.CreateMsg createMsg ->
+          case state.page of
+            NewPostPage model ->
+              let x = App.Posts.Create.update { onPostAdded = \_ -> Debug.log "onPostAdded" save } createMsg model 
+               in consumeEvents (mapCmd (PostsMsg << Posts.CreateMsg) (andThen (\newModel -> save { state | page = NewPostPage newModel }) x))
+
+            _ ->
+              save state
+        _ ->
+          save state
     RouterMsg routerMsg ->
       state.router
         |> updateSubstate routerState routerMsg
@@ -139,51 +181,65 @@ update msg state =
       state.ui
         |> updateSubstate uiState uiMsg
         |> andThen (insertAsUiIn state)
+    _ ->
+      save state
 
 subscriptions : State -> Sub Msg
 subscriptions state =
   Sub.batch
-    [ Sub.map AuthMsg (Auth.subscriptions state.auth)
-    , Sub.map PostsMsg (Posts.subscriptions state.posts)
-    , Sub.map RouterMsg (Router.subscriptions state.router)
+    [ --Sub.map AuthMsg (Auth.subscriptions state.auth)
+    -- , Sub.map PostsMsg (Posts.subscriptions state.posts)
+      Sub.map RouterMsg (Router.subscriptions state.router)
     , Sub.map UiMsg (Ui.subscriptions state.ui) ]
 
 pageOutlet : State -> Html Msg
-pageOutlet { auth, posts, router } =
-  case router.route of
-    Just Login ->
-      Html.map (AuthMsg << Auth.LoginMsg) (App.Auth.Login.view auth.login)
-    Just Register ->
-      Html.map (AuthMsg << Auth.RegisterMsg) (App.Auth.Register.view auth.register)
-    Just NewPost ->
-      Html.map (PostsMsg << Posts.CreateMsg) (App.Posts.Create.view posts.create)
-    Just Home ->
-      Html.map (PostsMsg << Posts.ListMsg) (App.Posts.List.view posts.list)
-    Just (ShowPost id) ->
-      Html.map (PostsMsg << Posts.ItemMsg) (App.Posts.Item.view posts.item)
-    Just About ->
-      div [] [ text "About" ]
-    Just (NewComment postId) ->
-      Html.map (PostsMsg << Posts.ItemMsg << App.Posts.Item.CommentsMsg) (App.Comments.view posts.item.comments)
-    Nothing ->
-      div [] [ text "Don't know that page" ]
+pageOutlet state = div [] []
+--
+--pageOutlet : State -> Html Msg
+--pageOutlet { auth, posts, router } =
+--  case router.route of
+--    Just Login ->
+--      Html.map (AuthMsg << Auth.LoginMsg) (App.Auth.Login.view auth.login)
+--    Just Register ->
+--      Html.map (AuthMsg << Auth.RegisterMsg) (App.Auth.Register.view auth.register)
+--    Just NewPost ->
+--      Html.map (PostsMsg << Posts.CreateMsg) (App.Posts.Create.view posts.create)
+--    Just Home ->
+--      Html.map (PostsMsg << Posts.ListMsg) (App.Posts.List.view posts.list)
+--    Just (ShowPost id) ->
+--      Html.map (PostsMsg << Posts.ItemMsg) (App.Posts.Item.view posts.item)
+--    Just About ->
+--      div [] [ text "About" ]
+--    Just (NewComment postId) ->
+--      Html.map (PostsMsg << Posts.ItemMsg << App.Posts.Item.CommentsMsg) (App.Comments.view posts.item.comments)
+--    Nothing ->
+--      div [] [ text "Don't know that page" ]
 
 content : State -> Html Msg
 content state =
-  div []
-    [ --ul []
-      --[ li [] [ a [ href "/" ] [ text "Home" ] ]
-      --, li [] [ a [ href "/about" ] [ text "About" ] ]
-      --, li [] [ a [ href "/login" ] [ text "Login" ] ]
-      --, li [] [ a [ href "/register" ] [ text "Register" ] ]
-      --, li [] [ a [ href "/posts/1" ] [ text "Show post" ] ]
-      --, li [] [ a [ href "/posts/new" ] [ text "New post" ] ]
-      --, li [] [ a [ href "/posts/1/comments/new" ] [ text "New comment" ] ]
-      --, li [] [ a [ href "#" ] [ text "#" ] ]
-        pageOutlet state
-  --        , text (Debug.toString state)
-      --]
-    ]
+  case state.page of
+    HomePage -> 
+      div [] [ text "home page" ]
+    AboutPage -> 
+      div [] [ text "about page" ]
+    NewPostPage model ->
+      div [] 
+        [ Html.map (PostsMsg << Posts.CreateMsg) (App.Posts.Create.view model) ]
+
+--  div []
+--    [ --ul []
+--      --[ li [] [ a [ href "/" ] [ text "Home" ] ]
+--      --, li [] [ a [ href "/about" ] [ text "About" ] ]
+--      --, li [] [ a [ href "/login" ] [ text "Login" ] ]
+--      --, li [] [ a [ href "/register" ] [ text "Register" ] ]
+--      --, li [] [ a [ href "/posts/1" ] [ text "Show post" ] ]
+--      --, li [] [ a [ href "/posts/new" ] [ text "New post" ] ]
+--      --, li [] [ a [ href "/posts/1/comments/new" ] [ text "New comment" ] ]
+--      --, li [] [ a [ href "#" ] [ text "#" ] ]
+--        pageOutlet state
+--  --        , text (Debug.toString state)
+--      --]
+--    ]
 
 view : State -> Document Msg
 view state =
