@@ -444,16 +444,20 @@ type Page
 --  | RegisterPage AuthRegisterModel
   | NotFoundPage
 
+type PageMsg
+  = PostsCreateMsg PostsCreateMsg
+  | PostsListMsg PostsListMsg
+--  | AuthLoginMsg AuthLoginMsg
+--  | AuthRegisterMsg AuthRegisterMsg
+
 --
 
 type Msg
   = RouterMsg RouterMsg
   | UiMsg UiMsg
-  | SetPage Page
-  | PostsCreateMsg PostsCreateMsg
-  | PostsListMsg PostsListMsg
---  | AuthLoginMsg AuthLoginMsg
---  | AuthRegisterMsg AuthRegisterMsg
+  | PageMsg PageMsg
+--  | PostsCreateMsg PostsCreateMsg
+--  | PostsListMsg PostsListMsg
 
 type alias Flags = ()
 
@@ -479,9 +483,9 @@ init flags url key =
    in map3 Model
         (router |> mapCmd RouterMsg)
         (ui     |> mapCmd UiMsg)
-        (page   |> mapCmd PostsCreateMsg) 
+        (page   |> mapCmd (PageMsg << PostsCreateMsg))
           |> andThen (update (RouterMsg (UrlChange url)))
-          |> andThen (update (PostsListMsg Refresh))
+          |> andThen (update ((PageMsg (PostsListMsg Refresh))))
 
 handleRouteChange : Maybe Route -> Model -> Update Model Msg (a -> Update a c e)
 handleRouteChange route model =
@@ -490,17 +494,35 @@ handleRouteChange route model =
       save model
     Just Home ->
       postsListInit
-        |> mapCmd PostsListMsg
+        |> mapCmd (PageMsg << PostsListMsg)
         |> andThen (\pageModel -> insertAsPageIn model (HomePage pageModel))
-        |> andThen (update (PostsListMsg Refresh))
+        |> andThen (update (PageMsg (PostsListMsg Refresh)))
     Just NewPost ->
       postsCreateInit
-        |> mapCmd PostsCreateMsg
+        |> mapCmd (PageMsg << PostsCreateMsg)
         |> andThen (\pageModel -> insertAsPageIn model (NewPostPage pageModel))
     _ -> save model
 
-redirect : String -> Model -> Update Model Msg (a -> Update a c e)
-redirect url = update (RouterMsg (Redirect url))
+doRedirect : String -> Model -> Update Model Msg (a -> Update a c e)
+doRedirect url = update (RouterMsg (Redirect url))
+
+updatePage : { redirect : String -> a -> Update a c e } -> PageMsg -> Page -> Update Page PageMsg (a -> Update a c e)
+updatePage { redirect } msg page =
+  case ( msg, page ) of
+    ( PostsCreateMsg postsCreateMsg, NewPostPage postsCreateModel ) ->
+      postsCreateModel
+        |> postsCreateUpdate { onPostAdded = always (invokeHandler (redirect "/")) } postsCreateMsg
+        |> mapCmd PostsCreateMsg
+        |> map NewPostPage
+        |> consumeEvents
+    ( PostsListMsg postsListMsg, HomePage postsListModel ) ->
+      postsListModel
+        |> postsListUpdate postsListMsg
+        |> mapCmd PostsListMsg
+        |> map HomePage
+        |> consumeEvents
+    _ ->
+      save page
 
 update : Msg -> Model -> Update Model Msg (a -> Update a c e)
 update msg model =
@@ -515,32 +537,18 @@ update msg model =
         |> uiUpdate uiMsg
         |> mapCmd UiMsg 
         |> andWithEvents (insertAsUiIn model)
-    SetPage page ->
-      save { model | page = page }
-    PostsCreateMsg postsCreateMsg ->
-      case model.page of
-        NewPostPage postsCreateModel ->
-          postsCreateModel
-            |> postsCreateUpdate { onPostAdded = always (redirect "/") } postsCreateMsg
-            |> mapCmd PostsCreateMsg 
-            |> andWithEvents (\pageModel -> insertAsPageIn model (NewPostPage pageModel))
-        _ -> save model
-    PostsListMsg postsListMsg ->
-      case model.page of
-        HomePage postsListModel ->
-          postsListModel
-            |> postsListUpdate postsListMsg
-            |> mapCmd PostsListMsg
-            |> andWithEvents (\pageModel -> insertAsPageIn model (HomePage pageModel))
-        _ -> save model
+    PageMsg pageMsg ->
+      updatePage { redirect = doRedirect } pageMsg model.page
+        |> mapCmd PageMsg
+        |> andWithEvents (insertAsPageIn model)
 
 pageSubscriptions : Page -> Sub Msg
 pageSubscriptions page =
   case page of
     HomePage postsListModel ->
-      Sub.map PostsListMsg (postsListSubscriptions postsListModel)
+      Sub.map (PageMsg << PostsListMsg) (postsListSubscriptions postsListModel)
     NewPostPage postsCreateModel ->
-      Sub.map PostsCreateMsg (postsCreateSubscriptions postsCreateModel)
+      Sub.map (PageMsg << PostsCreateMsg) (postsCreateSubscriptions postsCreateModel)
     _ ->
       Sub.none
 
@@ -554,9 +562,9 @@ pageView : Page -> Html Msg
 pageView page =
   case page of
     NewPostPage postsCreateModel ->
-      Html.map PostsCreateMsg (postsCreateView postsCreateModel)
+      Html.map (PageMsg << PostsCreateMsg) (postsCreateView postsCreateModel)
     HomePage postsListModel ->
-      Html.map PostsListMsg (postsListView postsListModel)
+      Html.map (PageMsg << PostsListMsg) (postsListView postsListModel)
     _ ->
       div [] []
 
