@@ -208,6 +208,22 @@ fromUrl = parse parser
 
 --
 
+type alias DataUser =
+  { id    : Int
+  , email : String
+  , login : String
+  , name  : String }
+
+dataUserDecoder : Json.Decoder DataUser
+dataUserDecoder =
+  Json.map4 DataUser
+    (Json.field "id"    Json.int)
+    (Json.field "email" Json.string)
+    (Json.field "login" Json.string)
+    (Json.field "name"  Json.string)
+
+--
+
 type alias DataPost =
   { id    : Int
   , title : String
@@ -219,6 +235,80 @@ dataPostDecoder =
     (Json.field "id"    Json.int)
     (Json.field "title" Json.string)
     (Json.field "body"  Json.string)
+
+--
+
+type alias AuthRegisterForm =
+  { login    : String
+  , password : String }
+
+authRegisterFormFields : Fields AuthRegisterForm
+authRegisterFormFields =
+
+  let loginField =
+        Form.textField
+          { parser = Ok
+          , value  = .login
+          , update = \value values -> { values | login = value }
+          , attributes =
+            { label       = "Email"
+            , placeholder = "Email" } }
+
+      passwordField =
+        Form.passwordField
+          { parser = Ok
+          , value  = .password
+          , update = \value values -> { values | password = value }
+          , attributes =
+            { label       = "Password"
+            , placeholder = "Your password" } }
+
+   in Form.succeed AuthRegisterForm
+    |> Form.append loginField
+    |> Form.append passwordField
+    |> Form.map SubmitForm
+
+authRegisterFormToJson : AuthRegisterForm -> Value
+authRegisterFormToJson { login, password } =
+  object [ ( "login"    , Encode.string login )
+         , ( "password" , Encode.string password ) ]
+
+--
+
+type alias AuthLoginForm =
+  { login    : String
+  , password : String }
+
+authLoginFormFields : Fields AuthLoginForm
+authLoginFormFields =
+
+  let loginField =
+        Form.textField
+          { parser = Ok
+          , value  = .login
+          , update = \value values -> { values | login = value }
+          , attributes =
+            { label       = "Login"
+            , placeholder = "Login" } }
+
+      passwordField =
+        Form.passwordField
+          { parser = Ok
+          , value  = .password
+          , update = \value values -> { values | password = value }
+          , attributes =
+            { label       = "Password"
+            , placeholder = "Your password" } }
+
+   in Form.succeed AuthLoginForm
+    |> Form.append loginField
+    |> Form.append passwordField
+    |> Form.map SubmitForm
+
+authLoginFormToJson : AuthLoginForm -> Value
+authLoginFormToJson { login, password } =
+  object [ ( "login"    , Encode.string login )
+         , ( "password" , Encode.string password ) ]
 
 --
 
@@ -364,21 +454,39 @@ postsCreateView { form } =
 
 --
 
--- type AuthLoginMsg
---   = NoAuthLoginMsg
--- 
--- type alias AuthLoginModel =
---   { user : ApiModel DataUser
---   , form : FormModel AuthLoginForm }
--- 
--- --
--- 
--- type AuthRegisterMsg
---   = NoAuthRegisterMsg
--- 
--- type alias AuthRegisterModel =
---   { response : ApiModel { status : String }
---   , form     : FormModel AuthRegisterForm }
+type AuthLoginMsg
+  = NoAuthLoginMsg
+
+type alias AuthLoginModel =
+  { user : ApiModel DataUser
+  , form : FormModel AuthLoginForm }
+
+authLoginInit : Update AuthLoginModel AuthLoginMsg e
+authLoginInit = Debug.todo ""
+
+authLoginUpdate : AuthLoginMsg -> AuthLoginModel -> Update AuthLoginModel AuthLoginMsg e
+authLoginUpdate msg model =
+  case msg of
+    _ ->
+      save model
+
+--
+
+type AuthRegisterMsg
+  = NoAuthRegisterMsg
+
+type alias AuthRegisterModel =
+  { response : ApiModel { status : String }
+  , form     : FormModel AuthRegisterForm }
+
+authRegisterInit : Update AuthRegisterModel AuthRegisterMsg e
+authRegisterInit = Debug.todo ""
+
+authRegisterUpdate : AuthRegisterMsg -> AuthRegisterModel -> Update AuthRegisterModel AuthRegisterMsg e
+authRegisterUpdate msg model =
+  case msg of
+    _ ->
+      save model
 
 --
 
@@ -440,15 +548,15 @@ uiSubscriptions model = Sub.none
 type Page
   = HomePage PostsListModel
   | NewPostPage PostsCreateModel
---  | LoginPage AuthLoginModel
---  | RegisterPage AuthRegisterModel
+  | LoginPage AuthLoginModel
+  | RegisterPage AuthRegisterModel
   | NotFoundPage
 
 type PageMsg
   = PostsCreateMsg PostsCreateMsg
   | PostsListMsg PostsListMsg
---  | AuthLoginMsg AuthLoginMsg
---  | AuthRegisterMsg AuthRegisterMsg
+  | AuthLoginMsg AuthLoginMsg
+  | AuthRegisterMsg AuthRegisterMsg
 
 --
 
@@ -456,8 +564,6 @@ type Msg
   = RouterMsg RouterMsg
   | UiMsg UiMsg
   | PageMsg PageMsg
---  | PostsCreateMsg PostsCreateMsg
---  | PostsListMsg PostsListMsg
 
 type alias Flags = ()
 
@@ -520,6 +626,18 @@ updatePage { redirect } msg page =
         |> postsListUpdate postsListMsg
         |> mapCmd PostsListMsg
         |> map HomePage
+        |> consumeEvents
+    ( AuthLoginMsg authLoginMsg, LoginPage authLoginModel ) ->
+      authLoginModel
+        |> authLoginUpdate authLoginMsg
+        |> mapCmd AuthLoginMsg
+        |> map LoginPage
+        |> consumeEvents
+    ( AuthRegisterMsg authRegisterMsg, RegisterPage authRegisterModel ) ->
+      authRegisterModel
+        |> authRegisterUpdate authRegisterMsg
+        |> mapCmd AuthRegisterMsg
+        |> map RegisterPage
         |> consumeEvents
     _ ->
       save page
