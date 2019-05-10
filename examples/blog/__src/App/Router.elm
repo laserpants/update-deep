@@ -45,6 +45,5 @@ update events msg state =
       state
         |> runCmd (Navigation.replaceUrl state.key url)
 
-
 subscriptions : State -> Sub Msg
 subscriptions _ = Sub.none
