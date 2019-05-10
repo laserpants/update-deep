@@ -194,14 +194,18 @@ type Route
   | About
   | NewPost
   | Post Int
+  | Login
+  | Register
 
 parser : Parser (Route -> a) a
 parser =
   oneOf
-    [ Parser.map Home    (Parser.top)
-    , Parser.map About   (Parser.s "about")
-    , Parser.map NewPost (Parser.s "posts" </> Parser.s "new")
-    , Parser.map Post    (Parser.s "posts" </> Parser.int) ]
+    [ Parser.map Home     (Parser.top)
+    , Parser.map About    (Parser.s "about")
+    , Parser.map Login    (Parser.s "login")
+    , Parser.map Register (Parser.s "register")
+    , Parser.map NewPost  (Parser.s "posts" </> Parser.s "new")
+    , Parser.map Post     (Parser.s "posts" </> Parser.int) ]
 
 fromUrl : Url -> Maybe Route
 fromUrl = parse parser
@@ -455,38 +459,97 @@ postsCreateView { form } =
 --
 
 type AuthLoginMsg
-  = NoAuthLoginMsg
+  = AuthLoginApiMsg (ApiMsg DataUser)
+  | AuthLoginFormMsg (FormMsg AuthLoginForm)
 
 type alias AuthLoginModel =
   { user : ApiModel DataUser
   , form : FormModel AuthLoginForm }
 
+authLoginInsertAsUserIn : AuthLoginModel -> ApiModel DataUser -> Update AuthLoginModel AuthLoginMsg a
+authLoginInsertAsUserIn model user = save { model | user = user }
+
+authLoginInsertAsFormIn : AuthLoginModel -> FormModel AuthLoginForm -> Update AuthLoginModel AuthLoginMsg a
+authLoginInsertAsFormIn model form = save { model | form = form }
+
 authLoginInit : Update AuthLoginModel AuthLoginMsg e
-authLoginInit = Debug.todo ""
+authLoginInit = 
+  let api = apiInit { endpoint = "/auth/login"
+                    , method   = HttpPost
+                    , decoder  = Json.field "user" dataUserDecoder }
+      form = formInit authLoginFormFields { login = "", password = "" }
+   in map2 AuthLoginModel
+        (api  |> mapCmd AuthLoginApiMsg) 
+        (form |> mapCmd AuthLoginFormMsg)
 
 authLoginUpdate : AuthLoginMsg -> AuthLoginModel -> Update AuthLoginModel AuthLoginMsg e
 authLoginUpdate msg model =
   case msg of
-    _ ->
-      save model
+    AuthLoginApiMsg apiMsg ->
+      model.user
+        |> apiUpdate apiDefaultHandlers apiMsg
+        |> mapCmd AuthLoginApiMsg
+        |> andWithEvents (authLoginInsertAsUserIn model)
+    AuthLoginFormMsg formMsg ->
+      model.form
+        |> formUpdate { onSubmit = always save } formMsg
+        |> mapCmd AuthLoginFormMsg
+        |> andWithEvents (authLoginInsertAsFormIn model)
+
+authLoginSubscriptions : AuthLoginModel -> Sub AuthLoginMsg
+authLoginSubscriptions model = Sub.none
+
+authLoginView : AuthLoginModel -> Html AuthLoginMsg
+authLoginView { form } = 
+  Html.map AuthLoginFormMsg (formView form)
 
 --
 
 type AuthRegisterMsg
-  = NoAuthRegisterMsg
+  = AuthRegisterApiMsg (ApiMsg { status : String })
+  | AuthRegisterFormMsg (FormMsg AuthRegisterForm)
 
 type alias AuthRegisterModel =
   { response : ApiModel { status : String }
   , form     : FormModel AuthRegisterForm }
 
+authRegisterInsertAsResponseIn : AuthRegisterModel -> ApiModel { status : String } -> Update AuthRegisterModel AuthRegisterMsg a
+authRegisterInsertAsResponseIn model response = save { model | response = response }
+
+authRegisterInsertAsFormIn : AuthRegisterModel -> FormModel AuthRegisterForm -> Update AuthRegisterModel AuthRegisterMsg a
+authRegisterInsertAsFormIn model form = save { model | form = form }
+
 authRegisterInit : Update AuthRegisterModel AuthRegisterMsg e
-authRegisterInit = Debug.todo ""
+authRegisterInit = 
+  let decoder = Json.field "status" Json.string |> Json.map (\status -> { status = status })
+      api = apiInit { endpoint = "/auth/register"
+                    , method   = HttpPost
+                    , decoder  = decoder }
+      form = formInit authRegisterFormFields { login = "", password = "" }
+   in map2 AuthRegisterModel
+        (api  |> mapCmd AuthRegisterApiMsg) 
+        (form |> mapCmd AuthRegisterFormMsg)
 
 authRegisterUpdate : AuthRegisterMsg -> AuthRegisterModel -> Update AuthRegisterModel AuthRegisterMsg e
 authRegisterUpdate msg model =
   case msg of
-    _ ->
-      save model
+    AuthRegisterApiMsg apiMsg ->
+      model.response
+        |> apiUpdate apiDefaultHandlers apiMsg
+        |> mapCmd AuthRegisterApiMsg
+        |> andWithEvents (authRegisterInsertAsResponseIn model)
+    AuthRegisterFormMsg formMsg ->
+      model.form
+        |> formUpdate { onSubmit = always save } formMsg
+        |> mapCmd AuthRegisterFormMsg
+        |> andWithEvents (authRegisterInsertAsFormIn model)
+
+authRegisterSubscriptions : AuthRegisterModel -> Sub AuthRegisterMsg
+authRegisterSubscriptions model = Sub.none
+
+authRegisterView : AuthRegisterModel -> Html AuthRegisterMsg
+authRegisterView { form } = 
+  Html.map AuthRegisterFormMsg (formView form)
 
 --
 
@@ -596,8 +659,6 @@ init flags url key =
 handleRouteChange : Maybe Route -> Model -> Update Model Msg (a -> Update a c e)
 handleRouteChange route model =
   case route of
-    Nothing ->
-      save model
     Just Home ->
       postsListInit
         |> mapCmd (PageMsg << PostsListMsg)
@@ -607,7 +668,16 @@ handleRouteChange route model =
       postsCreateInit
         |> mapCmd (PageMsg << PostsCreateMsg)
         |> andThen (\pageModel -> insertAsPageIn model (NewPostPage pageModel))
-    _ -> save model
+    Just Login ->
+      authLoginInit
+        |> mapCmd (PageMsg << AuthLoginMsg)
+        |> andThen (\pageModel -> insertAsPageIn model (LoginPage pageModel))
+    Just Register ->
+      authRegisterInit
+        |> mapCmd (PageMsg << AuthRegisterMsg)
+        |> andThen (\pageModel -> insertAsPageIn model (RegisterPage pageModel))
+    _ ->
+      save { model | page = NotFoundPage }
 
 doRedirect : String -> Model -> Update Model Msg (a -> Update a c e)
 doRedirect url = update (RouterMsg (Redirect url))
@@ -667,6 +737,10 @@ pageSubscriptions page =
       Sub.map (PageMsg << PostsListMsg) (postsListSubscriptions postsListModel)
     NewPostPage postsCreateModel ->
       Sub.map (PageMsg << PostsCreateMsg) (postsCreateSubscriptions postsCreateModel)
+    LoginPage authLoginModel ->
+      Sub.map (PageMsg << AuthLoginMsg) (authLoginSubscriptions authLoginModel)
+    RegisterPage authRegisterModel ->
+      Sub.map (PageMsg << AuthRegisterMsg) (authRegisterSubscriptions authRegisterModel)
     _ ->
       Sub.none
 
@@ -683,8 +757,12 @@ pageView page =
       Html.map (PageMsg << PostsCreateMsg) (postsCreateView postsCreateModel)
     HomePage postsListModel ->
       Html.map (PageMsg << PostsListMsg) (postsListView postsListModel)
-    _ ->
-      div [] []
+    LoginPage authLoginModel ->
+      Html.map (PageMsg << AuthLoginMsg) (authLoginView authLoginModel)
+    RegisterPage authRegisterModel ->
+      Html.map (PageMsg << AuthRegisterMsg) (authRegisterView authRegisterModel)
+    NotFoundPage ->
+      div [] [ text "not found" ]
 
 view : Model -> Document Msg
 view model =
@@ -695,6 +773,8 @@ view model =
       , ul []
         [ li [] [ a [ href "/" ] [ text "Home" ] ]
         , li [] [ a [ href "/posts/new" ] [ text "New post" ] ]
+        , li [] [ a [ href "/login" ] [ text "Login" ] ]
+        , li [] [ a [ href "/register" ] [ text "Register" ] ]
         , pageView model.page ]
       , text (Debug.toString model)
       ]
