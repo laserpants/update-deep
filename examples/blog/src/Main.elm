@@ -873,9 +873,6 @@ handleRouteChange route model =
     _ ->
       save { model | page = NotFoundPage }
 
-doRedirect : String -> Model -> Update Model Msg (a -> Update a c e)
-doRedirect url = update (RouterMsg (Redirect url))
-
 updatePage : { redirect : String -> a -> Update a c e, onAuthUserChange : Maybe DataUser -> a -> Update a c e } -> PageMsg -> Page -> Update Page PageMsg (a -> Update a c e)
 updatePage { redirect, onAuthUserChange } msg page =
   case ( msg, page ) of
@@ -917,6 +914,9 @@ updatePage { redirect, onAuthUserChange } msg page =
         |> consumeEvents
     _ ->
       save page
+
+doRedirect : String -> Model -> Update Model Msg (a -> Update a c e)
+doRedirect url = update (RouterMsg (Redirect url))
 
 update : Msg -> Model -> Update Model Msg (a -> Update a c e)
 update msg model =
