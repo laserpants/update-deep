@@ -15,6 +15,10 @@ import UiFormView
 import Url exposing (Url)
 import Url.Parser as Parser exposing (Parser, parse, oneOf, (</>))
 
+--
+--
+--
+
 type alias Update m a c = ( m, Cmd c, List a )
 
 save : m -> Update m a c
@@ -72,149 +76,152 @@ message update { set, msg } =
           |> consumeEvents
    in msg << rec
 
-
 --
 --
 --
 
-type MegaDeepMsg a
-  = MegaDeepHello a
+type Route
+  = Home
+  | About
+  | NewPost
+  | Post Int
+  | CommentPost Int
+  | Login
+  | Register
 
-type alias MegaDeepModel =
-  { prop : Int }
+parser : Parser (Route -> a) a
+parser =
+  oneOf
+    [ Parser.map Home        (Parser.top)
+    , Parser.map About       (Parser.s "about")
+    , Parser.map NewPost     (Parser.s "posts" </> Parser.s "new")
+    , Parser.map Post        (Parser.s "posts" </> Parser.int)
+    , Parser.map CommentPost (Parser.s "posts" </> Parser.int </> Parser.s "comment") 
+    , Parser.map Login       (Parser.s "login")
+    , Parser.map Register    (Parser.s "register") ]
 
-megaDeepInit : Update MegaDeepModel a c
-megaDeepInit =
-  save { prop = 5 }
-
-megaDeepUpdate : {} -> MegaDeepMsg a -> MegaDeepModel -> Update MegaDeepModel a (MegaDeepMsg a)
-megaDeepUpdate _ msg model =
-  case msg of
-    _ ->
-      save model
-
-
-megaDeepSubscriptions model = Sub.none
-
-megaDeepView model = div [] []
-
---
-
-type DeepMsg a
-  = DeepHello a
-  | SomeDeepMsg
-  | DeepMegaDeepMsg (MegaDeepModel -> {} -> DeepModel -> Update DeepModel a (DeepMsg a))
-
-type alias DeepModel =
-  { megaDeep : MegaDeepModel }
-
-deepInit : Update DeepModel a (DeepMsg a)
-deepInit =
-  let megaDeep = megaDeepInit
-   in map DeepModel
-       (megaDeep |> mapCmd deepMegaDeepMsg)
-
-deepMegaDeepMsg : MegaDeepMsg (DeepModel -> Update DeepModel a (DeepMsg a)) -> DeepMsg a
-deepMegaDeepMsg = message megaDeepUpdate
-  { set = \model megaDeep -> { model | megaDeep = megaDeep }
-  , msg = DeepMegaDeepMsg }
-
---deepUpdate : { t | onDeepEvent : String -> a, onOtherDeepEvent : String -> a } -> DeepMsg a -> DeepModel -> Update DeepModel a (DeepMsg a)
-
-type alias DeepUpdateEvents a = { onDeepEvent : String -> a, onOtherDeepEvent : String -> a }
-
-deepUpdate : DeepUpdateEvents a -> DeepMsg a -> DeepModel -> Update DeepModel a (DeepMsg a)
-deepUpdate { onDeepEvent, onOtherDeepEvent } msg model =
-  case msg of
-    SomeDeepMsg ->
-      save model
-    _ ->
-      save model
-
-deepSubscriptions model = Sub.none
-
-deepView model = div [] []
+fromUrl : Url -> Maybe Route
+fromUrl = parse parser
 
 --
-
-type alias RouterUpdate a = RouterModel -> Update RouterModel a (RouterMsg a)
 
 type RouterMsg a
-  = RouterHello
-  | UrlChange Url
+  = UrlChange Url
   | UrlRequest UrlRequest
-  --| RouterDeepMsg (DeepModel -> { onDeepEvent : String -> RouterModel -> Update RouterModel a (RouterMsg a), onOtherDeepEvent : String -> RouterModel -> Update RouterModel a (RouterMsg a) } -> RouterModel -> Update RouterModel a (RouterMsg a))
-  | RouterDeepMsg (DeepModel -> DeepUpdateEvents (RouterUpdate a) -> RouterUpdate a)
 
 type alias RouterModel =
-  { deep : DeepModel }
+  { route : Maybe Route
+  , key   : Navigation.Key }
 
-routerInit : Update RouterModel a (RouterMsg a)
-routerInit = --( { deep = { megaDeep = { prop = 5 } } }, Cmd.none )
-  let deep = deepInit
-   in consumeEvents <| map RouterModel
-        (deep |> mapCmd deepMsg)
+setRoute : Maybe Route -> RouterModel -> Update RouterModel a (RouterMsg a)
+setRoute route model = save { model | route = route }
 
-deepMsg : DeepMsg (RouterUpdate a) -> RouterMsg a
-deepMsg = message deepUpdate
-  { set = \model deep -> { model | deep = deep }
-  , msg = RouterDeepMsg }
+routerInit : Navigation.Key -> Update RouterModel a (RouterMsg a)
+routerInit key = 
+  save 
+    { route = Nothing
+    , key   = key }
 
-type alias RouterUpdateEvents a = { onRouteChange : Int -> a }
+type alias RouterEvents a = { onRouteChange : Maybe Route -> a }
 
-routerUpdate : RouterUpdateEvents a -> RouterMsg a -> RouterModel -> Update RouterModel a (RouterMsg a)
+routerUpdate : RouterEvents a -> RouterMsg a -> RouterModel -> Update RouterModel a (RouterMsg a)
 routerUpdate { onRouteChange } msg model =
   case msg of
-    RouterHello ->
-      save model
-        |> andInvokeHandler (onRouteChange 5)
-    RouterDeepMsg update ->
-      model
-        |> update model.deep
-             { onDeepEvent      = always save
-             , onOtherDeepEvent = always save }
-    _ ->
+    UrlChange url ->
+      let route = fromUrl url
+       in model
+        |> setRoute route
+        |> andInvokeHandler (onRouteChange route)
+    UrlRequest urlRequest ->
       save model
 
+routerSubscriptions : RouterModel -> Sub (RouterMsg a)
 routerSubscriptions model = Sub.none
 
-routerView model = div [] []
+--
+
+type UiMsg a
+  = NoUiMsg a
+
+type alias UiModel =
+  {}
+
+uiInit : Update UiModel a (UiMsg a)
+uiInit = save {}
+
+type alias UiEvents = {}
+
+uiUpdate : UiEvents -> UiMsg a -> UiModel -> Update UiModel a (UiMsg a)
+uiUpdate {} msg model =
+  save model
+
+uiSubscriptions : UiModel -> Sub (UiMsg a)
+uiSubscriptions model = Sub.none
+
+--
+
+type PageMsg a
+  = NoPageMsg a
+
+type alias PageModel =
+  {}
+
+pageInit : Update PageModel a (PageMsg a)
+pageInit = save {}
+
+type alias PageEvents = {}
+
+pageUpdate : PageEvents -> PageMsg a -> PageModel -> Update PageModel a (PageMsg a)
+pageUpdate {} msg model = 
+  save model
+
+pageSubscriptions : PageModel -> Sub (PageMsg a)
+pageSubscriptions model = Sub.none
 
 --
 
 type alias Flags = ()
 
+--
+
 type alias AppUpdate a = Model -> Update Model a (Msg a)
 
 type Msg a
-  = RouterMsg (RouterModel -> RouterUpdateEvents (AppUpdate a) -> AppUpdate a)
-  | MegaDeepMsg (MegaDeepModel -> {} -> Model -> ( Model, Cmd (Msg a), List a ))
-  | NoOp
+  = RouterMsg (RouterModel -> RouterEvents (AppUpdate a) -> AppUpdate a)
+  | UiMsg (UiModel -> UiEvents -> AppUpdate a)
+  | PageMsg (PageModel -> PageEvents -> AppUpdate a)
 
 type alias Model =
-  { router   : RouterModel
-  , megaDeep : MegaDeepModel }
+  { router : RouterModel
+  , ui     : UiModel
+  , page   : PageModel }
 
-init : Flags -> Url -> Navigation.Key -> Update Model a (Msg a)
-init flags url key = -- ( { router = { deep = { megaDeep = { prop = 5 } } }, megaDeep = { prop = 5 } }, Cmd.none )
-  let router   = routerInit
-      megaDeep = megaDeepInit
-   in map2 Model
-        (router   |> mapCmd routerMsg)
-        (megaDeep |> mapCmd megaDeepMsg)
+appInit : Flags -> Url -> Navigation.Key -> Update Model a (Msg a)
+appInit flags url key =
+  let router = routerInit key
+      ui     = uiInit
+      page   = pageInit
+   in map3 Model
+        (router |> mapCmd routerMsg)
+        (ui     |> mapCmd uiMsg)
+        (page   |> mapCmd pageMsg)
           |> consumeEvents
+          |> andThen (appUpdate (routerMsg (UrlChange url)))
 
 routerMsg : RouterMsg (AppUpdate a) -> Msg a
-routerMsg =
-  message routerUpdate
-    { set = \model router -> { model | router = router }
-    , msg = RouterMsg }
+routerMsg = message routerUpdate
+  { set = \model router -> { model | router = router }
+  , msg = RouterMsg }
 
-megaDeepMsg : MegaDeepMsg (AppUpdate a) -> Msg a
-megaDeepMsg =
-  message megaDeepUpdate
-    { set = \model megaDeep -> { model | megaDeep = megaDeep }
-    , msg = MegaDeepMsg }
+uiMsg : UiMsg (AppUpdate a) -> Msg a
+uiMsg = message uiUpdate
+  { set = \model ui -> { model | ui = ui }
+  , msg = UiMsg }
+
+pageMsg : PageMsg (AppUpdate a) -> Msg a
+pageMsg = message pageUpdate
+  { set = \model page -> { model | page = page }
+  , msg = PageMsg }
 
 appUpdate : Msg a -> AppUpdate a
 appUpdate msg model =
@@ -222,15 +229,19 @@ appUpdate msg model =
     RouterMsg update ->
       model
         |> update model.router { onRouteChange = always save }
-    MegaDeepMsg update ->
+    UiMsg update ->
       model
-        |> update model.megaDeep {}
-    NoOp ->
+        |> update model.ui {}
+    PageMsg update ->
       model
-        |> appUpdate (routerMsg RouterHello)
+        |> update model.page {}
 
 subscriptions : Model -> Sub (Msg a)
-subscriptions model = Sub.none
+subscriptions model = 
+  Sub.batch
+    [ Sub.map routerMsg (routerSubscriptions model.router)
+    , Sub.map uiMsg (uiSubscriptions model.ui)
+    , Sub.map pageMsg (pageSubscriptions model.page) ]
 
 view : Model -> Document (Msg a)
 view model = { title = "", body = [ div [] [] ] }
@@ -244,7 +255,7 @@ onUrlRequest urlRequest = routerMsg (UrlRequest urlRequest)
 main : Program Flags Model (Msg a)
 main =
   Browser.application
-    { init          = \flags url key -> let (a,b,_) = init flags url key in (a,b)
+    { init          = \flags url key -> let (a,b,_) = appInit flags url key in (a,b)
     , update        = \msg model -> let (a,b,_) = appUpdate msg model in (a,b)
     , subscriptions = subscriptions
     , view          = view
