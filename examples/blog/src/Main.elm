@@ -64,8 +64,8 @@ consumeEvents ( model, cmd, events ) = List.foldr andThen ( model, cmd, [] ) eve
 
 message : (b -> a -> m -> Update m (n -> Update n e c) a) -> { msg : (m -> b -> n -> Update n e c) -> c, set : n -> m -> n } -> a -> c
 message update { set, msg } =
-  let rec m deep ev model = 
-        deep 
+  let rec m deep ev model =
+        deep
           |> update ev m
           |> mapCmd (msg << rec)
           |> map (set model)
@@ -84,15 +84,15 @@ type alias MegaDeepModel =
   { prop : Int }
 
 megaDeepInit : Update MegaDeepModel a c
-megaDeepInit = 
+megaDeepInit =
   save { prop = 5 }
 
 megaDeepUpdate : {} -> MegaDeepMsg a -> MegaDeepModel -> Update MegaDeepModel a (MegaDeepMsg a)
-megaDeepUpdate _ msg model = 
+megaDeepUpdate _ msg model =
   case msg of
     _ ->
       save model
-      
+
 
 megaDeepSubscriptions model = Sub.none
 
@@ -108,22 +108,22 @@ type DeepMsg a
 type alias DeepModel =
   { megaDeep : MegaDeepModel }
 
-deepInit : Update DeepModel a (DeepMsg a) 
+deepInit : Update DeepModel a (DeepMsg a)
 deepInit =
   let megaDeep = megaDeepInit
-   in map DeepModel 
+   in map DeepModel
        (megaDeep |> mapCmd deepMegaDeepMsg)
 
 deepMegaDeepMsg : MegaDeepMsg (DeepModel -> Update DeepModel a (DeepMsg a)) -> DeepMsg a
-deepMegaDeepMsg = message megaDeepUpdate 
+deepMegaDeepMsg = message megaDeepUpdate
   { set = \model megaDeep -> { model | megaDeep = megaDeep }
   , msg = DeepMegaDeepMsg }
 
---deepUpdate : { t | onDeepEvent : String -> a, onOtherDeepEvent : String -> a } -> DeepMsg a -> DeepModel -> Update DeepModel a (DeepMsg a) 
+--deepUpdate : { t | onDeepEvent : String -> a, onOtherDeepEvent : String -> a } -> DeepMsg a -> DeepModel -> Update DeepModel a (DeepMsg a)
 
-type alias DeepUpdateEvents a = { onDeepEvent : String -> a, onOtherDeepEvent : String -> a } 
+type alias DeepUpdateEvents a = { onDeepEvent : String -> a, onOtherDeepEvent : String -> a }
 
-deepUpdate : DeepUpdateEvents a -> DeepMsg a -> DeepModel -> Update DeepModel a (DeepMsg a) 
+deepUpdate : DeepUpdateEvents a -> DeepMsg a -> DeepModel -> Update DeepModel a (DeepMsg a)
 deepUpdate { onDeepEvent, onOtherDeepEvent } msg model =
   case msg of
     SomeDeepMsg ->
@@ -156,23 +156,23 @@ routerInit = --( { deep = { megaDeep = { prop = 5 } } }, Cmd.none )
         (deep |> mapCmd deepMsg)
 
 deepMsg : DeepMsg (RouterUpdate a) -> RouterMsg a
-deepMsg = message deepUpdate 
+deepMsg = message deepUpdate
   { set = \model deep -> { model | deep = deep }
   , msg = RouterDeepMsg }
 
 type alias RouterUpdateEvents a = { onRouteChange : Int -> a }
 
 routerUpdate : RouterUpdateEvents a -> RouterMsg a -> RouterModel -> Update RouterModel a (RouterMsg a)
-routerUpdate { onRouteChange } msg model = 
+routerUpdate { onRouteChange } msg model =
   case msg of
     RouterHello ->
       save model
         |> andInvokeHandler (onRouteChange 5)
     RouterDeepMsg update ->
       model
-        |> update model.deep 
+        |> update model.deep
              { onDeepEvent      = always save
-             , onOtherDeepEvent = always save } 
+             , onOtherDeepEvent = always save }
     _ ->
       save model
 
@@ -204,23 +204,23 @@ init flags url key = -- ( { router = { deep = { megaDeep = { prop = 5 } } }, meg
         (megaDeep |> mapCmd megaDeepMsg)
 
 routerMsg : RouterMsg (AppUpdate a) -> Msg a
-routerMsg = 
-  message routerUpdate 
+routerMsg =
+  message routerUpdate
     { set = \model router -> { model | router = router }
     , msg = RouterMsg }
 
 megaDeepMsg : MegaDeepMsg (AppUpdate a) -> Msg a
-megaDeepMsg = 
-  message megaDeepUpdate 
+megaDeepMsg =
+  message megaDeepUpdate
     { set = \model megaDeep -> { model | megaDeep = megaDeep }
     , msg = MegaDeepMsg }
 
 appUpdate : Msg a -> AppUpdate a
-appUpdate msg model = 
+appUpdate msg model =
   case msg of
     RouterMsg update ->
       model
-        |> update model.router { onRouteChange = always save }  
+        |> update model.router { onRouteChange = always save }
     MegaDeepMsg update ->
       model
         |> update model.megaDeep {}
