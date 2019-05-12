@@ -61,15 +61,29 @@ consumeEvents ( model, cmd, events ) = List.foldr andThen ( model, cmd, [] ) eve
 --  , update  : a -> f -> ( f, Cmd a, List (b -> ( b, Cmd c, List e )) ) }
 --
 --someFun : X a b c d e -> a -> c
-someFun update { set, msg } = 
-  let rec msg_ deep model = 
+--someFun update { set, msg } = 
+--  let rec msg_ deep model = 
+--        deep
+--          |> update msg_
+--          |> mapCmd (msg << rec)
+--          |> map (set model)
+--          |> consumeEvents
+--   in msg << rec
+
+someFun2 : (b -> a -> a1 -> ( a1, Cmd a, List (e -> ( e, Cmd c, List f )) )) -> { msg : (b -> a1 -> g -> ( e, Cmd c, List f )) -> c, set : g -> a1 -> e } -> a -> c
+someFun2 update { set, msg } =
+  let rec msg_ ev deep model = 
         deep
-          |> update msg_
+          |> update ev msg_ 
           |> mapCmd (msg << rec)
           |> map (set model)
           |> consumeEvents
-   in msg << rec
+  in msg << rec
 
+
+--RouterMsg (Model -> ( Model, Cmd (Msg a), List a ))
+
+--{ onRouteChange : Int } -> RouterModel -> Model -> ( Model, Cmd (Msg a), List a )
 
 --
 --
@@ -104,7 +118,7 @@ type alias DeepModel =
 
 deepInit = ( { megaDeep = { prop = 5 } }, Cmd.none )
 
-deepUpdate : { onDeepEvent : String -> a, onOtherDeepEvent : String -> a } -> DeepMsg a -> DeepModel -> ( DeepModel, Cmd (DeepMsg a), List a )
+deepUpdate : { t | onDeepEvent : String -> a, onOtherDeepEvent : String -> a } -> DeepMsg a -> DeepModel -> ( DeepModel, Cmd (DeepMsg a), List a )
 deepUpdate { onDeepEvent, onOtherDeepEvent } msg model = 
   case msg of
     SomeDeepMsg ->
@@ -122,27 +136,29 @@ type RouterMsg a
   = RouterHello
   | UrlChange Url
   | UrlRequest UrlRequest
-  | RouterDeepMsg (DeepModel -> RouterModel -> ( RouterModel, Cmd (RouterMsg a), List a ))
+  | RouterDeepMsg ({ onDeepEvent : String -> RouterModel -> ( RouterModel, Cmd (RouterMsg a), List a ), onOtherDeepEvent : String -> RouterModel -> ( RouterModel, Cmd (RouterMsg a), List a ) } -> DeepModel -> RouterModel -> ( RouterModel, Cmd (RouterMsg a), List a ))
 
 type alias RouterModel =
   { deep : DeepModel }
 
 routerInit = ( { deep = { megaDeep = { prop = 5 } } }, Cmd.none )
 
-routerUpdate : { t | onRouteChange : number -> a } -> RouterMsg a -> RouterModel -> ( RouterModel, Cmd (RouterMsg a), List a )
+routerUpdate : { t | onRouteChange : Int -> a } -> RouterMsg a -> RouterModel -> ( RouterModel, Cmd (RouterMsg a), List a )
 routerUpdate { onRouteChange } msg model = 
   case msg of
     RouterHello ->
       save model
         |> andInvokeHandler (onRouteChange 5)
     RouterDeepMsg update ->
-      update model.deep model
+      model
+        |> update { onDeepEvent = always save
+                  , onOtherDeepEvent = always save } model.deep 
     _ ->
       save model
 
 deepMsg : DeepMsg (RouterModel -> ( RouterModel, Cmd (RouterMsg a), List a )) -> RouterMsg a
-deepMsg = someFun 
-  (deepUpdate { onDeepEvent = always save, onOtherDeepEvent = always save })
+deepMsg = someFun2
+  deepUpdate 
     { set = \model deep -> { model | deep = deep }
     , msg = RouterDeepMsg }
 
@@ -155,7 +171,7 @@ routerView model = div [] []
 type alias Flags = ()
 
 type Msg a
-  = RouterMsg (RouterModel -> Model -> ( Model, Cmd (Msg a), List a ))
+  = RouterMsg ({ onRouteChange : Int -> Model -> ( Model, Cmd (Msg a), List a ) } -> RouterModel -> Model -> ( Model, Cmd (Msg a), List a ))
   | MegaDeepMsg (MegaDeepModel -> Model -> ( Model, Cmd (Msg a), List a ))
   | NoOp
 
@@ -166,8 +182,8 @@ type alias Model =
 init flags url key = ( { router = { deep = { megaDeep = { prop = 5 } } }, megaDeep = { prop = 5 } }, Cmd.none )
 
 routerMsg : RouterMsg (Model -> ( Model, Cmd (Msg a), List a )) -> Msg a
-routerMsg = someFun 
-  (routerUpdate { onRouteChange = \route -> save })
+routerMsg = 
+  someFun2 routerUpdate 
     { set = \model router -> { model | router = router }
     , msg = RouterMsg }
 
@@ -176,7 +192,7 @@ appUpdate msg model =
   case msg of
     RouterMsg update ->
       model
-        |> update model.router
+        |> update { onRouteChange = always save } model.router 
     MegaDeepMsg update ->
       model
         |> update model.megaDeep
