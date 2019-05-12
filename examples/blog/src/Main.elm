@@ -15,75 +15,63 @@ import UiFormView
 import Url exposing (Url)
 import Url.Parser as Parser exposing (Parser, parse, oneOf, (</>))
 
+type alias Update m a c = ( m, Cmd c, List a )
+
+save : m -> Update m a c
 save model = ( model, Cmd.none, [] )
 
+runCmd : Cmd c -> m -> Update m a c
 runCmd cmd model = ( model, cmd, [] )
 
+mapCmd : (c -> d) -> Update m a c -> Update m a d
 mapCmd f ( model, cmd, events ) = ( model, Cmd.map f cmd, events )
 
-invokeHandler handler model = ( model , Cmd.none, [ handler ] )
+invokeHandler : a -> m -> Update m a c
+invokeHandler handler model = ( model, Cmd.none, [ handler ] )
 
+ap : Update (m -> n) a c -> Update m a c -> Update n a c
 ap ( f, cmda, e ) ( model, cmdb, e2 ) = ( f model, Cmd.batch [ cmda, cmdb ], e ++ e2 )
 
+map : (m -> n) -> Update m a c -> Update n a c
 map f ( model, cmd, events ) = ( f model, cmd, events )
 
+map2 : (m -> n -> o) -> Update m a c -> Update n a c -> Update o a c
 map2 f = ap << map f
 
+map3 : (m -> n -> o -> p) -> Update m a c -> Update n a c -> Update o a c -> Update p a c
 map3 f x = ap << map2 f x
 
+map4 : (m -> n -> o -> p -> q) -> Update m a c -> Update n a c -> Update o a c -> Update p a c -> Update q a c
 map4 f x y = ap << map3 f x y
 
+join : Update (Update m a c) a c -> Update m a c
 join ( ( model, cmda, e ), cmdb, e2 ) = ( model, Cmd.batch [ cmda, cmdb ], e ++ e2 )
 
+andThen : (m -> Update n a c) -> Update m a c -> Update n a c
 andThen f = join << map f
 
+kleisli : (n -> Update o a c) -> (m -> Update n a c) -> m -> Update o a c
 kleisli f g = andThen f << g
 
+andRunCmd : Cmd c -> Update m a c -> Update m a c
 andRunCmd = andThen << runCmd
 
+andInvokeHandler : a -> Update m a c -> Update m a c
 andInvokeHandler = andThen << invokeHandler
 
+consumeEvents : Update m (m -> Update m a c) c -> Update m a c
 consumeEvents ( model, cmd, events ) = List.foldr andThen ( model, cmd, [] ) events
 
---type alias X = 
---  { msg : (b -> c -> ( d, Cmd msg, List e )) -> msg
---  , set  : c -> f -> d
---  , update  : a -> b -> ( b, Cmd a, List (d -> ( d, Cmd msg, List e )) ) 
---  }
-
---someFun : X -> a -> msg
-
---(RouterModel -> Model -> ( Model, Cmd (Msg a), List a ))
-
---type alias X a b c e f =
---  { msg : (f -> b -> ( b, Cmd c, List e )) -> c
---  , set  : b -> f -> b
---  , update  : a -> f -> ( f, Cmd a, List (b -> ( b, Cmd c, List e )) ) }
---
---someFun : X a b c d e -> a -> c
---someFun update { set, msg } = 
---  let rec msg_ deep model = 
---        deep
---          |> update msg_
---          |> mapCmd (msg << rec)
---          |> map (set model)
---          |> consumeEvents
---   in msg << rec
-
-someFun2 : (b -> a -> a1 -> ( a1, Cmd a, List (e -> ( e, Cmd c, List f )) )) -> { msg : (b -> a1 -> g -> ( e, Cmd c, List f )) -> c, set : g -> a1 -> e } -> a -> c
-someFun2 update { set, msg } =
-  let rec msg_ ev deep model = 
-        deep
-          |> update ev msg_ 
+message : (b -> a -> m -> Update m (n -> Update n e c) a) -> { msg : (m -> b -> n -> Update n e c) -> c, set : n -> m -> n } -> a -> c
+message update { set, msg } =
+  let rec m deep ev model = 
+        deep 
+          |> update ev m
           |> mapCmd (msg << rec)
           |> map (set model)
           |> consumeEvents
-  in msg << rec
+   in msg << rec
 
-
---RouterMsg (Model -> ( Model, Cmd (Msg a), List a ))
-
---{ onRouteChange : Int } -> RouterModel -> Model -> ( Model, Cmd (Msg a), List a )
 
 --
 --
@@ -95,9 +83,12 @@ type MegaDeepMsg a
 type alias MegaDeepModel =
   { prop : Int }
 
-megaDeepInit = ( { prop = 5 }, Cmd.none )
+megaDeepInit : Update MegaDeepModel a c
+megaDeepInit = 
+  save { prop = 5 }
 
-megaDeepUpdate msg model = 
+megaDeepUpdate : {} -> MegaDeepMsg a -> MegaDeepModel -> Update MegaDeepModel a (MegaDeepMsg a)
+megaDeepUpdate _ msg model = 
   case msg of
     _ ->
       save model
@@ -112,14 +103,28 @@ megaDeepView model = div [] []
 type DeepMsg a
   = DeepHello a
   | SomeDeepMsg
+  | DeepMegaDeepMsg (MegaDeepModel -> {} -> DeepModel -> Update DeepModel a (DeepMsg a))
 
 type alias DeepModel =
   { megaDeep : MegaDeepModel }
 
-deepInit = ( { megaDeep = { prop = 5 } }, Cmd.none )
+deepInit : Update DeepModel a (DeepMsg a) 
+deepInit =
+  let megaDeep = megaDeepInit
+   in map DeepModel 
+       (megaDeep |> mapCmd deepMegaDeepMsg)
 
-deepUpdate : { t | onDeepEvent : String -> a, onOtherDeepEvent : String -> a } -> DeepMsg a -> DeepModel -> ( DeepModel, Cmd (DeepMsg a), List a )
-deepUpdate { onDeepEvent, onOtherDeepEvent } msg model = 
+deepMegaDeepMsg : MegaDeepMsg (DeepModel -> Update DeepModel a (DeepMsg a)) -> DeepMsg a
+deepMegaDeepMsg = message megaDeepUpdate 
+  { set = \model megaDeep -> { model | megaDeep = megaDeep }
+  , msg = DeepMegaDeepMsg }
+
+--deepUpdate : { t | onDeepEvent : String -> a, onOtherDeepEvent : String -> a } -> DeepMsg a -> DeepModel -> Update DeepModel a (DeepMsg a) 
+
+type alias DeepUpdateEvents a = { onDeepEvent : String -> a, onOtherDeepEvent : String -> a } 
+
+deepUpdate : DeepUpdateEvents a -> DeepMsg a -> DeepModel -> Update DeepModel a (DeepMsg a) 
+deepUpdate { onDeepEvent, onOtherDeepEvent } msg model =
   case msg of
     SomeDeepMsg ->
       save model
@@ -132,18 +137,32 @@ deepView model = div [] []
 
 --
 
+type alias RouterUpdate a = RouterModel -> Update RouterModel a (RouterMsg a)
+
 type RouterMsg a
   = RouterHello
   | UrlChange Url
   | UrlRequest UrlRequest
-  | RouterDeepMsg ({ onDeepEvent : String -> RouterModel -> ( RouterModel, Cmd (RouterMsg a), List a ), onOtherDeepEvent : String -> RouterModel -> ( RouterModel, Cmd (RouterMsg a), List a ) } -> DeepModel -> RouterModel -> ( RouterModel, Cmd (RouterMsg a), List a ))
+  --| RouterDeepMsg (DeepModel -> { onDeepEvent : String -> RouterModel -> Update RouterModel a (RouterMsg a), onOtherDeepEvent : String -> RouterModel -> Update RouterModel a (RouterMsg a) } -> RouterModel -> Update RouterModel a (RouterMsg a))
+  | RouterDeepMsg (DeepModel -> DeepUpdateEvents (RouterUpdate a) -> RouterUpdate a)
 
 type alias RouterModel =
   { deep : DeepModel }
 
-routerInit = ( { deep = { megaDeep = { prop = 5 } } }, Cmd.none )
+routerInit : Update RouterModel a (RouterMsg a)
+routerInit = --( { deep = { megaDeep = { prop = 5 } } }, Cmd.none )
+  let deep = deepInit
+   in consumeEvents <| map RouterModel
+        (deep |> mapCmd deepMsg)
 
-routerUpdate : { t | onRouteChange : Int -> a } -> RouterMsg a -> RouterModel -> ( RouterModel, Cmd (RouterMsg a), List a )
+deepMsg : DeepMsg (RouterUpdate a) -> RouterMsg a
+deepMsg = message deepUpdate 
+  { set = \model deep -> { model | deep = deep }
+  , msg = RouterDeepMsg }
+
+type alias RouterUpdateEvents a = { onRouteChange : Int -> a }
+
+routerUpdate : RouterUpdateEvents a -> RouterMsg a -> RouterModel -> Update RouterModel a (RouterMsg a)
 routerUpdate { onRouteChange } msg model = 
   case msg of
     RouterHello ->
@@ -151,16 +170,11 @@ routerUpdate { onRouteChange } msg model =
         |> andInvokeHandler (onRouteChange 5)
     RouterDeepMsg update ->
       model
-        |> update { onDeepEvent = always save
-                  , onOtherDeepEvent = always save } model.deep 
+        |> update model.deep 
+             { onDeepEvent      = always save
+             , onOtherDeepEvent = always save } 
     _ ->
       save model
-
-deepMsg : DeepMsg (RouterModel -> ( RouterModel, Cmd (RouterMsg a), List a )) -> RouterMsg a
-deepMsg = someFun2
-  deepUpdate 
-    { set = \model deep -> { model | deep = deep }
-    , msg = RouterDeepMsg }
 
 routerSubscriptions model = Sub.none
 
@@ -170,48 +184,66 @@ routerView model = div [] []
 
 type alias Flags = ()
 
+type alias AppUpdate a = Model -> Update Model a (Msg a)
+
 type Msg a
-  = RouterMsg ({ onRouteChange : Int -> Model -> ( Model, Cmd (Msg a), List a ) } -> RouterModel -> Model -> ( Model, Cmd (Msg a), List a ))
-  | MegaDeepMsg (MegaDeepModel -> Model -> ( Model, Cmd (Msg a), List a ))
+  = RouterMsg (RouterModel -> RouterUpdateEvents (AppUpdate a) -> AppUpdate a)
+  | MegaDeepMsg (MegaDeepModel -> {} -> Model -> ( Model, Cmd (Msg a), List a ))
   | NoOp
 
 type alias Model =
   { router   : RouterModel
   , megaDeep : MegaDeepModel }
 
-init flags url key = ( { router = { deep = { megaDeep = { prop = 5 } } }, megaDeep = { prop = 5 } }, Cmd.none )
+init : Flags -> Url -> Navigation.Key -> Update Model a (Msg a)
+init flags url key = -- ( { router = { deep = { megaDeep = { prop = 5 } } }, megaDeep = { prop = 5 } }, Cmd.none )
+  let router   = routerInit
+      megaDeep = megaDeepInit
+   in consumeEvents <| map2 Model
+        (router   |> mapCmd routerMsg)
+        (megaDeep |> mapCmd megaDeepMsg)
 
-routerMsg : RouterMsg (Model -> ( Model, Cmd (Msg a), List a )) -> Msg a
+routerMsg : RouterMsg (AppUpdate a) -> Msg a
 routerMsg = 
-  someFun2 routerUpdate 
+  message routerUpdate 
     { set = \model router -> { model | router = router }
     , msg = RouterMsg }
 
-appUpdate : Msg a -> Model -> ( Model, Cmd (Msg a), List a )
+megaDeepMsg : MegaDeepMsg (AppUpdate a) -> Msg a
+megaDeepMsg = 
+  message megaDeepUpdate 
+    { set = \model megaDeep -> { model | megaDeep = megaDeep }
+    , msg = MegaDeepMsg }
+
+appUpdate : Msg a -> AppUpdate a
 appUpdate msg model = 
   case msg of
     RouterMsg update ->
       model
-        |> update { onRouteChange = always save } model.router 
+        |> update model.router { onRouteChange = always save }  
     MegaDeepMsg update ->
       model
-        |> update model.megaDeep
+        |> update model.megaDeep {}
     NoOp ->
       model
         |> appUpdate (routerMsg RouterHello)
 
+subscriptions : Model -> Sub (Msg a)
 subscriptions model = Sub.none
 
+view : Model -> Document (Msg a)
 view model = { title = "", body = [ div [] [] ] }
 
+onUrlChange : Url -> Msg a
 onUrlChange url = routerMsg (UrlChange url)
 
+onUrlRequest : UrlRequest -> Msg a
 onUrlRequest urlRequest = routerMsg (UrlRequest urlRequest)
 
 main : Program Flags Model (Msg a)
 main =
   Browser.application
-    { init          = init
+    { init          = \flags url key -> let (a,b,_) = init flags url key in (a,b)
     , update        = \msg model -> let (a,b,_) = appUpdate msg model in (a,b)
     , subscriptions = subscriptions
     , view          = view
