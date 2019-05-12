@@ -26,7 +26,7 @@ module.exports = function() {
           exclude: [ /elm-stuff/, /node_modules/ ],
           loader: 'elm-webpack-loader?verbose=true&warn=true',
           options: {
-            debug: true
+            debug: false //true
           }
         }
       ]
