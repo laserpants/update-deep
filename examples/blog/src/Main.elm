@@ -46,8 +46,8 @@ andInvokeHandler = andThen << invokeHandler
 consumeEvents ( model, cmd, events ) = List.foldr andThen ( model, cmd, [] ) events
 
 --type alias X = 
---  { message : (b -> c -> ( d, Cmd msg, List e )) -> msg
---  , setter  : c -> f -> d
+--  { msg : (b -> c -> ( d, Cmd msg, List e )) -> msg
+--  , set  : c -> f -> d
 --  , update  : a -> b -> ( b, Cmd a, List (d -> ( d, Cmd msg, List e )) ) 
 --  }
 
@@ -56,19 +56,19 @@ consumeEvents ( model, cmd, events ) = List.foldr andThen ( model, cmd, [] ) eve
 --(RouterModel -> Model -> ( Model, Cmd (Msg a), List a ))
 
 --type alias X a b c e f =
---  { message : (f -> b -> ( b, Cmd c, List e )) -> c
---  , setter  : b -> f -> b
+--  { msg : (f -> b -> ( b, Cmd c, List e )) -> c
+--  , set  : b -> f -> b
 --  , update  : a -> f -> ( f, Cmd a, List (b -> ( b, Cmd c, List e )) ) }
 --
 --someFun : X a b c d e -> a -> c
-someFun update { setter, message } = 
-  let rec msg deep model = 
+someFun update { set, msg } = 
+  let rec msg_ deep model = 
         deep
-          |> update msg 
-          |> mapCmd (message << rec)
-          |> map (setter model)
+          |> update msg_
+          |> mapCmd (msg << rec)
+          |> map (set model)
           |> consumeEvents
-   in message << rec
+   in msg << rec
 
 
 --
@@ -129,23 +129,22 @@ type alias RouterModel =
 
 routerInit = ( { deep = { megaDeep = { prop = 5 } } }, Cmd.none )
 
-routerUpdate : { onRouteChange : number -> a } -> RouterMsg a -> RouterModel -> ( RouterModel, Cmd (RouterMsg a), List a )
+routerUpdate : { t | onRouteChange : number -> a } -> RouterMsg a -> RouterModel -> ( RouterModel, Cmd (RouterMsg a), List a )
 routerUpdate { onRouteChange } msg model = 
   case msg of
     RouterHello ->
       save model
         |> andInvokeHandler (onRouteChange 5)
     RouterDeepMsg update ->
-      model
-        |> update model.deep
+      update model.deep model
     _ ->
       save model
 
 deepMsg : DeepMsg (RouterModel -> ( RouterModel, Cmd (RouterMsg a), List a )) -> RouterMsg a
 deepMsg = someFun 
-    (deepUpdate { onDeepEvent = always save, onOtherDeepEvent = always save })
-    { setter = \model deep -> { model | deep = deep }, message = RouterDeepMsg }
-
+  (deepUpdate { onDeepEvent = always save, onOtherDeepEvent = always save })
+    { set = \model deep -> { model | deep = deep }
+    , msg = RouterDeepMsg }
 
 routerSubscriptions model = Sub.none
 
@@ -169,8 +168,8 @@ init flags url key = ( { router = { deep = { megaDeep = { prop = 5 } } }, megaDe
 routerMsg : RouterMsg (Model -> ( Model, Cmd (Msg a), List a )) -> Msg a
 routerMsg = someFun 
   (routerUpdate { onRouteChange = \route -> save })
-    { setter  = \model router -> { model | router = router }
-    , message = RouterMsg }
+    { set = \model router -> { model | router = router }
+    , msg = RouterMsg }
 
 appUpdate : Msg a -> Model -> ( Model, Cmd (Msg a), List a )
 appUpdate msg model = 
