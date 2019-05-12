@@ -199,9 +199,10 @@ init : Flags -> Url -> Navigation.Key -> Update Model a (Msg a)
 init flags url key = -- ( { router = { deep = { megaDeep = { prop = 5 } } }, megaDeep = { prop = 5 } }, Cmd.none )
   let router   = routerInit
       megaDeep = megaDeepInit
-   in consumeEvents <| map2 Model
+   in map2 Model
         (router   |> mapCmd routerMsg)
         (megaDeep |> mapCmd megaDeepMsg)
+          |> consumeEvents
 
 routerMsg : RouterMsg (AppUpdate a) -> Msg a
 routerMsg =
