@@ -66,15 +66,26 @@ andInvokeHandler = andThen << invokeHandler
 consumeEvents : Update m (m -> Update m a c) c -> Update m a c
 consumeEvents ( model, cmd, events ) = List.foldr andThen ( model, cmd, [] ) events
 
-message : (b -> a -> m -> Update m (n -> Update n e c) a) -> { msg : (m -> b -> n -> Update n e c) -> c, set : n -> m -> n } -> a -> c
-message update { set, msg } =
-  let rec m deep ev model =
-        deep
-          |> update ev m
-          |> mapCmd (msg << rec)
-          |> map (set model)
-          |> consumeEvents
-   in msg << rec
+message cons get update set =
+  let fun msg model = 
+        model
+          |> get 
+          |> update msg 
+          |> mapCmd (cons << fun)
+          |> map (set model) 
+          |> consumeEvents 
+   in cons << fun
+
+-- --message : (Model -> c) -> (b -> c -> Update m (Model -> Update Model a (Msg a)) b) -> (Model -> m -> Model) -> b -> Msg a
+-- message get update set =
+--   let fun msg model = 
+--         model
+--           |> get 
+--           |> update msg 
+--           |> mapCmd (ModelMsg << fun)
+--           |> map (set model) 
+--           |> consumeEvents 
+--    in ModelMsg << fun
 
 --
 --
@@ -122,9 +133,7 @@ routerInit key =
     { route = Nothing
     , key   = key }
 
-type alias RouterEvents a = { onRouteChange : Maybe Route -> a }
-
-routerUpdate : RouterEvents a -> RouterMsg a -> RouterModel -> Update RouterModel a (RouterMsg a)
+routerUpdate : { onRouteChange : Maybe Route -> a } -> RouterMsg a -> RouterModel -> Update RouterModel a (RouterMsg a)
 routerUpdate { onRouteChange } msg model =
   case msg of
     UrlChange url ->
@@ -149,10 +158,8 @@ type alias UiModel =
 uiInit : Update UiModel a (UiMsg a)
 uiInit = save {}
 
-type alias UiEvents = {}
-
-uiUpdate : UiEvents -> UiMsg a -> UiModel -> Update UiModel a (UiMsg a)
-uiUpdate {} msg model =
+uiUpdate : UiMsg a -> UiModel -> Update UiModel a (UiMsg a)
+uiUpdate msg model =
   save model
 
 uiSubscriptions : UiModel -> Sub (UiMsg a)
@@ -169,10 +176,8 @@ type alias PageModel =
 pageInit : Update PageModel a (PageMsg a)
 pageInit = save {}
 
-type alias PageEvents = {}
-
-pageUpdate : PageEvents -> PageMsg a -> PageModel -> Update PageModel a (PageMsg a)
-pageUpdate {} msg model = 
+pageUpdate : PageMsg a -> PageModel -> Update PageModel a (PageMsg a)
+pageUpdate msg model = 
   save model
 
 pageSubscriptions : PageModel -> Sub (PageMsg a)
@@ -187,9 +192,8 @@ type alias Flags = ()
 type alias AppUpdate a = Model -> Update Model a (Msg a)
 
 type Msg a
-  = RouterMsg (RouterModel -> RouterEvents (AppUpdate a) -> AppUpdate a)
-  | UiMsg (UiModel -> UiEvents -> AppUpdate a)
-  | PageMsg (PageModel -> PageEvents -> AppUpdate a)
+  = ModelMsg (Model -> Update Model a (Msg a))
+  | Nope
 
 type alias Model =
   { router : RouterModel
@@ -197,47 +201,48 @@ type alias Model =
   , page   : PageModel }
 
 appInit : Flags -> Url -> Navigation.Key -> Update Model a (Msg a)
-appInit flags url key =
-  let router = routerInit key
-      ui     = uiInit
-      page   = pageInit
-   in map3 Model
-        (router |> mapCmd routerMsg)
-        (ui     |> mapCmd uiMsg)
-        (page   |> mapCmd pageMsg)
-          |> consumeEvents
-          |> andThen (appUpdate (routerMsg (UrlChange url)))
+appInit flags url key = Debug.todo ""
 
 routerMsg : RouterMsg (AppUpdate a) -> Msg a
-routerMsg = message routerUpdate
-  { set = \model router -> { model | router = router }
-  , msg = RouterMsg }
+routerMsg = message 
+  ModelMsg 
+  .router 
+  (routerUpdate { onRouteChange = always save }) 
+  (\model router -> { model | router = router }) 
 
 uiMsg : UiMsg (AppUpdate a) -> Msg a
-uiMsg = message uiUpdate
-  { set = \model ui -> { model | ui = ui }
-  , msg = UiMsg }
+uiMsg = message 
+  ModelMsg 
+  .ui 
+  uiUpdate 
+  (\model ui -> { model | ui = ui }) 
 
 pageMsg : PageMsg (AppUpdate a) -> Msg a
-pageMsg = message pageUpdate
-  { set = \model page -> { model | page = page }
-  , msg = PageMsg }
+pageMsg = message 
+  ModelMsg 
+  .page 
+  pageUpdate 
+  (\model page -> { model | page = page }) 
 
 appUpdate : Msg a -> AppUpdate a
 appUpdate msg model =
   case msg of
-    RouterMsg update ->
-      model
-        |> update model.router { onRouteChange = always save }
-    UiMsg update ->
-      model
-        |> update model.ui {}
-    PageMsg update ->
-      model
-        |> update model.page {}
+    ModelMsg update ->
+      update model 
+    _ ->
+      save model
+--    RouterMsg update ->
+--      model
+--        |> update model.router { onRouteChange = always save }
+--    UiMsg update ->
+--      model
+--        |> update model.ui {}
+--    PageMsg update ->
+--      model
+--        |> update model.page {}
 
 subscriptions : Model -> Sub (Msg a)
-subscriptions model = 
+subscriptions model =
   Sub.batch
     [ Sub.map routerMsg (routerSubscriptions model.router)
     , Sub.map uiMsg (uiSubscriptions model.ui)
