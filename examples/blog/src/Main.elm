@@ -63,29 +63,19 @@ andRunCmd = andThen << runCmd
 andInvokeHandler : a -> Update m a c -> Update m a c
 andInvokeHandler = andThen << invokeHandler
 
-consumeEvents : Update m (m -> Update m a c) c -> Update m a c
-consumeEvents ( model, cmd, events ) = List.foldr andThen ( model, cmd, [] ) events
+foldEvents : Update m (m -> Update m a c) c -> Update m a c
+foldEvents ( model, cmd, events ) = List.foldr andThen ( model, cmd, [] ) events
 
-message cons get update set =
-  let fun msg model = 
+message : ((n -> Update n b c) -> c) -> { update : a -> m -> Update m (n -> Update n b c) a, get : n -> m, set : n -> m -> n } -> a -> c
+message cons { update, get, set } =
+  let rec msg model =
         model
-          |> get 
-          |> update msg 
-          |> mapCmd (cons << fun)
-          |> map (set model) 
-          |> consumeEvents 
-   in cons << fun
-
--- --message : (Model -> c) -> (b -> c -> Update m (Model -> Update Model a (Msg a)) b) -> (Model -> m -> Model) -> b -> Msg a
--- message get update set =
---   let fun msg model = 
---         model
---           |> get 
---           |> update msg 
---           |> mapCmd (ModelMsg << fun)
---           |> map (set model) 
---           |> consumeEvents 
---    in ModelMsg << fun
+          |> get
+          |> update msg
+          |> mapCmd (cons << rec)
+          |> map (set model)
+          |> foldEvents
+   in cons << rec
 
 --
 --
@@ -116,9 +106,13 @@ fromUrl = parse parser
 
 --
 
+type alias RouterUpdate a = RouterModel -> Update RouterModel a (RouterMsg a)
+
 type RouterMsg a
   = UrlChange Url
   | UrlRequest UrlRequest
+  | Redirect String
+  | RouterModelMsg (RouterUpdate a)
 
 type alias RouterModel =
   { route : Maybe Route
@@ -127,13 +121,13 @@ type alias RouterModel =
 setRoute : Maybe Route -> RouterModel -> Update RouterModel a (RouterMsg a)
 setRoute route model = save { model | route = route }
 
-routerInit : Navigation.Key -> Update RouterModel a (RouterMsg a)
+routerInit : Navigation.Key -> Update RouterModel (RouterUpdate a) (RouterMsg a)
 routerInit key = 
   save 
     { route = Nothing
     , key   = key }
 
-routerUpdate : { onRouteChange : Maybe Route -> a } -> RouterMsg a -> RouterModel -> Update RouterModel a (RouterMsg a)
+routerUpdate : { t | onRouteChange : Maybe Route -> a } -> RouterMsg a -> RouterUpdate a
 routerUpdate { onRouteChange } msg model =
   case msg of
     UrlChange url ->
@@ -141,44 +135,55 @@ routerUpdate { onRouteChange } msg model =
        in model
         |> setRoute route
         |> andInvokeHandler (onRouteChange route)
-    UrlRequest urlRequest ->
-      save model
+    UrlRequest (Browser.Internal url) ->
+      model
+        |> runCmd (Navigation.pushUrl model.key (Url.toString url))
+    UrlRequest (Browser.External href) ->
+      model
+        |> runCmd (Navigation.load href)
+    Redirect href ->
+      model
+        |> runCmd (Navigation.replaceUrl model.key href)
+    RouterModelMsg update ->
+      update model
 
 routerSubscriptions : RouterModel -> Sub (RouterMsg a)
 routerSubscriptions model = Sub.none
 
 --
 
+type alias UiUpdate a = UiModel -> Update UiModel a (UiMsg a)
+
 type UiMsg a
-  = NoUiMsg a
+  = NoUiMsg
 
 type alias UiModel =
   {}
 
-uiInit : Update UiModel a (UiMsg a)
+uiInit : Update UiModel (UiUpdate a) (UiMsg a)
 uiInit = save {}
 
 uiUpdate : UiMsg a -> UiModel -> Update UiModel a (UiMsg a)
-uiUpdate msg model =
-  save model
+uiUpdate msg model = save model
 
 uiSubscriptions : UiModel -> Sub (UiMsg a)
 uiSubscriptions model = Sub.none
 
 --
 
+type alias PageUpdate a = PageModel -> Update PageModel a (PageMsg a)
+
 type PageMsg a
-  = NoPageMsg a
+  = NoPageMsg
 
 type alias PageModel =
   {}
 
-pageInit : Update PageModel a (PageMsg a)
+pageInit : Update PageModel (PageUpdate a) (PageMsg a)
 pageInit = save {}
 
 pageUpdate : PageMsg a -> PageModel -> Update PageModel a (PageMsg a)
-pageUpdate msg model = 
-  save model
+pageUpdate msg model = save model
 
 pageSubscriptions : PageModel -> Sub (PageMsg a)
 pageSubscriptions model = Sub.none
@@ -192,54 +197,46 @@ type alias Flags = ()
 type alias AppUpdate a = Model -> Update Model a (Msg a)
 
 type Msg a
-  = ModelMsg (Model -> Update Model a (Msg a))
-  | Nope
+  = ModelMsg (AppUpdate a)
 
 type alias Model =
   { router : RouterModel
   , ui     : UiModel
   , page   : PageModel }
 
-appInit : Flags -> Url -> Navigation.Key -> Update Model a (Msg a)
-appInit flags url key = Debug.todo ""
+appInit : Flags -> Url -> Navigation.Key -> Update Model (AppUpdate a) (Msg a)
+appInit flags url key = 
+  let router = routerInit key |> foldEvents
+      ui     = uiInit         |> foldEvents
+      page   = pageInit       |> foldEvents
+   in map3 Model
+        (router |> mapCmd routerMsg) 
+        (ui     |> mapCmd uiMsg) 
+        (page   |> mapCmd pageMsg)
 
 routerMsg : RouterMsg (AppUpdate a) -> Msg a
-routerMsg = message 
-  ModelMsg 
-  .router 
-  (routerUpdate { onRouteChange = always save }) 
-  (\model router -> { model | router = router }) 
+routerMsg = message ModelMsg 
+  { update = routerUpdate { onRouteChange = always save }
+  , get = .router
+  , set = \model router -> { model | router = router } }
 
 uiMsg : UiMsg (AppUpdate a) -> Msg a
-uiMsg = message 
-  ModelMsg 
-  .ui 
-  uiUpdate 
-  (\model ui -> { model | ui = ui }) 
+uiMsg = message ModelMsg
+  { update = uiUpdate
+  , get = .ui
+  , set = \model ui -> { model | ui = ui } }
 
 pageMsg : PageMsg (AppUpdate a) -> Msg a
-pageMsg = message 
-  ModelMsg 
-  .page 
-  pageUpdate 
-  (\model page -> { model | page = page }) 
+pageMsg = message ModelMsg
+  { update = pageUpdate
+  , get = .page
+  , set = \model page -> { model | page = page } }
 
 appUpdate : Msg a -> AppUpdate a
 appUpdate msg model =
   case msg of
     ModelMsg update ->
       update model 
-    _ ->
-      save model
---    RouterMsg update ->
---      model
---        |> update model.router { onRouteChange = always save }
---    UiMsg update ->
---      model
---        |> update model.ui {}
---    PageMsg update ->
---      model
---        |> update model.page {}
 
 subscriptions : Model -> Sub (Msg a)
 subscriptions model =
@@ -249,7 +246,19 @@ subscriptions model =
     , Sub.map pageMsg (pageSubscriptions model.page) ]
 
 view : Model -> Document (Msg a)
-view model = { title = "", body = [ div [] [] ] }
+view model = 
+  { title = ""
+  , body  = [ 
+      div [] 
+        [ ul [] 
+          [ li [] [ a [ href "/" ] [ text "Home" ] ]
+          , li [] [ a [ href "/about" ] [ text "About" ] ]
+          , li [] [ a [ href "/login" ] [ text "Login" ] ]
+          , li [] [ a [ href "/register" ] [ text "Register" ] ] ]
+        , text (Debug.toString model) 
+        ] 
+    ]
+  }
 
 onUrlChange : Url -> Msg a
 onUrlChange url = routerMsg (UrlChange url)
