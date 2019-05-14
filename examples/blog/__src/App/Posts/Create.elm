@@ -11,27 +11,33 @@ import Json.Decode as Json
 import Update.Deep exposing (..)
 import Update.Form as Form
 
+--type State
+--  = Clean
+--  | Edit
+--  | Submitted
+--  | Final
+
 type Msg
   = ApiMsg (Api.Msg Post)
   | FormMsg (Form.Msg Form)
 
-type alias State =
-  { post : Api Post
-  , form : Form.State Form }
+type alias Model =
+  { post  : Api Post
+  , form  : Form.State Form }
 
-init : Config -> Init State Msg
+init : Config -> Init Model Msg
 init { flags } =
   let post = Api.init { endpoint = flags.api ++ "/posts"
                       , method   = HttpPost
                       , decoder  = Json.field "post" Data.Post.decoder }
       form = Form.init CreateForm.fields { title = "", body = "" }
-   in { post = post.state
-      , form = form.state }
+   in { post  = post.state
+      , form  = form.state }
         |> initial
         |> initCmd ApiMsg post
         |> initCmd FormMsg form
 
-onSubmit : { onPostAdded : Post -> a -> Update a c e } -> Form -> State -> Update State Msg (a -> Update a c e)
+onSubmit : { onPostAdded : Post -> a -> Update a c e } -> Form -> Model -> Update Model Msg (a -> Update a c e)
 onSubmit events form =
   form
     |> CreateForm.toJson
@@ -39,14 +45,14 @@ onSubmit events form =
     |> ApiMsg
     |> update events
 
-onSuccess : { onPostAdded : Post -> a -> Update a c e } -> Post -> State -> Update State Msg (a -> Update a c e)
+onSuccess : { onPostAdded : Post -> a -> Update a c e } -> Post -> Model -> Update Model Msg (a -> Update a c e)
 onSuccess events post state =
   let resetForm = update events (FormMsg Form.Reset)
    in state
     |> invoke (events.onPostAdded post)
     |> andThen resetForm
 
-update : { onPostAdded : Post -> a -> Update a c e } -> Msg -> State -> Update State Msg (a -> Update a c e)
+update : { onPostAdded : Post -> a -> Update a c e } -> Msg -> Model -> Update Model Msg (a -> Update a c e)
 update events msg state =
   let default = Api.defaultHandlers
    in case msg of
@@ -63,8 +69,8 @@ update events msg state =
             |> mapCmd FormMsg
             |> consumeEvents
 
-subscriptions : State -> Sub Msg
+subscriptions : Model -> Sub Msg
 subscriptions _ = Sub.none
 
-view : State -> Html Msg
+view : Model -> Html Msg
 view { form } = Html.map FormMsg (Form.view form)

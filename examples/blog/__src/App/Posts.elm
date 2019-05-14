@@ -16,8 +16,12 @@ type Msg
 
 type alias State =
   { list   : List.State
-  , create : Create.State
+  , create : Create.Model
   , item   : Item.State }
+
+--  = List List.State
+--  | Create Create.Model
+--  | Item Item.State
 
 init : Config -> Init State Msg
 init config =
