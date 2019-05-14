@@ -78,6 +78,33 @@ message_ cons { update, get, set } msg model =
 message : ((n -> Update n b c) -> c) -> { update : a -> m -> Update m (n -> Update n b c) a, get : n -> m, set : n -> m -> n } -> a -> c
 message cons access = cons << message_ cons access
 
+applicationInit : (d -> e -> f -> Update m a c) -> d -> e -> f -> ( m, Cmd c )
+applicationInit f a b c = let ( model, cmd, _ ) = f a b c in ( model, cmd )
+
+documentInit : (f -> Update m a c) -> f -> ( m, Cmd c )
+documentInit f a = let ( model, cmd, _ ) = f a in ( model, cmd )
+
+runUpdate : (d -> e -> Update m a c) -> d -> e -> ( m, Cmd c )
+runUpdate f a b = let ( model, cmd, _ ) = f a b in ( model, cmd )
+
+--
+
+application config = 
+  Browser.application
+    { init          = applicationInit config.init
+    , update        = runUpdate config.update
+    , subscriptions = config.subscriptions
+    , view          = config.view
+    , onUrlChange   = config.onUrlChange
+    , onUrlRequest  = config.onUrlRequest }
+
+document config = 
+  Browser.document
+    { init          = documentInit config.init
+    , update        = runUpdate config.update
+    , subscriptions = config.subscriptions
+    , view          = config.view }
+
 --
 --
 --
@@ -85,7 +112,7 @@ message cons access = cons << message_ cons access
 type Route
   = Home
   | About
-  | NewPost
+  | PostCreate
   | Post Int
   | CommentPost Int
   | Login
@@ -96,7 +123,7 @@ parser =
   oneOf
     [ Parser.map Home        (Parser.top)
     , Parser.map About       (Parser.s "about")
-    , Parser.map NewPost     (Parser.s "posts" </> Parser.s "new")
+    , Parser.map PostCreate  (Parser.s "posts" </> Parser.s "new")
     , Parser.map Post        (Parser.s "posts" </> Parser.int)
     , Parser.map CommentPost (Parser.s "posts" </> Parser.int </> Parser.s "comment")
     , Parser.map Login       (Parser.s "login")
@@ -113,7 +140,6 @@ type RouterMsg a
   = UrlChange Url
   | UrlRequest UrlRequest
   | Redirect String
-  | RouterModelMsg (RouterUpdate a)
 
 type alias RouterModel =
   { route : Maybe Route
@@ -145,8 +171,6 @@ routerUpdate { onRouteChange } msg model =
     Redirect href ->
       model
         |> runCmd (Navigation.replaceUrl model.key href)
-    RouterModelMsg update ->
-      update model
 
 routerSubscriptions : RouterModel -> Sub (RouterMsg a)
 routerSubscriptions model = Sub.none
@@ -204,6 +228,90 @@ authRegisterSubscriptions model = Sub.none
 
 --
 
+type alias PostShowUpdate a = PostShowModel -> Update PostShowModel a (PostShowMsg a)
+
+type PostShowMsg a
+  = NoPostShowMsg
+
+type alias PostShowModel =
+  {}
+
+postShowInit : Update PostShowModel (PostShowUpdate a) (PostShowMsg a)
+postShowInit = save {}
+
+postShowUpdate : PostShowMsg a -> PostShowModel -> Update PostShowModel a (PostShowMsg a)
+postShowUpdate msg model =
+  case msg of
+    _ -> save model
+
+postShowSubscriptions : PostShowModel -> Sub (PostShowMsg a)
+postShowSubscriptions model = Sub.none
+
+--
+
+type alias PostCommentUpdate a = PostCommentModel -> Update PostCommentModel a (PostCommentMsg a)
+
+type PostCommentMsg a
+  = NoPostCommentMsg
+
+type alias PostCommentModel =
+  {}
+
+postCommentInit : Update PostCommentModel (PostCommentUpdate a) (PostCommentMsg a)
+postCommentInit = save {}
+
+postCommentUpdate : PostCommentMsg a -> PostCommentModel -> Update PostCommentModel a (PostCommentMsg a)
+postCommentUpdate msg model =
+  case msg of
+    _ -> save model
+
+postCommentSubscriptions : PostCommentModel -> Sub (PostCommentMsg a)
+postCommentSubscriptions model = Sub.none
+
+--
+
+type alias PostListUpdate a = PostListModel -> Update PostListModel a (PostListMsg a)
+
+type PostListMsg a
+  = NoPostListMsg
+
+type alias PostListModel =
+  {}
+
+postListInit : Update PostListModel (PostListUpdate a) (PostListMsg a)
+postListInit = save {}
+
+postListUpdate : PostListMsg a -> PostListModel -> Update PostListModel a (PostListMsg a)
+postListUpdate msg model =
+  case msg of
+    _ -> save model
+
+postListSubscriptions : PostListModel -> Sub (PostListMsg a)
+postListSubscriptions model = Sub.none
+
+--
+
+type alias PostCreateUpdate a = PostCreateModel -> Update PostCreateModel a (PostCreateMsg a)
+
+type PostCreateMsg a
+  = NoPostCreateMsg
+
+type alias PostCreateModel =
+  {}
+
+postCreateInit : Update PostCreateModel (PostCreateUpdate a) (PostCreateMsg a)
+postCreateInit = save {}
+
+postCreateUpdate : PostCreateMsg a -> PostCreateModel -> Update PostCreateModel a (PostCreateMsg a)
+postCreateUpdate msg model =
+  case msg of
+    _ -> save model
+
+postCreateSubscriptions : PostCreateModel -> Sub (PostCreateMsg a)
+postCreateSubscriptions model = Sub.none
+
+--
+
 type alias Flags = ()
 
 --
@@ -214,9 +322,16 @@ type PageMsg a
   = HomePageMsg
   | AuthLoginMsg (AuthLoginUpdate a)
   | AuthRegisterMsg (AuthRegisterUpdate a)
+  | PostCreateMsg (PostCreateUpdate a)
+  | PostShowMsg (PostShowUpdate a)
+  | PostCommentMsg (PostCommentUpdate a)
 
 type Page
   = HomePage
+  | AboutPage
+  | PostCreatePage PostCreateModel
+  | PostShowPage PostShowModel
+  | PostCommentPage PostCommentModel
   | LoginPage AuthLoginModel
   | RegisterPage AuthRegisterModel
 
@@ -229,6 +344,15 @@ loginMsg = AuthLoginMsg << authLoginUpdate
 registerMsg : AuthRegisterMsg a -> PageMsg a
 registerMsg = AuthRegisterMsg << authRegisterUpdate
 
+postCreateMsg : PostCreateMsg a -> PageMsg a
+postCreateMsg = PostCreateMsg << postCreateUpdate
+
+postShowMsg : PostShowMsg a -> PageMsg a
+postShowMsg = PostShowMsg << postShowUpdate
+
+postCommentMsg : PostCommentMsg a -> PageMsg a
+postCommentMsg = PostCommentMsg << postCommentUpdate
+
 pageUpdate : PageMsg a -> Page -> Update Page a (PageMsg a)
 pageUpdate msg page =
   case ( msg, page ) of
@@ -240,6 +364,18 @@ pageUpdate msg page =
       update authRegisterModel
         |> map RegisterPage
         |> mapCmd registerMsg
+    ( PostCreateMsg update, PostCreatePage postCreateModel ) ->
+      update postCreateModel
+        |> map PostCreatePage
+        |> mapCmd postCreateMsg
+    ( PostShowMsg update, PostShowPage postShowModel ) ->
+      update postShowModel
+        |> map PostShowPage
+        |> mapCmd postShowMsg
+    ( PostCommentMsg update, PostCommentPage postCommentModel ) ->
+      update postCommentModel
+        |> map PostCommentPage
+        |> mapCmd postCommentMsg
     _ ->
       save page
 
@@ -248,6 +384,14 @@ pageSubscriptions page =
   case page of
     HomePage ->
       Sub.none
+    AboutPage ->
+      Sub.none
+    PostCreatePage postCreateModel ->
+      Sub.map appPostCreateMsg (postCreateSubscriptions postCreateModel)
+    PostShowPage postShowModel ->
+      Sub.map appPostShowMsg (postShowSubscriptions postShowModel)
+    PostCommentPage postCommentModel ->
+      Sub.map appPostCommentMsg (postCommentSubscriptions postCommentModel)
     LoginPage authLoginModel ->
       Sub.map appLoginMsg (authLoginSubscriptions authLoginModel)
     RegisterPage authRegisterModel ->
@@ -283,15 +427,20 @@ routerMsg = message ModelMsg
 
 uiMsg : UiMsg (AppUpdate a) -> Msg a
 uiMsg = message ModelMsg
-  { update = uiUpdate
-  , get = .ui
-  , set = \model ui -> { model | ui = ui } }
+  { update = uiUpdate, get = .ui, set = \model ui -> { model | ui = ui } }
 
 pageMsg : PageMsg (AppUpdate a) -> Msg a
 pageMsg = message ModelMsg
-  { update = pageUpdate
-  , get = .page
-  , set = \model page -> { model | page = page } }
+  { update = pageUpdate, get = .page, set = \model page -> { model | page = page } }
+
+appPostCreateMsg : PostCreateMsg (AppUpdate a) -> Msg a
+appPostCreateMsg = pageMsg << PostCreateMsg << postCreateUpdate
+
+appPostShowMsg : PostShowMsg (AppUpdate a) -> Msg a
+appPostShowMsg = pageMsg << PostShowMsg << postShowUpdate
+
+appPostCommentMsg : PostCommentMsg (AppUpdate a) -> Msg a
+appPostCommentMsg = pageMsg << PostCommentMsg << postCommentUpdate
 
 appLoginMsg : AuthLoginMsg (AppUpdate a) -> Msg a
 appLoginMsg = pageMsg << AuthLoginMsg << authLoginUpdate
@@ -335,9 +484,9 @@ onUrlRequest urlRequest = routerMsg (UrlRequest urlRequest)
 
 main : Program Flags Model (Msg a)
 main =
-  Browser.application
-    { init          = \flags url key -> let (a,b,_) = appInit flags url key in (a,b)
-    , update        = \msg model -> let (a,b,_) = appUpdate msg model in (a,b)
+  application
+    { init          = appInit
+    , update        = appUpdate
     , subscriptions = subscriptions
     , view          = view
     , onUrlChange   = onUrlChange
