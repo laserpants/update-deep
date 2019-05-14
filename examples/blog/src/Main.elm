@@ -66,16 +66,17 @@ andInvokeHandler = andThen << invokeHandler
 foldEvents : Update m (m -> Update m a c) c -> Update m a c
 foldEvents ( model, cmd, events ) = List.foldr andThen ( model, cmd, [] ) events
 
+message_ : ((n -> Update n b d) -> d) -> { get : n -> m , set : n -> m -> n , update : c -> m -> Update m (n -> Update n b d) c } -> c -> n -> Update n b d
+message_ cons { update, get, set } msg model =
+  model
+    |> get
+    |> update msg
+    |> mapCmd (message cons { update = update, get = get, set = set })
+    |> map (set model)
+    |> foldEvents
+
 message : ((n -> Update n b c) -> c) -> { update : a -> m -> Update m (n -> Update n b c) a, get : n -> m, set : n -> m -> n } -> a -> c
-message cons { update, get, set } =
-  let rec msg model =
-        model
-          |> get
-          |> update msg
-          |> mapCmd (cons << rec)
-          |> map (set model)
-          |> foldEvents
-   in cons << rec
+message cons access = cons << message_ cons access
 
 --
 --
@@ -97,7 +98,7 @@ parser =
     , Parser.map About       (Parser.s "about")
     , Parser.map NewPost     (Parser.s "posts" </> Parser.s "new")
     , Parser.map Post        (Parser.s "posts" </> Parser.int)
-    , Parser.map CommentPost (Parser.s "posts" </> Parser.int </> Parser.s "comment") 
+    , Parser.map CommentPost (Parser.s "posts" </> Parser.int </> Parser.s "comment")
     , Parser.map Login       (Parser.s "login")
     , Parser.map Register    (Parser.s "register") ]
 
@@ -122,8 +123,8 @@ setRoute : Maybe Route -> RouterModel -> Update RouterModel a (RouterMsg a)
 setRoute route model = save { model | route = route }
 
 routerInit : Navigation.Key -> Update RouterModel (RouterUpdate a) (RouterMsg a)
-routerInit key = 
-  save 
+routerInit key =
+  save
     { route = Nothing
     , key   = key }
 
@@ -171,26 +172,86 @@ uiSubscriptions model = Sub.none
 
 --
 
-type alias PageUpdate a = PageModel -> Update PageModel a (PageMsg a)
+type alias AuthLoginUpdate a = AuthLoginModel -> Update AuthLoginModel a (AuthLoginMsg a)
 
-type PageMsg a
-  = NoPageMsg
+type AuthLoginMsg a
+  = NoAuthLoginMsg
 
-type alias PageModel =
+type alias AuthLoginModel =
   {}
 
-pageInit : Update PageModel (PageUpdate a) (PageMsg a)
-pageInit = save {}
+authLoginUpdate : AuthLoginMsg a -> AuthLoginModel -> Update AuthLoginModel a (AuthLoginMsg a)
+authLoginUpdate msg model = save model
 
-pageUpdate : PageMsg a -> PageModel -> Update PageModel a (PageMsg a)
-pageUpdate msg model = save model
+authLoginSubscriptions : AuthLoginModel -> Sub (AuthLoginMsg a)
+authLoginSubscriptions model = Sub.none
 
-pageSubscriptions : PageModel -> Sub (PageMsg a)
-pageSubscriptions model = Sub.none
+--
+
+type alias AuthRegisterUpdate a = AuthRegisterModel -> Update AuthRegisterModel a (AuthRegisterMsg a)
+
+type AuthRegisterMsg a
+  = NoAuthRegisterMsg
+
+type alias AuthRegisterModel =
+  {}
+
+authRegisterUpdate : AuthRegisterMsg a -> AuthRegisterModel -> Update AuthRegisterModel a (AuthRegisterMsg a)
+authRegisterUpdate msg model = save model
+
+authRegisterSubscriptions : AuthRegisterModel -> Sub (AuthRegisterMsg a)
+authRegisterSubscriptions model = Sub.none
 
 --
 
 type alias Flags = ()
+
+--
+
+type alias PageUpdate a = Page -> Update Page a (PageMsg a)
+
+type PageMsg a
+  = HomePageMsg
+  | AuthLoginMsg (AuthLoginUpdate a)
+  | AuthRegisterMsg (AuthRegisterUpdate a)
+
+type Page
+  = HomePage
+  | LoginPage AuthLoginModel
+  | RegisterPage AuthRegisterModel
+
+pageInit : Update Page (PageUpdate a) (PageMsg a)
+pageInit = save HomePage
+
+loginMsg : AuthLoginMsg a -> PageMsg a
+loginMsg = AuthLoginMsg << authLoginUpdate
+
+registerMsg : AuthRegisterMsg a -> PageMsg a
+registerMsg = AuthRegisterMsg << authRegisterUpdate
+
+pageUpdate : PageMsg a -> Page -> Update Page a (PageMsg a)
+pageUpdate msg page =
+  case ( msg, page ) of
+    ( AuthLoginMsg update, LoginPage authLoginModel ) ->
+      update authLoginModel
+        |> map LoginPage
+        |> mapCmd loginMsg
+    ( AuthRegisterMsg update, RegisterPage authRegisterModel ) ->
+      update authRegisterModel
+        |> map RegisterPage
+        |> mapCmd registerMsg
+    _ ->
+      save page
+
+pageSubscriptions : Page -> Sub (Msg a)
+pageSubscriptions page =
+  case page of
+    HomePage ->
+      Sub.none
+    LoginPage authLoginModel ->
+      Sub.map appLoginMsg (authLoginSubscriptions authLoginModel)
+    RegisterPage authRegisterModel ->
+      Sub.map appRegisterMsg (authRegisterSubscriptions authRegisterModel)
 
 --
 
@@ -202,20 +263,20 @@ type Msg a
 type alias Model =
   { router : RouterModel
   , ui     : UiModel
-  , page   : PageModel }
+  , page   : Page }
 
 appInit : Flags -> Url -> Navigation.Key -> Update Model (AppUpdate a) (Msg a)
-appInit flags url key = 
+appInit flags url key =
   let router = routerInit key |> foldEvents
       ui     = uiInit         |> foldEvents
       page   = pageInit       |> foldEvents
    in map3 Model
-        (router |> mapCmd routerMsg) 
-        (ui     |> mapCmd uiMsg) 
+        (router |> mapCmd routerMsg)
+        (ui     |> mapCmd uiMsg)
         (page   |> mapCmd pageMsg)
 
 routerMsg : RouterMsg (AppUpdate a) -> Msg a
-routerMsg = message ModelMsg 
+routerMsg = message ModelMsg
   { update = routerUpdate { onRouteChange = always save }
   , get = .router
   , set = \model router -> { model | router = router } }
@@ -232,31 +293,37 @@ pageMsg = message ModelMsg
   , get = .page
   , set = \model page -> { model | page = page } }
 
+appLoginMsg : AuthLoginMsg (AppUpdate a) -> Msg a
+appLoginMsg = pageMsg << AuthLoginMsg << authLoginUpdate
+
+appRegisterMsg : AuthRegisterMsg (AppUpdate a) -> Msg a
+appRegisterMsg = pageMsg << AuthRegisterMsg << authRegisterUpdate
+
 appUpdate : Msg a -> AppUpdate a
 appUpdate msg model =
   case msg of
     ModelMsg update ->
-      update model 
+      update model
 
 subscriptions : Model -> Sub (Msg a)
 subscriptions model =
   Sub.batch
-    [ Sub.map routerMsg (routerSubscriptions model.router)
-    , Sub.map uiMsg (uiSubscriptions model.ui)
-    , Sub.map pageMsg (pageSubscriptions model.page) ]
+    ( pageSubscriptions model.page ::
+      [ Sub.map routerMsg (routerSubscriptions model.router)
+      , Sub.map uiMsg (uiSubscriptions model.ui) ] )
 
 view : Model -> Document (Msg a)
-view model = 
+view model =
   { title = ""
-  , body  = [ 
-      div [] 
-        [ ul [] 
+  , body  = [
+      div []
+        [ ul []
           [ li [] [ a [ href "/" ] [ text "Home" ] ]
           , li [] [ a [ href "/about" ] [ text "About" ] ]
           , li [] [ a [ href "/login" ] [ text "Login" ] ]
           , li [] [ a [ href "/register" ] [ text "Register" ] ] ]
-        , text (Debug.toString model) 
-        ] 
+        , text (Debug.toString model)
+        ]
     ]
   }
 
