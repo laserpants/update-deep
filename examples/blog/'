@@ -507,93 +507,49 @@ uiSubscriptions model = Sub.none
 type alias AuthLoginUpdate a = AuthLoginModel -> Update AuthLoginModel a (AuthLoginMsg a)
 
 type AuthLoginMsg a
-  = AuthLoginModelMsg (AuthLoginUpdate a)
+  = NoAuthLoginMsg
 
-type alias AuthLoginModel =
-  { user : ApiModel DataUser
-  , form : FormModel AuthLoginForm }
+type alias AuthLoginModel = {}
+--  { user : ApiModel DataUser
+--  , form : FormModel AuthLoginForm }
 
 authLoginInit : Update AuthLoginModel b (AuthLoginMsg a)
-authLoginInit =
-  let api = apiInit { endpoint = "/auth/login"
-                    , method   = HttpPost
-                    , decoder  = Json.field "user" dataUserDecoder }
-      form = formInit authLoginFormFields { login = "", password = "" }
-   in map2 AuthLoginModel
-        (api  |> mapCmd authLoginApiMsg)
-        (form |> mapCmd authLoginFormMsg)
-
-authLoginApiMsg : ApiMsg DataUser -> AuthLoginMsg a
-authLoginApiMsg = message AuthLoginModelMsg
-  { update = apiUpdate { onSuccess = always save, onError = always save }
-  , get = .user
-  , set = \model user -> { model | user = user } }
-
-authLoginFormMsg : FormMsg AuthLoginForm -> AuthLoginMsg a
-authLoginFormMsg = message AuthLoginModelMsg
-  { update = formUpdate { onSubmit = always save }
-  , get = .form
-  , set = \model form -> { model | form = form } }
+authLoginInit = Debug.todo ""
+--  let api = apiInit { endpoint = "/auth/login"
+--                    , method   = HttpPost
+--                    , decoder  = Json.field "user" dataUserDecoder }
+--      form = formInit authLoginFormFields { login = "", password = "" }
+--   in map2 AuthLoginModel
+--        (api  |> mapCmd AuthLoginApiMsg)
+--        (form |> mapCmd AuthLoginFormMsg)
 
 authLoginUpdate : AuthLoginMsg a -> AuthLoginModel -> Update AuthLoginModel a (AuthLoginMsg a)
-authLoginUpdate msg model =
-  case msg of
-    AuthLoginModelMsg update ->
-      update model
+authLoginUpdate msg model = save model
 
 authLoginSubscriptions : AuthLoginModel -> Sub (AuthLoginMsg a)
 authLoginSubscriptions model = Sub.none
 
 authLoginView : AuthLoginModel -> Html (AuthLoginMsg a)
-authLoginView { form } =
-  Html.map authLoginFormMsg (formView form)
+authLoginView model = div [] []
 
 --
 
 type alias AuthRegisterUpdate a = AuthRegisterModel -> Update AuthRegisterModel a (AuthRegisterMsg a)
 
 type AuthRegisterMsg a
-  = AuthRegisterModelMsg (AuthRegisterUpdate a)
+  = NoAuthRegisterMsg
 
 type alias AuthRegisterModel =
-  { response : ApiModel { status : String }
-  , form     : FormModel AuthRegisterForm }
+  {}
 
 authRegisterInit : Update AuthRegisterModel b (AuthRegisterMsg a)
-authRegisterInit =
-  let decoder = Json.field "status" Json.string |> Json.map (\status -> { status = status })
-      api = apiInit { endpoint = "/auth/register"
-                    , method   = HttpPost
-                    , decoder  = decoder }
-      form = formInit authRegisterFormFields { login = "", password = "" }
-   in map2 AuthRegisterModel
-        (api  |> foldEvents |> mapCmd authRegisterApiMsg)
-        (form |> foldEvents |> mapCmd authRegisterFormMsg)
-
-authRegisterApiMsg : ApiMsg { status : String } -> AuthRegisterMsg a
-authRegisterApiMsg = message AuthRegisterModelMsg
-  { update = apiUpdate { onSuccess = always save, onError = always save }
-  , get = .response
-  , set = \model response -> { model | response = response } }
-
-authRegisterFormMsg : FormMsg AuthRegisterForm -> AuthRegisterMsg a
-authRegisterFormMsg = message AuthRegisterModelMsg
-  { update = formUpdate { onSubmit = always save }
-  , get = .form
-  , set = \model form -> { model | form = form } }
+authRegisterInit = save {}
 
 authRegisterUpdate : AuthRegisterMsg a -> AuthRegisterModel -> Update AuthRegisterModel a (AuthRegisterMsg a)
-authRegisterUpdate msg model =
-  case msg of
-    AuthRegisterModelMsg update ->
-      update model
+authRegisterUpdate msg model = save model
 
 authRegisterSubscriptions : AuthRegisterModel -> Sub (AuthRegisterMsg a)
 authRegisterSubscriptions model = Sub.none
-
-authRegisterView : AuthRegisterModel -> Html (AuthRegisterMsg a)
-authRegisterView { form } =
-  Html.map authRegisterFormMsg (formView form)
 
 --
 
@@ -642,24 +598,13 @@ postCommentSubscriptions model = Sub.none
 type alias PostListUpdate a = PostListModel -> Update PostListModel a (PostListMsg a)
 
 type PostListMsg a
-  = PostListModelMsg (PostListUpdate a)
+  = NoPostListMsg
 
 type alias PostListModel =
-  { collection : ApiModel (List DataPost) }
+  {}
 
 postListInit : Update PostListModel b (PostListMsg a)
-postListInit =
-   let collection = apiInit { endpoint = "/posts"
-                            , method   = HttpGet
-                            , decoder  = Json.field "posts" (Json.list dataPostDecoder) }
-    in map PostListModel
-         (collection |> foldEvents |> mapCmd postListApiMsg)
-
-postListApiMsg : ApiMsg (List DataPost) -> PostListMsg a
-postListApiMsg = message PostListModelMsg
-  { update = apiUpdate { onSuccess = always save, onError = always save }
-  , get = .collection
-  , set = \model collection -> { model | collection = collection } }
+postListInit = save {}
 
 postListUpdate : PostListMsg a -> PostListModel -> Update PostListModel a (PostListMsg a)
 postListUpdate msg model =
@@ -673,8 +618,10 @@ postListSubscriptions model = Sub.none
 
 type alias PostCreateUpdate a = PostCreateModel -> Update PostCreateModel a (PostCreateMsg a)
 
-type PostCreateMsg a
-  = PostCreateModelMsg (PostCreateUpdate a)
+--type PostCreateMsg a
+--  = PostCreateModelMsg (PostCreateUpdate a)
+
+type PostCreateMsg a = PostCreateModelMsg (PostCreateUpdate a)
 
 type alias PostCreateModel =
   { post : ApiModel DataPost
@@ -703,10 +650,10 @@ postCreateFormMsg = message PostCreateModelMsg
   , set = \model form -> { model | form = form } }
 
 postCreateUpdate : PostCreateMsg a -> PostCreateModel -> Update PostCreateModel a (PostCreateMsg a)
-postCreateUpdate msg model =
-  case msg of
-    PostCreateModelMsg update ->
-      update model
+postCreateUpdate (PostCreateModelMsg msg) = msg 
+--  case msg of
+--    PostCreateModelMsg update ->
+--      update model
 
 postCreateSubscriptions : PostCreateModel -> Sub (PostCreateMsg a)
 postCreateSubscriptions model = Sub.none
@@ -720,8 +667,7 @@ type alias Flags = ()
 type alias PageUpdate a = Page -> Update Page a (PageMsg a)
 
 type PageMsg a
-  = PageModelMsg (PageUpdate a)
-  | HomePageMsg (PostListUpdate a)
+  = HomePageMsg
   | AuthLoginMsg (AuthLoginUpdate a)
   | AuthRegisterMsg (AuthRegisterUpdate a)
   | PostCreateMsg (PostCreateUpdate a)
@@ -730,7 +676,7 @@ type PageMsg a
   | SetPage Page
 
 type Page
-  = HomePage PostListModel
+  = HomePage
   | AboutPage
   | PostCreatePage PostCreateModel
   | PostShowPage PostShowModel
@@ -739,25 +685,22 @@ type Page
   | RegisterPage AuthRegisterModel
 
 pageInit : Update Page b (PageMsg a)
-pageInit = save AboutPage
+pageInit = save HomePage
 
-loginPageMsg : AuthLoginMsg a -> PageMsg a
-loginPageMsg = AuthLoginMsg << authLoginUpdate
+loginMsg : AuthLoginMsg a -> PageMsg a
+loginMsg = AuthLoginMsg << authLoginUpdate
 
-registerPageMsg : AuthRegisterMsg a -> PageMsg a
-registerPageMsg = AuthRegisterMsg << authRegisterUpdate
+registerMsg : AuthRegisterMsg a -> PageMsg a
+registerMsg = AuthRegisterMsg << authRegisterUpdate
 
-homePageMsg : PostListMsg a -> PageMsg a
-homePageMsg = HomePageMsg << postListUpdate
+postCreateMsg : PostCreateMsg a -> PageMsg a
+postCreateMsg = PostCreateMsg << postCreateUpdate
 
-postCreatePageMsg : PostCreateMsg a -> PageMsg a
-postCreatePageMsg = PostCreateMsg << postCreateUpdate
+postShowMsg : PostShowMsg a -> PageMsg a
+postShowMsg = PostShowMsg << postShowUpdate
 
-postShowPageMsg : PostShowMsg a -> PageMsg a
-postShowPageMsg = PostShowMsg << postShowUpdate
-
-postCommentPageMsg : PostCommentMsg a -> PageMsg a
-postCommentPageMsg = PostCommentMsg << postCommentUpdate
+postCommentMsg : PostCommentMsg a -> PageMsg a
+postCommentMsg = PostCommentMsg << postCommentUpdate
 
 pageUpdate : PageMsg a -> Page -> Update Page a (PageMsg a)
 pageUpdate msg page =
@@ -765,25 +708,23 @@ pageUpdate msg page =
     ( AuthLoginMsg update, LoginPage authLoginModel ) ->
       update authLoginModel
         |> map LoginPage
-        |> mapCmd loginPageMsg
+        |> mapCmd loginMsg
     ( AuthRegisterMsg update, RegisterPage authRegisterModel ) ->
       update authRegisterModel
         |> map RegisterPage
-        |> mapCmd registerPageMsg
+        |> mapCmd registerMsg
     ( PostCreateMsg update, PostCreatePage postCreateModel ) ->
       update postCreateModel
         |> map PostCreatePage
-        |> mapCmd postCreatePageMsg
+        |> mapCmd postCreateMsg
     ( PostShowMsg update, PostShowPage postShowModel ) ->
       update postShowModel
         |> map PostShowPage
-        |> mapCmd postShowPageMsg
+        |> mapCmd postShowMsg
     ( PostCommentMsg update, PostCommentPage postCommentModel ) ->
       update postCommentModel
         |> map PostCommentPage
-        |> mapCmd postCommentPageMsg
-    ( PageModelMsg update, _ ) ->
-      update page
+        |> mapCmd postCommentMsg
     ( SetPage newPage, _ ) ->
       save newPage
     _ ->
@@ -792,8 +733,8 @@ pageUpdate msg page =
 pageSubscriptions : Page -> Sub (Msg a)
 pageSubscriptions page =
   case page of
-    HomePage postListModel ->
-      Sub.map appHomePageMsg (postListSubscriptions postListModel)
+    HomePage ->
+      Sub.none
     AboutPage ->
       Sub.none
     PostCreatePage postCreateModel ->
@@ -810,7 +751,7 @@ pageSubscriptions page =
 pageView : Page -> Html (Msg a)
 pageView page =
   case page of
-    HomePage postListModel ->
+    HomePage ->
       text "homepage"
     AboutPage ->
       text "about"
@@ -821,9 +762,9 @@ pageView page =
     PostCommentPage postCommentModel ->
       text "comment post"
     LoginPage authLoginModel ->
-      Html.map appLoginMsg (authLoginView authLoginModel)
+      text "login"
     RegisterPage authRegisterModel ->
-      Html.map appRegisterMsg (authRegisterView authRegisterModel)
+      text "register"
 
 --
 
@@ -855,18 +796,11 @@ routerMsg = message ModelMsg
 
 uiMsg : UiMsg (AppUpdate a) -> Msg a
 uiMsg = message ModelMsg
-  { update = uiUpdate
-  , get = .ui
-  , set = \model ui -> { model | ui = ui } }
+  { update = uiUpdate, get = .ui, set = \model ui -> { model | ui = ui } }
 
 pageMsg : PageMsg (AppUpdate a) -> Msg a
 pageMsg = message ModelMsg
-  { update = pageUpdate
-  , get = .page
-  , set = \model page -> { model | page = page } }
-
-appHomePageMsg : PostListMsg (AppUpdate a) -> Msg a
-appHomePageMsg = pageMsg << HomePageMsg << postListUpdate
+  { update = pageUpdate, get = .page, set = \model page -> { model | page = page } }
 
 appPostCreateMsg : PostCreateMsg (AppUpdate a) -> Msg a
 appPostCreateMsg = pageMsg << PostCreateMsg << postCreateUpdate
@@ -885,30 +819,30 @@ appRegisterMsg = pageMsg << AuthRegisterMsg << authRegisterUpdate
 
 handleRouteChange : Maybe Route -> AppUpdate a
 handleRouteChange route model =
-  let updatePage msg = appUpdate (pageMsg msg) model
+  let setPage page = appUpdate (pageMsg (SetPage page)) model
    in case route of
-        Just Home ->
-          map HomePage postListInit
-            |> mapCmd homePageMsg
-            |> updatePage << PageModelMsg << always
-        Just About ->
-          updatePage (SetPage AboutPage)
-        Just PostCreate ->
-          save model
-        Just (Post id) ->
-          save model
-        Just (CommentPost postId) ->
-          save model
-        Just Login ->
-          map LoginPage authLoginInit
-            |> mapCmd loginPageMsg
-            |> updatePage << PageModelMsg << always
-        Just Register ->
-          map RegisterPage authRegisterInit
-            |> mapCmd registerPageMsg
-            |> updatePage << PageModelMsg << always
-        Nothing ->
-          save model
+    Just Home ->
+      model
+        |> appUpdate (pageMsg (SetPage HomePage))
+    Just About ->
+      model
+        |> appUpdate (pageMsg (SetPage AboutPage))
+    Just PostCreate ->
+      save model
+    Just (Post id) ->
+      save model
+    Just (CommentPost postId) ->
+      save model
+    Just Login ->
+      authLoginInit
+        |> mapCmd appLoginMsg
+        |> andThen (\authLoginModel -> setPage (LoginPage authLoginModel))
+    Just Register ->
+      authRegisterInit
+        |> mapCmd appRegisterMsg
+        |> andThen (\authRegisterModel -> setPage (LoginPage authRegisterModel))
+    Nothing ->
+      save model
 
 appUpdate : Msg a -> AppUpdate a
 appUpdate msg model =
