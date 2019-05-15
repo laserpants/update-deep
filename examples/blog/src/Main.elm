@@ -639,47 +639,47 @@ postsCommentsSubscriptions model = Sub.none
 
 --
 
-type alias PostsListUpdate a = PostsListModel -> Update PostsListModel a (PostsListMsg a)
+type alias HomePageUpdate a = HomePageModel -> Update HomePageModel a (HomePageMsg a)
 
-type PostsListMsg a
-  = PostsListModelMsg (PostsListUpdate a)
+type HomePageMsg a
+  = HomePageModelMsg (HomePageUpdate a)
 
-type alias PostsListModel =
+type alias HomePageModel =
   { collection : ApiModel (List DataPost) }
 
-postsListInit : Update PostsListModel b (PostsListMsg a)
-postsListInit =
+homePageInit : Update HomePageModel b (HomePageMsg a)
+homePageInit =
    let collection = apiInit { endpoint = "/posts"
                             , method   = HttpGet
                             , decoder  = Json.field "posts" (Json.list dataPostDecoder) }
-    in map PostsListModel
-         (collection |> foldEvents |> mapCmd postsListApiMsg)
+    in map HomePageModel
+         (collection |> foldEvents |> mapCmd homePageApiMsg)
 
-postsListApiMsg : ApiMsg (List DataPost) -> PostsListMsg a
-postsListApiMsg = message PostsListModelMsg
+homePageApiMsg : ApiMsg (List DataPost) -> HomePageMsg a
+homePageApiMsg = message HomePageModelMsg
   { update = apiUpdate { onSuccess = always save, onError = always save }
   , get = .collection
   , set = \model collection -> { model | collection = collection } }
 
-postsListUpdate : PostsListMsg a -> PostsListModel -> Update PostsListModel a (PostsListMsg a)
-postsListUpdate msg model =
+homePageUpdate : HomePageMsg a -> HomePageModel -> Update HomePageModel a (HomePageMsg a)
+homePageUpdate msg model =
   case msg of
-    PostsListModelMsg update ->
+    HomePageModelMsg update ->
       update model
 
-postsListSubscriptions : PostsListModel -> Sub (PostsListMsg a)
-postsListSubscriptions model = Sub.none
+homePageSubscriptions : HomePageModel -> Sub (HomePageMsg a)
+homePageSubscriptions model = Sub.none
 
 fetchButton =
-  div [] [ button [ onClick (postsListApiMsg (Request "" Nothing)) ] [ text "Fetch" ] ]
+  div [] [ button [ onClick (homePageApiMsg (Request "" Nothing)) ] [ text "Fetch" ] ]
 
 item post = 
   div [] 
     [ h1 [] [ text post.title ] 
     , p [] [ text post.body ] ]
 
-postsListView : PostsListModel -> Html (PostsListMsg a)
-postsListView model =
+homePageView : HomePageModel -> Html (HomePageMsg a)
+homePageView model =
   case model.collection.resource of
     NotRequested ->
       div [] 
@@ -755,7 +755,7 @@ type alias PageUpdate a = Page -> Update Page a (PageMsg a)
 
 type PageMsg a
   = PageModelMsg (PageUpdate a)
-  | HomePageMsg (PostsListUpdate a)
+  | HomePageMsg (HomePageUpdate a)
   | AuthLoginMsg (AuthLoginUpdate a)
   | AuthRegisterMsg (AuthRegisterUpdate a)
   | PostsCreateMsg (PostsCreateUpdate a)
@@ -764,7 +764,7 @@ type PageMsg a
   | SetPage Page
 
 type Page
-  = HomePage PostsListModel
+  = HomePage HomePageModel
   | AboutPage
   | PostsCreatePage PostsCreateModel
   | PostsShowPage PostsShowModel
@@ -774,7 +774,7 @@ type Page
 
 pageInit : Update Page b (PageMsg a)
 pageInit = 
-  map HomePage postsListInit
+  map HomePage homePageInit
     |> mapCmd homePageMsg
     |> foldEvents
 
@@ -784,8 +784,8 @@ loginPageMsg = AuthLoginMsg << authLoginUpdate
 registerPageMsg : AuthRegisterMsg a -> PageMsg a
 registerPageMsg = AuthRegisterMsg << authRegisterUpdate
 
-homePageMsg : PostsListMsg a -> PageMsg a
-homePageMsg = HomePageMsg << postsListUpdate
+homePageMsg : HomePageMsg a -> PageMsg a
+homePageMsg = HomePageMsg << homePageUpdate
 
 postsCreatePageMsg : PostsCreateMsg a -> PageMsg a
 postsCreatePageMsg = PostsCreateMsg << postsCreateUpdate
@@ -799,8 +799,8 @@ postsCommentsPageMsg = PostsCommentMsg << postsCommentsUpdate
 pageUpdate : PageMsg a -> Page -> Update Page a (PageMsg a)
 pageUpdate msg page =
   case ( msg, page ) of
-    ( HomePageMsg update, HomePage postsListModel ) ->
-      update postsListModel
+    ( HomePageMsg update, HomePage homePageModel ) ->
+      update homePageModel
         |> map HomePage
         |> mapCmd homePageMsg
     ( AuthLoginMsg update, LoginPage authLoginModel ) ->
@@ -833,8 +833,8 @@ pageUpdate msg page =
 pageSubscriptions : Page -> Sub (Msg a)
 pageSubscriptions page =
   case page of
-    HomePage postsListModel ->
-      Sub.map appHomePageMsg (postsListSubscriptions postsListModel)
+    HomePage homePageModel ->
+      Sub.map appHomePageMsg (homePageSubscriptions homePageModel)
     AboutPage ->
       Sub.none
     PostsCreatePage postsCreateModel ->
@@ -851,8 +851,8 @@ pageSubscriptions page =
 pageView : Page -> Html (Msg a)
 pageView page =
   case page of
-    HomePage postsListModel ->
-      Html.map appHomePageMsg (postsListView postsListModel)
+    HomePage homePageModel ->
+      Html.map appHomePageMsg (homePageView homePageModel)
     AboutPage ->
       text "about"
     PostsCreatePage postsCreateModel ->
@@ -906,8 +906,8 @@ pageMsg = message ModelMsg
   , get = .page
   , set = \model page -> { model | page = page } }
 
-appHomePageMsg : PostsListMsg (AppUpdate a) -> Msg a
-appHomePageMsg = pageMsg << HomePageMsg << postsListUpdate
+appHomePageMsg : HomePageMsg (AppUpdate a) -> Msg a
+appHomePageMsg = pageMsg << HomePageMsg << homePageUpdate
 
 appPostsCreateMsg : PostsCreateMsg (AppUpdate a) -> Msg a
 appPostsCreateMsg = pageMsg << PostsCreateMsg << postsCreateUpdate
@@ -929,7 +929,7 @@ handleRouteChange route model =
   let updatePage msg = appUpdate (pageMsg msg) model
    in case route of
         Just Home ->
-          map HomePage postsListInit
+          map HomePage homePageInit
             |> mapCmd homePageMsg
             |> updatePage << PageModelMsg << always
         Just About ->
