@@ -67,8 +67,49 @@ andInvokeHandler = andThen << invokeHandler
 foldEvents : Update a c (a -> Update a c e) -> Update a c e
 foldEvents ( m, cmd, events ) = List.foldr andThen ( m, cmd, [] ) events
 
-andWithEvents : (m -> Update a c (a -> Update a c e)) -> Update m c (a -> Update a c e) -> Update a c e
-andWithEvents setter = foldEvents << andThen setter
+andFinally : (m -> Update a c (a -> Update a c e)) -> Update m c (a -> Update a c e) -> Update a c e
+andFinally do = foldEvents << andThen do
+
+applicationInit : (d -> e -> f -> Update a b c) -> d -> e -> f -> ( a, Cmd b )
+applicationInit f a b c = let ( model, cmd, _ ) = f a b c in ( model, cmd )
+
+documentInit : (f -> Update a b c) -> f -> ( a, Cmd b )
+documentInit f a = let ( model, cmd, _ ) = f a in ( model, cmd )
+
+runUpdate : (d -> e -> Update a b c) -> d -> e -> ( a, Cmd b )
+runUpdate f a b = let ( model, cmd, _ ) = f a b in ( model, cmd )
+
+--
+
+application : { init          : flags -> Url -> Navigation.Key -> Update model msg d
+              , onUrlChange   : Url -> msg
+              , onUrlRequest  : UrlRequest -> msg
+              , subscriptions : model -> Sub msg
+              , update        : msg -> model -> Update model msg c
+              , view          : model -> Document msg 
+              } -> Program flags model msg
+application config =
+  Browser.application
+    { init          = applicationInit config.init
+    , update        = runUpdate config.update
+    , subscriptions = config.subscriptions
+    , view          = config.view
+    , onUrlChange   = config.onUrlChange
+    , onUrlRequest  = config.onUrlRequest }
+
+document : { init          : flags -> Update model msg d
+           , onUrlChange   : Url -> msg
+           , onUrlRequest  : UrlRequest -> msg
+           , subscriptions : model -> Sub msg
+           , update        : msg -> model -> Update model msg c
+           , view          : model -> Document msg 
+           } -> Program flags model msg
+document config =
+  Browser.document
+    { init          = documentInit config.init
+    , update        = runUpdate config.update
+    , subscriptions = config.subscriptions
+    , view          = config.view }
 
 --
 --
@@ -91,7 +132,7 @@ type alias ApiModel a =
   { resource : ApiResource a
   , request  : Request a }
 
-setResource : ApiResource a -> ApiModel a -> Update (ApiModel a) (ApiMsg a) e
+setResource : ApiResource a -> ApiModel a -> Update (ApiModel a) (ApiMsg a) b
 setResource resource state = save { state | resource = resource }
 
 type HttpMethod
@@ -103,7 +144,7 @@ type alias RequestConfig a =
   , method   : HttpMethod
   , decoder  : Json.Decoder a }
 
-apiInit : RequestConfig a -> Update (ApiModel a) (ApiMsg a) e
+apiInit : RequestConfig a -> Update (ApiModel a) (ApiMsg a) b
 apiInit { endpoint, method, decoder } =
   let expect = Http.expectJson Response decoder
       request suffix body =
@@ -121,14 +162,14 @@ apiInit { endpoint, method, decoder } =
     { resource = NotRequested
     , request  = request }
 
-type alias ApiHandlers a b c e = 
-  { onSuccess : b -> a -> Update a c e
-  , onError   : Http.Error -> a -> Update a c e }
+type alias ApiHandlers a b = 
+  { onSuccess : a -> b
+  , onError   : Http.Error -> b }
 
-apiDefaultHandlers : ApiHandlers a b c e
+apiDefaultHandlers : ApiHandlers a (b -> Update b c e)
 apiDefaultHandlers = { onSuccess = always save, onError = always save }
 
-apiUpdate : ApiHandlers a b c e -> ApiMsg b -> ApiModel b -> Update (ApiModel b) (ApiMsg b) (a -> Update a c e)
+apiUpdate : ApiHandlers a b -> ApiMsg a -> ApiModel a -> Update (ApiModel a) (ApiMsg a) b
 apiUpdate { onSuccess, onError } msg model =
   case msg of
     Request url maybeBody ->
@@ -164,14 +205,14 @@ type alias FormModel a =
 
 type alias Fields a = Form a (FormMsg a)
 
-formInit : Form a (FormMsg a) -> a -> Update (FormModel a) (FormMsg a) e
+formInit : Form a (FormMsg a) -> a -> Update (FormModel a) (FormMsg a) b
 formInit form values =
   save
     { state   = Form.View.idle values
     , form    = form
     , initial = values }
 
-formUpdate : { onSubmit : b -> a -> Update a c e } -> FormMsg b -> FormModel b -> Update (FormModel b) (FormMsg b) (a -> Update a c e)
+formUpdate : { onSubmit : a -> b } -> FormMsg a -> FormModel a -> Update (FormModel a) (FormMsg a) b
 formUpdate { onSubmit } msg model =
   case msg of
     ChangeForm formViewModel ->
@@ -453,17 +494,17 @@ postsCommentCreateUpdate msg model =
       model.post
         |> apiUpdate apiDefaultHandlers apiMsg
         |> mapCmd PostsCommentCreateApiPostMsg
-        |> andWithEvents (postsCommentCreateInsertAsPostIn model)
+        |> andFinally (postsCommentCreateInsertAsPostIn model)
     PostsCommentCreateApiCommentMsg apiMsg ->
       model.comment
         |> apiUpdate apiDefaultHandlers apiMsg
         |> mapCmd PostsCommentCreateApiCommentMsg
-        |> andWithEvents (postsCommentCreateInsertAsCommentIn model)
+        |> andFinally (postsCommentCreateInsertAsCommentIn model)
     PostsCommentCreateFormMsg formMsg ->
       model.form
         |> formUpdate { onSubmit = always save } formMsg
         |> mapCmd PostsCommentCreateFormMsg
-        |> andWithEvents (postsCommentCreateInsertAsFormIn model)
+        |> andFinally (postsCommentCreateInsertAsFormIn model)
 
 postsCommentCreateSubscriptions : PostsCommentCreateModel -> Sub PostsCommentCreateMsg
 postsCommentCreateSubscriptions model = Sub.none
@@ -508,7 +549,7 @@ postsShowUpdate msg model =
       model.post
         |> apiUpdate apiDefaultHandlers apiMsg
         |> mapCmd PostsShowApiMsg
-        |> andWithEvents (postsShowInsertAsPostIn model)
+        |> andFinally (postsShowInsertAsPostIn model)
 
 postsShowSubscriptions : PostsShowModel -> Sub PostsShowMsg
 postsShowSubscriptions model = Sub.none
@@ -557,7 +598,7 @@ homePageUpdate { onPostsLoaded } msg model =
       model.posts
         |> apiUpdate { apiDefaultHandlers | onSuccess = \posts -> invokeHandler (onPostsLoaded posts) } apiMsg
         |> mapCmd HomePageApiMsg
-        |> andWithEvents (insertAsPostsIn model)
+        |> andFinally (insertAsPostsIn model)
     FetchPosts ->
       model
         |> homePageUpdate { onPostsLoaded = onPostsLoaded } (HomePageApiMsg (Request "" Nothing))
@@ -614,24 +655,24 @@ postsCreateInit =
         (api  |> mapCmd PostsCreateApiMsg)
         (form |> mapCmd PostsCreateFormMsg)
 
-postsCreateHandleSubmit : { onPostAdded : DataPost -> a -> Update a c e } -> PostsCreateForm -> PostsCreateModel -> Update PostsCreateModel PostsCreateMsg (a -> Update a c e)
+postsCreateHandleSubmit : { onPostAdded : DataPost -> a } -> PostsCreateForm -> PostsCreateModel -> Update PostsCreateModel PostsCreateMsg a
 postsCreateHandleSubmit events form model =
   let json = postsCreateFormToJson form
    in postsCreateUpdate events (PostsCreateApiMsg (apiJsonRequest "" json)) model
 
-postsCreateUpdate : { onPostAdded : DataPost -> a -> Update a c e } -> PostsCreateMsg -> PostsCreateModel -> Update PostsCreateModel PostsCreateMsg (a -> Update a c e)
+postsCreateUpdate : { onPostAdded : DataPost -> a } -> PostsCreateMsg -> PostsCreateModel -> Update PostsCreateModel PostsCreateMsg a
 postsCreateUpdate { onPostAdded } msg model =
   case msg of
     PostsCreateApiMsg apiMsg ->
       model.post
         |> apiUpdate { apiDefaultHandlers | onSuccess = invokeHandler << onPostAdded } apiMsg
         |> mapCmd PostsCreateApiMsg
-        |> andWithEvents (insertAsPostIn model)
+        |> andFinally (insertAsPostIn model)
     PostsCreateFormMsg formMsg ->
       model.form
         |> formUpdate { onSubmit = postsCreateHandleSubmit { onPostAdded = onPostAdded } } formMsg
         |> mapCmd PostsCreateFormMsg
-        |> andWithEvents (insertAsFormIn model)
+        |> andFinally (insertAsFormIn model)
 
 postsCreateSubscriptions : PostsCreateModel -> Sub PostsCreateMsg
 postsCreateSubscriptions model = Sub.none
@@ -656,7 +697,7 @@ authLoginInsertAsUserIn model user = save { model | user = user }
 authLoginInsertAsFormIn : AuthLoginModel -> FormModel AuthLoginForm -> Update AuthLoginModel AuthLoginMsg a
 authLoginInsertAsFormIn model form = save { model | form = form }
 
-authLoginInit : Update AuthLoginModel AuthLoginMsg e
+authLoginInit : Update AuthLoginModel AuthLoginMsg a
 authLoginInit =
   let api = apiInit { endpoint = "/auth/login"
                     , method   = HttpPost
@@ -666,25 +707,25 @@ authLoginInit =
         (api  |> mapCmd AuthLoginApiMsg)
         (form |> mapCmd AuthLoginFormMsg)
 
-authLoginHandleSubmit : { onResponse : Maybe DataUser -> a -> Update a c e } -> AuthLoginForm -> AuthLoginModel -> Update AuthLoginModel AuthLoginMsg (a -> Update a c e)
+authLoginHandleSubmit : { onResponse : Maybe DataUser -> a } -> AuthLoginForm -> AuthLoginModel -> Update AuthLoginModel AuthLoginMsg a
 authLoginHandleSubmit events form model =
   let json = authLoginFormToJson form
    in authLoginUpdate events (AuthLoginApiMsg (apiJsonRequest "" json)) model
 
-authLoginUpdate : { onResponse : Maybe DataUser -> a -> Update a c e } -> AuthLoginMsg -> AuthLoginModel -> Update AuthLoginModel AuthLoginMsg (a -> Update a c e)
+authLoginUpdate : { onResponse : Maybe DataUser -> a } -> AuthLoginMsg -> AuthLoginModel -> Update AuthLoginModel AuthLoginMsg a
 authLoginUpdate { onResponse } msg model =
   case msg of
     AuthLoginApiMsg apiMsg ->
       model.user
-        |> apiUpdate { onSuccess = \user -> invokeHandler (onResponse (Just user))
+        |> apiUpdate { onSuccess = invokeHandler << onResponse << Just
                      , onError   = always (invokeHandler (onResponse Nothing)) } apiMsg
         |> mapCmd AuthLoginApiMsg
-        |> andWithEvents (authLoginInsertAsUserIn model)
+        |> andFinally (authLoginInsertAsUserIn model)
     AuthLoginFormMsg formMsg ->
       model.form
         |> formUpdate { onSubmit = authLoginHandleSubmit { onResponse = onResponse } } formMsg
         |> mapCmd AuthLoginFormMsg
-        |> andWithEvents (authLoginInsertAsFormIn model)
+        |> andFinally (authLoginInsertAsFormIn model)
 
 authLoginSubscriptions : AuthLoginModel -> Sub AuthLoginMsg
 authLoginSubscriptions model = Sub.none
@@ -709,7 +750,7 @@ authRegisterInsertAsResponseIn model response = save { model | response = respon
 authRegisterInsertAsFormIn : AuthRegisterModel -> FormModel AuthRegisterForm -> Update AuthRegisterModel AuthRegisterMsg a
 authRegisterInsertAsFormIn model form = save { model | form = form }
 
-authRegisterInit : Update AuthRegisterModel AuthRegisterMsg e
+authRegisterInit : Update AuthRegisterModel AuthRegisterMsg a
 authRegisterInit =
   let decoder = Json.field "status" Json.string |> Json.map (\status -> { status = status })
       api = apiInit { endpoint = "/auth/register"
@@ -720,19 +761,19 @@ authRegisterInit =
         (api  |> mapCmd AuthRegisterApiMsg)
         (form |> mapCmd AuthRegisterFormMsg)
 
-authRegisterUpdate : AuthRegisterMsg -> AuthRegisterModel -> Update AuthRegisterModel AuthRegisterMsg e
+authRegisterUpdate : AuthRegisterMsg -> AuthRegisterModel -> Update AuthRegisterModel AuthRegisterMsg a
 authRegisterUpdate msg model =
   case msg of
     AuthRegisterApiMsg apiMsg ->
       model.response
         |> apiUpdate apiDefaultHandlers apiMsg
         |> mapCmd AuthRegisterApiMsg
-        |> andWithEvents (authRegisterInsertAsResponseIn model)
+        |> andFinally (authRegisterInsertAsResponseIn model)
     AuthRegisterFormMsg formMsg ->
       model.form
         |> formUpdate { onSubmit = always save } formMsg
         |> mapCmd AuthRegisterFormMsg
-        |> andWithEvents (authRegisterInsertAsFormIn model)
+        |> andFinally (authRegisterInsertAsFormIn model)
 
 authRegisterSubscriptions : AuthRegisterModel -> Sub AuthRegisterMsg
 authRegisterSubscriptions model = Sub.none
@@ -758,7 +799,7 @@ setRoute route model = save { model | route = route }
 routerInit : Flags -> Url -> Navigation.Key -> Update RouterModel RouterMsg a
 routerInit flags url key = save { route = Nothing, key = key }
 
-routerUpdate : { onRouteChange : Maybe Route -> a -> Update a c e } -> RouterMsg -> RouterModel -> Update RouterModel RouterMsg (a -> Update a c e)
+routerUpdate : { onRouteChange : Maybe Route -> a } -> RouterMsg -> RouterModel -> Update RouterModel RouterMsg a
 routerUpdate { onRouteChange } msg model =
   case msg of
     UrlChange url ->
@@ -870,7 +911,7 @@ insertAsCacheIn model cache = save { model | cache = cache }
 setUser : Maybe DataUser -> Model -> Update Model Msg a
 setUser user model = save { model | user = user }
 
-init : Flags -> Url -> Navigation.Key -> Update Model Msg (a -> Update a c e)
+init : Flags -> Url -> Navigation.Key -> Update Model Msg a
 init flags url key =
   let router = routerInit flags url key
       ui     = uiInit flags url key
@@ -882,9 +923,9 @@ init flags url key =
         (save Nothing)
         (save { posts = Nothing })
           |> andThen (update (RouterMsg (UrlChange url)))
---          |> andThen (update ((PageMsg (HomePageMsg Refresh))))
+          |> andThen (update ((PageMsg (HomePageMsg FetchPosts))))
 
-handleRouteChange : CacheModel -> Maybe Route -> Model -> Update Model Msg (a -> Update a c e)
+handleRouteChange : CacheModel -> Maybe Route -> Model -> Update Model Msg a
 handleRouteChange cache route model =
   case route of
     Just Home ->
@@ -914,74 +955,80 @@ handleRouteChange cache route model =
     _ ->
       save { model | page = NotFoundPage }
 
-updatePage : { redirect : String -> a -> Update a c e, onAuthUserChange : Maybe DataUser -> a -> Update a c e, updateCache : CacheData -> a -> Update a c e } -> PageMsg -> Page -> Update Page PageMsg (a -> Update a c e)
-updatePage { redirect, onAuthUserChange, updateCache } msg page =
+handlePostAdded : { redirect : String -> a, updateCache : CacheMsg -> a } -> DataPost -> PostsCreateModel -> Update PostsCreateModel PageMsg a
+handlePostAdded { redirect, updateCache } post model = 
+  model
+    |> invokeHandler (updateCache ClearPosts)
+    |> andThen (invokeHandler (redirect "/"))
+
+pageUpdate : { redirect : String -> a, onUserAuth : Maybe DataUser -> a, updateCache : CacheMsg -> a } -> PageMsg -> Page -> Update Page PageMsg a
+pageUpdate { redirect, onUserAuth, updateCache } msg page =
   case ( msg, page ) of
     ( PostsCreateMsg postsCreateMsg, NewPostPage postsCreateModel ) ->
       postsCreateModel
-        |> postsCreateUpdate { onPostAdded = always (invokeHandler (redirect "/")) } postsCreateMsg
+        |> postsCreateUpdate { onPostAdded = handlePostAdded { redirect = redirect, updateCache = updateCache } } postsCreateMsg
         |> mapCmd PostsCreateMsg
-        |> map NewPostPage
         |> foldEvents
+        |> map NewPostPage
     ( HomePageMsg homePageMsg, HomePage homePageModel ) ->
       homePageModel
-        |> homePageUpdate { onPostsLoaded = \posts -> invokeHandler (updateCache (CachePosts posts)) } homePageMsg
+        |> homePageUpdate { onPostsLoaded = invokeHandler << updateCache << InsertData << CachePosts } homePageMsg
         |> mapCmd HomePageMsg
-        |> map HomePage
         |> foldEvents
+        |> map HomePage
     ( PostsShowMsg postsShowMsg, ShowPostPage postsShowModel ) ->
       postsShowModel
         |> postsShowUpdate postsShowMsg
         |> mapCmd PostsShowMsg
-        |> map ShowPostPage
         |> foldEvents
+        |> map ShowPostPage
     ( PostsCommentCreateMsg postsCommentCreateMsg, CommentPostPage postsCommentCreateModel ) ->
       postsCommentCreateModel
         |> postsCommentCreateUpdate postsCommentCreateMsg
         |> mapCmd PostsCommentCreateMsg
-        |> map CommentPostPage
         |> foldEvents
+        |> map CommentPostPage
     ( AuthLoginMsg authLoginMsg, LoginPage authLoginModel ) ->
       authLoginModel
-        |> authLoginUpdate { onResponse = invokeHandler << onAuthUserChange } authLoginMsg
+        |> authLoginUpdate { onResponse = invokeHandler << onUserAuth } authLoginMsg
         |> mapCmd AuthLoginMsg
-        |> map LoginPage
         |> foldEvents
+        |> map LoginPage
     ( AuthRegisterMsg authRegisterMsg, RegisterPage authRegisterModel ) ->
       authRegisterModel
         |> authRegisterUpdate authRegisterMsg
         |> mapCmd AuthRegisterMsg
-        |> map RegisterPage
         |> foldEvents
+        |> map RegisterPage
     _ ->
       save page
 
-handleRedirect : String -> Model -> Update Model Msg (a -> Update a c e)
-handleRedirect url = update (RouterMsg (Redirect url))
-
-update : Msg -> Model -> Update Model Msg (a -> Update a c e)
+update : Msg -> Model -> Update Model Msg a
 update msg model =
   case msg of
     RouterMsg routerMsg ->
       model.router
         |> routerUpdate { onRouteChange = handleRouteChange model.cache } routerMsg
         |> mapCmd RouterMsg
-        |> andWithEvents (insertAsRouterIn model)
+        |> andFinally (insertAsRouterIn model) 
     UiMsg uiMsg ->
       model.ui
         |> uiUpdate uiMsg
         |> mapCmd UiMsg
-        |> andWithEvents (insertAsUiIn model)
+        |> andFinally (insertAsUiIn model)
     CacheMsg cacheMsg ->
       model.cache
         |> cacheUpdate cacheMsg
         |> mapCmd CacheMsg
-        |> andWithEvents (insertAsCacheIn model)
+        |> andFinally (insertAsCacheIn model)
     PageMsg pageMsg ->
-      updatePage { redirect = handleRedirect, onAuthUserChange = setUser
-                 , updateCache = \data -> update (CacheMsg (InsertData data)) } pageMsg model.page
+      let handlers = { redirect    = update << RouterMsg << Redirect
+                     , updateCache = update << CacheMsg 
+                     , onUserAuth  = setUser }
+       in model.page
+        |> pageUpdate handlers pageMsg
         |> mapCmd PageMsg
-        |> andWithEvents (insertAsPageIn model)
+        |> andFinally (insertAsPageIn model)
 
 pageSubscriptions : Page -> Sub Msg
 pageSubscriptions page =
@@ -1046,9 +1093,9 @@ view model =
 
 main : Program Flags Model Msg
 main =
-  Browser.application
-    { init          = \flags url key -> let ( a, b, _ ) = init flags url key in ( a, b )
-    , update        = \msg model -> let ( a, b, _ ) = update msg model in ( a, b )
+  application
+    { init          = init 
+    , update        = update 
     , subscriptions = subscriptions
     , view          = view
     , onUrlChange   = RouterMsg << UrlChange
