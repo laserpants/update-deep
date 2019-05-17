@@ -81,11 +81,11 @@ runUpdate f a b = let ( model, cmd, _ ) = f a b in ( model, cmd )
 
 --
 
-application : { init          : flags -> Url -> Navigation.Key -> Update model msg d
+application : { init          : flags -> Url -> Navigation.Key -> Update model msg a
               , onUrlChange   : Url -> msg
               , onUrlRequest  : UrlRequest -> msg
               , subscriptions : model -> Sub msg
-              , update        : msg -> model -> Update model msg c
+              , update        : msg -> model -> Update model msg a
               , view          : model -> Document msg 
               } -> Program flags model msg
 application config =
@@ -97,11 +97,11 @@ application config =
     , onUrlChange   = config.onUrlChange
     , onUrlRequest  = config.onUrlRequest }
 
-document : { init          : flags -> Update model msg d
+document : { init          : flags -> Update model msg a
            , onUrlChange   : Url -> msg
            , onUrlRequest  : UrlRequest -> msg
            , subscriptions : model -> Sub msg
-           , update        : msg -> model -> Update model msg c
+           , update        : msg -> model -> Update model msg a
            , view          : model -> Document msg 
            } -> Program flags model msg
 document config =
@@ -454,27 +454,27 @@ postsCreateFormToJson { title, body } =
 
 --
 
-type PostsCommentCreateMsg
-  = PostsCommentCreateApiPostMsg (ApiMsg DataPost)
-  | PostsCommentCreateApiCommentMsg (ApiMsg DataComment)
-  | PostsCommentCreateFormMsg (FormMsg CommentsCreateForm)
+type PostsCommentMsg
+  = PostsCommentApiPostMsg (ApiMsg DataPost)
+  | PostsCommentApiCommentMsg (ApiMsg DataComment)
+  | PostsCommentFormMsg (FormMsg CommentsCreateForm)
 
-type alias PostsCommentCreateModel =
+type alias PostsCommentModel =
   { post    : ApiModel DataPost
   , comment : ApiModel DataComment
   , form    : FormModel CommentsCreateForm }
 
-postsCommentCreateInsertAsPostIn : PostsCommentCreateModel -> ApiModel DataPost -> Update PostsCommentCreateModel PostsCommentCreateMsg a
-postsCommentCreateInsertAsPostIn model post = save { model | post = post }
+postsCommentInsertAsPostIn : PostsCommentModel -> ApiModel DataPost -> Update PostsCommentModel PostsCommentMsg a
+postsCommentInsertAsPostIn model post = save { model | post = post }
 
-postsCommentCreateInsertAsCommentIn : PostsCommentCreateModel -> ApiModel DataComment -> Update PostsCommentCreateModel PostsCommentCreateMsg a
-postsCommentCreateInsertAsCommentIn model comment = save { model | comment = comment }
+postsCommentInsertAsCommentIn : PostsCommentModel -> ApiModel DataComment -> Update PostsCommentModel PostsCommentMsg a
+postsCommentInsertAsCommentIn model comment = save { model | comment = comment }
 
-postsCommentCreateInsertAsFormIn : PostsCommentCreateModel -> FormModel CommentsCreateForm -> Update PostsCommentCreateModel PostsCommentCreateMsg a
-postsCommentCreateInsertAsFormIn model form = save { model | form = form }
+postsCommentInsertAsFormIn : PostsCommentModel -> FormModel CommentsCreateForm -> Update PostsCommentModel PostsCommentMsg a
+postsCommentInsertAsFormIn model form = save { model | form = form }
 
-postsCommentCreateInit : Int -> Update PostsCommentCreateModel PostsCommentCreateMsg a
-postsCommentCreateInit postId =
+postsCommentInit : Int -> Update PostsCommentModel PostsCommentMsg a
+postsCommentInit postId =
   let post    = apiInit { endpoint = "/posts/" ++ String.fromInt postId
                         , method   = HttpGet
                         , decoder  = Json.field "post" dataPostDecoder }
@@ -482,35 +482,35 @@ postsCommentCreateInit postId =
                         , method   = HttpPost
                         , decoder  = Json.field "post" dataCommentDecoder }
       form = formInit commentsCreateFormFields { email = "", comment = "" }
-   in map3 PostsCommentCreateModel
-        (post    |> mapCmd PostsCommentCreateApiPostMsg)
-        (comment |> mapCmd PostsCommentCreateApiCommentMsg)
-        (form    |> mapCmd PostsCommentCreateFormMsg)
+   in map3 PostsCommentModel
+        (post    |> mapCmd PostsCommentApiPostMsg)
+        (comment |> mapCmd PostsCommentApiCommentMsg)
+        (form    |> mapCmd PostsCommentFormMsg)
 
-postsCommentCreateUpdate : PostsCommentCreateMsg -> PostsCommentCreateModel -> Update PostsCommentCreateModel PostsCommentCreateMsg a
-postsCommentCreateUpdate msg model =
+postsCommentUpdate : PostsCommentMsg -> PostsCommentModel -> Update PostsCommentModel PostsCommentMsg a
+postsCommentUpdate msg model =
   case msg of
-    PostsCommentCreateApiPostMsg apiMsg ->
+    PostsCommentApiPostMsg apiMsg ->
       model.post
         |> apiUpdate apiDefaultHandlers apiMsg
-        |> mapCmd PostsCommentCreateApiPostMsg
-        |> andFinally (postsCommentCreateInsertAsPostIn model)
-    PostsCommentCreateApiCommentMsg apiMsg ->
+        |> mapCmd PostsCommentApiPostMsg
+        |> andFinally (postsCommentInsertAsPostIn model)
+    PostsCommentApiCommentMsg apiMsg ->
       model.comment
         |> apiUpdate apiDefaultHandlers apiMsg
-        |> mapCmd PostsCommentCreateApiCommentMsg
-        |> andFinally (postsCommentCreateInsertAsCommentIn model)
-    PostsCommentCreateFormMsg formMsg ->
+        |> mapCmd PostsCommentApiCommentMsg
+        |> andFinally (postsCommentInsertAsCommentIn model)
+    PostsCommentFormMsg formMsg ->
       model.form
         |> formUpdate { onSubmit = always save } formMsg
-        |> mapCmd PostsCommentCreateFormMsg
-        |> andFinally (postsCommentCreateInsertAsFormIn model)
+        |> mapCmd PostsCommentFormMsg
+        |> andFinally (postsCommentInsertAsFormIn model)
 
-postsCommentCreateSubscriptions : PostsCommentCreateModel -> Sub PostsCommentCreateMsg
-postsCommentCreateSubscriptions model = Sub.none
+postsCommentSubscriptions : PostsCommentModel -> Sub PostsCommentMsg
+postsCommentSubscriptions model = Sub.none
 
-postsCommentCreateView : PostsCommentCreateModel -> Html PostsCommentCreateMsg
-postsCommentCreateView { post, form } =
+postsCommentView : PostsCommentModel -> Html PostsCommentMsg
+postsCommentView { post, form } =
   case post.resource of
     NotRequested ->
       div [] [ text "Not requested" ]
@@ -521,7 +521,7 @@ postsCommentCreateView { post, form } =
     Available item ->
       div [] [ h1 []
         [ text item.title
-        , Html.map PostsCommentCreateFormMsg (formView form) ] ]
+        , Html.map PostsCommentFormMsg (formView form) ] ]
 
 --
 
@@ -600,8 +600,14 @@ homePageUpdate { onPostsLoaded } msg model =
         |> mapCmd HomePageApiMsg
         |> andFinally (insertAsPostsIn model)
     FetchPosts ->
-      model
-        |> homePageUpdate { onPostsLoaded = onPostsLoaded } (HomePageApiMsg (Request "" Nothing))
+      case model.posts.resource of
+        Requested ->
+          save model
+        Available _ ->
+          save model
+        _ -> 
+          model
+            |> homePageUpdate { onPostsLoaded = onPostsLoaded } (HomePageApiMsg (Request "" Nothing))
 
 homePageSubscriptions : HomePageModel -> Sub HomePageMsg
 homePageSubscriptions model = Sub.none
@@ -864,9 +870,10 @@ cacheUpdate msg model =
 
 type Page
   = HomePage HomePageModel
+  | AboutPage
   | NewPostPage PostsCreateModel
   | ShowPostPage PostsShowModel
-  | CommentPostPage PostsCommentCreateModel
+  | CommentPostPage PostsCommentModel
   | LoginPage AuthLoginModel
   | RegisterPage AuthRegisterModel
   | NotFoundPage
@@ -875,7 +882,7 @@ type PageMsg
   = PostsCreateMsg PostsCreateMsg
   | HomePageMsg HomePageMsg
   | PostsShowMsg PostsShowMsg
-  | PostsCommentCreateMsg PostsCommentCreateMsg
+  | PostsCommentMsg PostsCommentMsg
   | AuthLoginMsg AuthLoginMsg
   | AuthRegisterMsg AuthRegisterMsg
 
@@ -893,8 +900,8 @@ type alias Model =
   { router : RouterModel
   , ui     : UiModel
   , page   : Page
-  , user   : Maybe DataUser
-  , cache  : CacheModel }
+  , cache  : CacheModel 
+  , user   : Maybe DataUser }
 
 insertAsRouterIn : Model -> RouterModel -> Update Model Msg a
 insertAsRouterIn model router = save { model | router = router }
@@ -916,22 +923,23 @@ init flags url key =
   let router = routerInit flags url key
       ui     = uiInit flags url key
       page   = map NewPostPage postsCreateInit
+      cache  = save { posts = Nothing }
    in map5 Model
         (router |> mapCmd RouterMsg)
         (ui     |> mapCmd UiMsg)
         (page   |> mapCmd (PageMsg << PostsCreateMsg))
+        (cache  |> mapCmd CacheMsg)
         (save Nothing)
-        (save { posts = Nothing })
           |> andThen (update (RouterMsg (UrlChange url)))
-          |> andThen (update ((PageMsg (HomePageMsg FetchPosts))))
 
-handleRouteChange : CacheModel -> Maybe Route -> Model -> Update Model Msg a
-handleRouteChange cache route model =
+handleRouteChange : Maybe Route -> Model -> Update Model Msg a
+handleRouteChange route model =
   case route of
     Just Home ->
-      homePageInit cache.posts
+      homePageInit model.cache.posts
         |> mapCmd (PageMsg << HomePageMsg)
         |> andThen (\pageModel -> insertAsPageIn model (HomePage pageModel))
+        |> andThen (update ((PageMsg (HomePageMsg FetchPosts))))
     Just NewPost ->
       postsCreateInit
         |> mapCmd (PageMsg << PostsCreateMsg)
@@ -941,8 +949,8 @@ handleRouteChange cache route model =
         |> mapCmd (PageMsg << PostsShowMsg)
         |> andThen (\pageModel -> insertAsPageIn model (ShowPostPage pageModel))
     Just (CommentPost postId) ->
-      postsCommentCreateInit postId
-        |> mapCmd (PageMsg << PostsCommentCreateMsg)
+      postsCommentInit postId
+        |> mapCmd (PageMsg << PostsCommentMsg)
         |> andThen (\pageModel -> insertAsPageIn model (CommentPostPage pageModel))
     Just Login ->
       authLoginInit
@@ -967,68 +975,76 @@ pageUpdate { redirect, onUserAuth, updateCache } msg page =
     ( PostsCreateMsg postsCreateMsg, NewPostPage postsCreateModel ) ->
       postsCreateModel
         |> postsCreateUpdate { onPostAdded = handlePostAdded { redirect = redirect, updateCache = updateCache } } postsCreateMsg
-        |> mapCmd PostsCreateMsg
-        |> foldEvents
-        |> map NewPostPage
+        |> mapCmd PostsCreateMsg |> foldEvents |> map NewPostPage
     ( HomePageMsg homePageMsg, HomePage homePageModel ) ->
       homePageModel
         |> homePageUpdate { onPostsLoaded = invokeHandler << updateCache << InsertData << CachePosts } homePageMsg
-        |> mapCmd HomePageMsg
-        |> foldEvents
-        |> map HomePage
+        |> mapCmd HomePageMsg |> foldEvents |> map HomePage
     ( PostsShowMsg postsShowMsg, ShowPostPage postsShowModel ) ->
       postsShowModel
         |> postsShowUpdate postsShowMsg
-        |> mapCmd PostsShowMsg
-        |> foldEvents
-        |> map ShowPostPage
-    ( PostsCommentCreateMsg postsCommentCreateMsg, CommentPostPage postsCommentCreateModel ) ->
-      postsCommentCreateModel
-        |> postsCommentCreateUpdate postsCommentCreateMsg
-        |> mapCmd PostsCommentCreateMsg
-        |> foldEvents
-        |> map CommentPostPage
+        |> mapCmd PostsShowMsg |> foldEvents |> map ShowPostPage
+    ( PostsCommentMsg postsCommentMsg, CommentPostPage postsCommentModel ) ->
+      postsCommentModel
+        |> postsCommentUpdate postsCommentMsg
+        |> mapCmd PostsCommentMsg |> foldEvents |> map CommentPostPage
     ( AuthLoginMsg authLoginMsg, LoginPage authLoginModel ) ->
       authLoginModel
         |> authLoginUpdate { onResponse = invokeHandler << onUserAuth } authLoginMsg
-        |> mapCmd AuthLoginMsg
-        |> foldEvents
-        |> map LoginPage
+        |> mapCmd AuthLoginMsg |> foldEvents |> map LoginPage
     ( AuthRegisterMsg authRegisterMsg, RegisterPage authRegisterModel ) ->
       authRegisterModel
         |> authRegisterUpdate authRegisterMsg
-        |> mapCmd AuthRegisterMsg
-        |> foldEvents
-        |> map RegisterPage
+        |> mapCmd AuthRegisterMsg |> foldEvents |> map RegisterPage
     _ ->
       save page
+
+updateRouterWith : RouterMsg -> Model -> Update Model Msg a
+updateRouterWith msg model =
+  model.router
+    |> routerUpdate { onRouteChange = handleRouteChange } msg
+    |> mapCmd RouterMsg
+    |> andFinally (insertAsRouterIn model)
+
+updateUiWith : UiMsg -> Model -> Update Model Msg a
+updateUiWith msg model = 
+  model.ui
+    |> uiUpdate msg
+    |> mapCmd UiMsg
+    |> andFinally (insertAsUiIn model)
+
+updateCacheWith : CacheMsg -> Model -> Update Model Msg a
+updateCacheWith msg model =
+  model.cache
+    |> cacheUpdate msg
+    |> mapCmd CacheMsg
+    |> andFinally (insertAsCacheIn model)
+
+updatePageWith : PageMsg -> Model -> Update Model Msg a
+updatePageWith msg model =
+  let handlers = { redirect    = update << RouterMsg << Redirect
+                 , updateCache = update << CacheMsg 
+                 , onUserAuth  = setUser }
+   in model.page
+    |> pageUpdate handlers msg
+    |> mapCmd PageMsg
+    |> andFinally (insertAsPageIn model)
 
 update : Msg -> Model -> Update Model Msg a
 update msg model =
   case msg of
     RouterMsg routerMsg ->
-      model.router
-        |> routerUpdate { onRouteChange = handleRouteChange model.cache } routerMsg
-        |> mapCmd RouterMsg
-        |> andFinally (insertAsRouterIn model) 
+      model
+        |> updateRouterWith routerMsg
     UiMsg uiMsg ->
-      model.ui
-        |> uiUpdate uiMsg
-        |> mapCmd UiMsg
-        |> andFinally (insertAsUiIn model)
+      model
+        |> updateUiWith uiMsg
     CacheMsg cacheMsg ->
-      model.cache
-        |> cacheUpdate cacheMsg
-        |> mapCmd CacheMsg
-        |> andFinally (insertAsCacheIn model)
+      model
+        |> updateCacheWith cacheMsg
     PageMsg pageMsg ->
-      let handlers = { redirect    = update << RouterMsg << Redirect
-                     , updateCache = update << CacheMsg 
-                     , onUserAuth  = setUser }
-       in model.page
-        |> pageUpdate handlers pageMsg
-        |> mapCmd PageMsg
-        |> andFinally (insertAsPageIn model)
+       model
+        |> updatePageWith pageMsg
 
 pageSubscriptions : Page -> Sub Msg
 pageSubscriptions page =
@@ -1039,12 +1055,14 @@ pageSubscriptions page =
       Sub.map (PageMsg << PostsCreateMsg) (postsCreateSubscriptions postsCreateModel)
     ShowPostPage postsShowModel ->
       Sub.map (PageMsg << PostsShowMsg) (postsShowSubscriptions postsShowModel)
-    CommentPostPage postsCommentCreateModel ->
-      Sub.map (PageMsg << PostsCommentCreateMsg) (postsCommentCreateSubscriptions postsCommentCreateModel)
+    CommentPostPage postsCommentModel ->
+      Sub.map (PageMsg << PostsCommentMsg) (postsCommentSubscriptions postsCommentModel)
     LoginPage authLoginModel ->
       Sub.map (PageMsg << AuthLoginMsg) (authLoginSubscriptions authLoginModel)
     RegisterPage authRegisterModel ->
       Sub.map (PageMsg << AuthRegisterMsg) (authRegisterSubscriptions authRegisterModel)
+    AboutPage ->
+      Sub.none
     NotFoundPage ->
       Sub.none
 
@@ -1061,14 +1079,16 @@ pageView page =
       Html.map (PageMsg << PostsCreateMsg) (postsCreateView postsCreateModel)
     ShowPostPage postsShowModel ->
       Html.map (PageMsg << PostsShowMsg) (postsShowView postsShowModel)
-    CommentPostPage postsCommentCreateModel ->
-      Html.map (PageMsg << PostsCommentCreateMsg) (postsCommentCreateView postsCommentCreateModel)
+    CommentPostPage postsCommentModel ->
+      Html.map (PageMsg << PostsCommentMsg) (postsCommentView postsCommentModel)
     HomePage homePageModel ->
       Html.map (PageMsg << HomePageMsg) (homePageView homePageModel)
     LoginPage authLoginModel ->
       Html.map (PageMsg << AuthLoginMsg) (authLoginView authLoginModel)
     RegisterPage authRegisterModel ->
       Html.map (PageMsg << AuthRegisterMsg) (authRegisterView authRegisterModel)
+    AboutPage ->
+      div [] [ text "about" ]
     NotFoundPage ->
       div [] [ text "not found" ]
 
