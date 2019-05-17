@@ -86,7 +86,7 @@ application : { init          : flags -> Url -> Navigation.Key -> Update model m
               , onUrlRequest  : UrlRequest -> msg
               , subscriptions : model -> Sub msg
               , update        : msg -> model -> Update model msg a
-              , view          : model -> Document msg 
+              , view          : model -> Document msg
               } -> Program flags model msg
 application config =
   Browser.application
@@ -102,7 +102,7 @@ document : { init          : flags -> Update model msg a
            , onUrlRequest  : UrlRequest -> msg
            , subscriptions : model -> Sub msg
            , update        : msg -> model -> Update model msg a
-           , view          : model -> Document msg 
+           , view          : model -> Document msg
            } -> Program flags model msg
 document config =
   Browser.document
@@ -162,7 +162,7 @@ apiInit { endpoint, method, decoder } =
     { resource = NotRequested
     , request  = request }
 
-type alias ApiHandlers a b = 
+type alias ApiHandlers a b =
   { onSuccess : a -> b
   , onError   : Http.Error -> b }
 
@@ -580,7 +580,7 @@ insertAsPostsIn model posts = save { model | posts = posts }
 
 homePageInit : Maybe (List DataPost) -> Update HomePageModel HomePageMsg a
 homePageInit maybePosts =
-  let resource = 
+  let resource =
         case maybePosts of
           Nothing -> NotRequested
           Just posts_ -> Available posts_
@@ -605,7 +605,7 @@ homePageUpdate { onPostsLoaded } msg model =
           save model
         Available _ ->
           save model
-        _ -> 
+        _ ->
           model
             |> homePageUpdate { onPostsLoaded = onPostsLoaded } (HomePageApiMsg (Request "" Nothing))
 
@@ -626,7 +626,7 @@ homePageView : HomePageModel -> Html HomePageMsg
 homePageView { posts } =
   case posts.resource of
     NotRequested ->
-      div [] [ text "Not requested" 
+      div [] [ text "Not requested"
              , button [ onClick FetchPosts ] [ text "Fetch" ] ]
     Requested ->
       div [] [ text "Requested..." ]
@@ -850,9 +850,9 @@ type CacheData
 
 type CacheMsg
   = InsertData CacheData
-  | ClearPosts
+  | PurgePosts
 
-type alias CacheModel = 
+type alias CacheModel =
   { posts : Maybe (List DataPost) }
 
 cacheInit : Update CacheModel CacheMsg a
@@ -863,7 +863,7 @@ cacheUpdate msg model =
   case msg of
     InsertData (CachePosts posts) ->
       save { model | posts = Just posts }
-    ClearPosts ->
+    PurgePosts ->
       save { model | posts = Nothing }
 
 --
@@ -899,8 +899,8 @@ type alias Flags = ()
 type alias Model =
   { router : RouterModel
   , ui     : UiModel
+  , cache  : CacheModel
   , page   : Page
-  , cache  : CacheModel 
   , user   : Maybe DataUser }
 
 insertAsRouterIn : Model -> RouterModel -> Update Model Msg a
@@ -922,13 +922,12 @@ init : Flags -> Url -> Navigation.Key -> Update Model Msg a
 init flags url key =
   let router = routerInit flags url key
       ui     = uiInit flags url key
-      page   = map NewPostPage postsCreateInit
       cache  = save { posts = Nothing }
    in map5 Model
         (router |> mapCmd RouterMsg)
         (ui     |> mapCmd UiMsg)
-        (page   |> mapCmd (PageMsg << PostsCreateMsg))
         (cache  |> mapCmd CacheMsg)
+        (save NotFoundPage)
         (save Nothing)
           |> andThen (update (RouterMsg (UrlChange url)))
 
@@ -964,10 +963,9 @@ handleRouteChange route model =
       save { model | page = NotFoundPage }
 
 handlePostAdded : { redirect : String -> a, updateCache : CacheMsg -> a } -> DataPost -> PostsCreateModel -> Update PostsCreateModel PageMsg a
-handlePostAdded { redirect, updateCache } post model = 
+handlePostAdded { redirect, updateCache } post model =
   model
-    |> invokeHandler (updateCache ClearPosts)
-    |> andThen (invokeHandler (redirect "/"))
+    |> invokeHandler (redirect "/")
 
 pageUpdate : { redirect : String -> a, onUserAuth : Maybe DataUser -> a, updateCache : CacheMsg -> a } -> PageMsg -> Page -> Update Page PageMsg a
 pageUpdate { redirect, onUserAuth, updateCache } msg page =
@@ -975,27 +973,39 @@ pageUpdate { redirect, onUserAuth, updateCache } msg page =
     ( PostsCreateMsg postsCreateMsg, NewPostPage postsCreateModel ) ->
       postsCreateModel
         |> postsCreateUpdate { onPostAdded = handlePostAdded { redirect = redirect, updateCache = updateCache } } postsCreateMsg
-        |> mapCmd PostsCreateMsg |> foldEvents |> map NewPostPage
+        |> mapCmd PostsCreateMsg
+        |> foldEvents
+        |> map NewPostPage
     ( HomePageMsg homePageMsg, HomePage homePageModel ) ->
       homePageModel
         |> homePageUpdate { onPostsLoaded = invokeHandler << updateCache << InsertData << CachePosts } homePageMsg
-        |> mapCmd HomePageMsg |> foldEvents |> map HomePage
+        |> mapCmd HomePageMsg
+        |> foldEvents
+        |> map HomePage
     ( PostsShowMsg postsShowMsg, ShowPostPage postsShowModel ) ->
       postsShowModel
         |> postsShowUpdate postsShowMsg
-        |> mapCmd PostsShowMsg |> foldEvents |> map ShowPostPage
+        |> mapCmd PostsShowMsg
+        |> foldEvents
+        |> map ShowPostPage
     ( PostsCommentMsg postsCommentMsg, CommentPostPage postsCommentModel ) ->
       postsCommentModel
         |> postsCommentUpdate postsCommentMsg
-        |> mapCmd PostsCommentMsg |> foldEvents |> map CommentPostPage
+        |> mapCmd PostsCommentMsg
+        |> foldEvents
+        |> map CommentPostPage
     ( AuthLoginMsg authLoginMsg, LoginPage authLoginModel ) ->
       authLoginModel
         |> authLoginUpdate { onResponse = invokeHandler << onUserAuth } authLoginMsg
-        |> mapCmd AuthLoginMsg |> foldEvents |> map LoginPage
+        |> mapCmd AuthLoginMsg
+        |> foldEvents
+        |> map LoginPage
     ( AuthRegisterMsg authRegisterMsg, RegisterPage authRegisterModel ) ->
       authRegisterModel
         |> authRegisterUpdate authRegisterMsg
-        |> mapCmd AuthRegisterMsg |> foldEvents |> map RegisterPage
+        |> mapCmd AuthRegisterMsg
+        |> foldEvents
+        |> map RegisterPage
     _ ->
       save page
 
@@ -1007,7 +1017,7 @@ updateRouterWith msg model =
     |> andFinally (insertAsRouterIn model)
 
 updateUiWith : UiMsg -> Model -> Update Model Msg a
-updateUiWith msg model = 
+updateUiWith msg model =
   model.ui
     |> uiUpdate msg
     |> mapCmd UiMsg
@@ -1023,7 +1033,7 @@ updateCacheWith msg model =
 updatePageWith : PageMsg -> Model -> Update Model Msg a
 updatePageWith msg model =
   let handlers = { redirect    = update << RouterMsg << Redirect
-                 , updateCache = update << CacheMsg 
+                 , updateCache = update << CacheMsg
                  , onUserAuth  = setUser }
    in model.page
     |> pageUpdate handlers msg
@@ -1114,8 +1124,8 @@ view model =
 main : Program Flags Model Msg
 main =
   application
-    { init          = init 
-    , update        = update 
+    { init          = init
+    , update        = update
     , subscriptions = subscriptions
     , view          = view
     , onUrlChange   = RouterMsg << UrlChange
