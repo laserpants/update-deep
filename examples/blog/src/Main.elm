@@ -723,7 +723,8 @@ routerInit flags url key = save { route = Nothing, key = key, restricted = Nothi
 
 routerUpdate : { onRouteChange : Maybe Route -> a } -> RouterMsg -> RouterModel -> Update RouterModel RouterMsg a
 routerUpdate { onRouteChange } msg model =
-  case msg of
+  let redirect = routerUpdate { onRouteChange = onRouteChange } << Redirect
+   in case msg of
     UrlChange url ->
       let route = fromUrl url
        in model
@@ -741,15 +742,16 @@ routerUpdate { onRouteChange } msg model =
       model
         |> runCmd (Navigation.replaceUrl model.key href)
     Restricted route ->
-      save { model | restricted = Just route }
-        |> andThen (routerUpdate { onRouteChange = onRouteChange } (Redirect "/login"))
+      model
+        |> setRestricted (Just route)
+        |> andThen (redirect "/login")
     ReturnToRestricted ->
       model
         |> case model.returnUrl of
              Nothing ->
                save
              Just href ->
-               routerUpdate { onRouteChange = onRouteChange } (Redirect href)
+               redirect href
 
 routerSubscriptions : RouterModel -> Sub RouterMsg
 routerSubscriptions model = Sub.none
