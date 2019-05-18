@@ -22,6 +22,7 @@ var posts =
 ];
 
 var postsId = 1;
+var delay = 300;
 
 xhook.before(function(request, callback) {
 
@@ -32,7 +33,7 @@ xhook.before(function(request, callback) {
         data: JSON.stringify({ status: 'success' }),
         headers: { 'Content-Type': 'application/json' }
       });
-    }, 800);
+    }, delay);
   }
   else if (request.url.endsWith('auth/login') && 'POST' === request.method) {
     setTimeout(function() {
@@ -56,7 +57,7 @@ xhook.before(function(request, callback) {
           headers: { 'Content-Type': 'application/json' }
         });
       }
-    }, 800);
+    }, delay);
   } else if (request.url.endsWith('posts')) {
     if ('GET' === request.method) {
       setTimeout(function() {
@@ -65,7 +66,7 @@ xhook.before(function(request, callback) {
           data: JSON.stringify({ posts: posts.slice().reverse() }),
           headers: { 'Content-Type': 'application/json' }
         });
-      }, 800);
+      }, delay);
     } else if ('POST' === request.method) {
       setTimeout(function() {
         var post = JSON.parse(request.body);
@@ -78,7 +79,7 @@ xhook.before(function(request, callback) {
           headers: { 'Content-Type': 'application/json' }
         });
         //console.log(posts);
-      }, 1800);
+      }, delay);
     }
   } else if (/posts\/\d+$/.test(request.url) && 'GET' === request.method) {
     setTimeout(function() {
@@ -99,7 +100,7 @@ xhook.before(function(request, callback) {
           headers: { 'Content-Type': 'application/json' }
         });
       }
-    }, 800);
+    }, delay);
   } else if (/posts\/d+\/comments\/new$/.test(request.url) && 'POST' === request.method) {
 
     callback();

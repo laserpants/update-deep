@@ -49,6 +49,9 @@ map4 f x y = ap << map3 f x y
 map5 : (a -> b -> p -> q -> r -> s) -> Update a c e -> Update b c e -> Update p c e -> Update q c e -> Update r c e -> Update s c e
 map5 f x y z = ap << map4 f x y z
 
+map6 : (a -> b -> p -> q -> r -> s -> t) -> Update a c e -> Update b c e -> Update p c e -> Update q c e -> Update r c e -> Update s c e -> Update t c e
+map6 f x y z a = ap << map5 f x y z a
+
 join : Update (Update a c e) c e -> Update a c e
 join ( ( model, cmda, e ), cmdb, e2 ) = ( model, Cmd.batch [ cmda, cmdb ], e ++ e2 )
 
@@ -194,44 +197,44 @@ apiJsonRequest url = Request url << Just << Http.jsonBody
 --
 
 type FormMsg a
-  = ChangeForm (Form.View.Model a)
+  = UpdateViewModel (Form.View.Model a)
   | ResetForm
   | SubmitForm a
 
 type alias FormModel a =
-  { state   : Form.View.Model a
-  , form    : Form a (FormMsg a)
-  , initial : a }
+  { viewModel : Form.View.Model a
+  , form      : Form a (FormMsg a)
+  , initial   : a }
 
 type alias Fields a = Form a (FormMsg a)
 
 formInit : Form a (FormMsg a) -> a -> Update (FormModel a) (FormMsg a) b
 formInit form values =
   save
-    { state   = Form.View.idle values
-    , form    = form
-    , initial = values }
+    { viewModel = Form.View.idle values
+    , form      = form
+    , initial   = values }
 
 formUpdate : { onSubmit : a -> b } -> FormMsg a -> FormModel a -> Update (FormModel a) (FormMsg a) b
 formUpdate { onSubmit } msg model =
   case msg of
-    ChangeForm formViewModel ->
-      save { model | state = formViewModel }
+    UpdateViewModel formViewModel ->
+      save { model | viewModel = formViewModel }
     ResetForm ->
-      save { model | state = Form.View.idle model.initial }
+      save { model | viewModel = Form.View.idle model.initial }
     SubmitForm values ->
-      let { state } = model
-       in save { model | state = { state | state = Form.View.Loading } }
+      let { viewModel } = model
+       in save { model | viewModel = { viewModel | state = Form.View.Loading } }
         |> andInvokeHandler (onSubmit values)
 
 formView : FormModel a -> Html (FormMsg a)
-formView { form, state } =
+formView { form, viewModel } =
   UiFormView.view
-    { onChange   = ChangeForm
+    { onChange   = UpdateViewModel
     , action     = "Submit"
     , loading    = "Submit"
     , validation = Form.View.ValidateOnSubmit
-    } form state
+    } form viewModel
 
 --
 --
@@ -738,7 +741,9 @@ authLoginSubscriptions model = Sub.none
 
 authLoginView : AuthLoginModel -> Html AuthLoginMsg
 authLoginView { form } =
-  Html.map AuthLoginFormMsg (formView form)
+  div []
+    [ h1 [] [ text "Log in" ]
+    , Html.map AuthLoginFormMsg (formView form) ]
 
 --
 
@@ -794,16 +799,26 @@ type RouterMsg
   = UrlChange Url
   | UrlRequest UrlRequest
   | Redirect String
+  | Restricted String
+  | ReturnToRestrictedRoute
 
 type alias RouterModel =
-  { route : Maybe Route
-  , key   : Navigation.Key }
+  { route      : Maybe Route
+  , key        : Navigation.Key
+  , restricted : Maybe String
+  , returnUrl  : Maybe String }
 
 setRoute : Maybe Route -> RouterModel -> Update RouterModel RouterMsg a
 setRoute route model = save { model | route = route }
 
+setRestricted : Maybe String -> RouterModel -> Update RouterModel RouterMsg a
+setRestricted restricted model = save { model | restricted = restricted }
+
+setReturnUrl : Maybe String -> RouterModel -> Update RouterModel RouterMsg a
+setReturnUrl url model = save { model | returnUrl = url }
+
 routerInit : Flags -> Url -> Navigation.Key -> Update RouterModel RouterMsg a
-routerInit flags url key = save { route = Nothing, key = key }
+routerInit flags url key = save { route = Nothing, key = key, restricted = Nothing, returnUrl = Nothing }
 
 routerUpdate : { onRouteChange : Maybe Route -> a } -> RouterMsg -> RouterModel -> Update RouterModel RouterMsg a
 routerUpdate { onRouteChange } msg model =
@@ -812,6 +827,8 @@ routerUpdate { onRouteChange } msg model =
       let route = fromUrl url
        in model
         |> setRoute route
+        |> andThen (setReturnUrl model.restricted)
+        |> andThen (setRestricted Nothing)
         |> andInvokeHandler (onRouteChange route)
     UrlRequest (Browser.Internal url) ->
       model
@@ -822,6 +839,16 @@ routerUpdate { onRouteChange } msg model =
     Redirect href ->
       model
         |> runCmd (Navigation.replaceUrl model.key href)
+    Restricted route ->
+      save { model | restricted = Just route }
+        |> andThen (routerUpdate { onRouteChange = onRouteChange } (Redirect "/login"))
+    ReturnToRestrictedRoute ->
+      model
+        |> case model.returnUrl of
+             Nothing ->
+               save
+             Just href ->
+               routerUpdate { onRouteChange = onRouteChange } (Redirect href)
 
 routerSubscriptions : RouterModel -> Sub RouterMsg
 routerSubscriptions model = Sub.none
@@ -868,6 +895,14 @@ cacheUpdate msg model =
 
 --
 
+type PageMsg
+  = PostsCreateMsg PostsCreateMsg
+  | HomePageMsg HomePageMsg
+  | PostsShowMsg PostsShowMsg
+  | PostsCommentMsg PostsCommentMsg
+  | AuthLoginMsg AuthLoginMsg
+  | AuthRegisterMsg AuthRegisterMsg
+
 type Page
   = HomePage HomePageModel
   | AboutPage
@@ -878,94 +913,11 @@ type Page
   | RegisterPage AuthRegisterModel
   | NotFoundPage
 
-type PageMsg
-  = PostsCreateMsg PostsCreateMsg
-  | HomePageMsg HomePageMsg
-  | PostsShowMsg PostsShowMsg
-  | PostsCommentMsg PostsCommentMsg
-  | AuthLoginMsg AuthLoginMsg
-  | AuthRegisterMsg AuthRegisterMsg
-
---
-
-type Msg
-  = RouterMsg RouterMsg
-  | UiMsg UiMsg
-  | PageMsg PageMsg
-  | CacheMsg CacheMsg
-
-type alias Flags = ()
-
-type alias Model =
-  { router : RouterModel
-  , ui     : UiModel
-  , cache  : CacheModel
-  , page   : Page
-  , user   : Maybe DataUser }
-
-insertAsRouterIn : Model -> RouterModel -> Update Model Msg a
-insertAsRouterIn model router = save { model | router = router }
-
-insertAsUiIn : Model -> UiModel -> Update Model Msg a
-insertAsUiIn model ui = save { model | ui = ui }
-
-insertAsPageIn : Model -> Page -> Update Model Msg a
-insertAsPageIn model page = save { model | page = page }
-
-insertAsCacheIn : Model -> CacheModel -> Update Model Msg a
-insertAsCacheIn model cache = save { model | cache = cache }
-
-setUser : Maybe DataUser -> Model -> Update Model Msg a
-setUser user model = save { model | user = user }
-
-init : Flags -> Url -> Navigation.Key -> Update Model Msg a
-init flags url key =
-  let router = routerInit flags url key
-      ui     = uiInit flags url key
-      cache  = save { posts = Nothing }
-   in map5 Model
-        (router |> mapCmd RouterMsg)
-        (ui     |> mapCmd UiMsg)
-        (cache  |> mapCmd CacheMsg)
-        (save NotFoundPage)
-        (save Nothing)
-          |> andThen (update (RouterMsg (UrlChange url)))
-
-handleRouteChange : Maybe Route -> Model -> Update Model Msg a
-handleRouteChange route model =
-  case route of
-    Just Home ->
-      homePageInit model.cache.posts
-        |> mapCmd (PageMsg << HomePageMsg)
-        |> andThen (\pageModel -> insertAsPageIn model (HomePage pageModel))
-        |> andThen (update ((PageMsg (HomePageMsg FetchPosts))))
-    Just NewPost ->
-      postsCreateInit
-        |> mapCmd (PageMsg << PostsCreateMsg)
-        |> andThen (\pageModel -> insertAsPageIn model (NewPostPage pageModel))
-    Just (Post id) ->
-      postsShowInit id
-        |> mapCmd (PageMsg << PostsShowMsg)
-        |> andThen (\pageModel -> insertAsPageIn model (ShowPostPage pageModel))
-    Just (CommentPost postId) ->
-      postsCommentInit postId
-        |> mapCmd (PageMsg << PostsCommentMsg)
-        |> andThen (\pageModel -> insertAsPageIn model (CommentPostPage pageModel))
-    Just Login ->
-      authLoginInit
-        |> mapCmd (PageMsg << AuthLoginMsg)
-        |> andThen (\pageModel -> insertAsPageIn model (LoginPage pageModel))
-    Just Register ->
-      authRegisterInit
-        |> mapCmd (PageMsg << AuthRegisterMsg)
-        |> andThen (\pageModel -> insertAsPageIn model (RegisterPage pageModel))
-    _ ->
-      save { model | page = NotFoundPage }
-
 handlePostAdded : { redirect : String -> a, updateCache : CacheMsg -> a } -> DataPost -> PostsCreateModel -> Update PostsCreateModel PageMsg a
 handlePostAdded { redirect, updateCache } post model =
   model
-    |> invokeHandler (redirect "/")
+    |> invokeHandler (updateCache PurgePosts)
+    |> andInvokeHandler (redirect "/")
 
 pageUpdate : { redirect : String -> a, onUserAuth : Maybe DataUser -> a, updateCache : CacheMsg -> a } -> PageMsg -> Page -> Update Page PageMsg a
 pageUpdate { redirect, onUserAuth, updateCache } msg page =
@@ -1009,6 +961,136 @@ pageUpdate { redirect, onUserAuth, updateCache } msg page =
     _ ->
       save page
 
+pageSubscriptions : Page -> Int -> Sub Msg
+pageSubscriptions page pageId =
+  case page of
+    HomePage homePageModel ->
+      Sub.map (PageMsg pageId << HomePageMsg) (homePageSubscriptions homePageModel)
+    NewPostPage postsCreateModel ->
+      Sub.map (PageMsg pageId << PostsCreateMsg) (postsCreateSubscriptions postsCreateModel)
+    ShowPostPage postsShowModel ->
+      Sub.map (PageMsg pageId << PostsShowMsg) (postsShowSubscriptions postsShowModel)
+    CommentPostPage postsCommentModel ->
+      Sub.map (PageMsg pageId << PostsCommentMsg) (postsCommentSubscriptions postsCommentModel)
+    LoginPage authLoginModel ->
+      Sub.map (PageMsg pageId << AuthLoginMsg) (authLoginSubscriptions authLoginModel)
+    RegisterPage authRegisterModel ->
+      Sub.map (PageMsg pageId << AuthRegisterMsg) (authRegisterSubscriptions authRegisterModel)
+    AboutPage ->
+      Sub.none
+    NotFoundPage ->
+      Sub.none
+
+pageView : Page -> Int -> Html Msg
+pageView page pageId =
+  case page of
+    NewPostPage postsCreateModel ->
+      Html.map (PageMsg pageId << PostsCreateMsg) (postsCreateView postsCreateModel)
+    ShowPostPage postsShowModel ->
+      Html.map (PageMsg pageId << PostsShowMsg) (postsShowView postsShowModel)
+    CommentPostPage postsCommentModel ->
+      Html.map (PageMsg pageId << PostsCommentMsg) (postsCommentView postsCommentModel)
+    HomePage homePageModel ->
+      Html.map (PageMsg pageId << HomePageMsg) (homePageView homePageModel)
+    LoginPage authLoginModel ->
+      Html.map (PageMsg pageId << AuthLoginMsg) (authLoginView authLoginModel)
+    RegisterPage authRegisterModel ->
+      Html.map (PageMsg pageId << AuthRegisterMsg) (authRegisterView authRegisterModel)
+    AboutPage ->
+      div [] [ text "about" ]
+    NotFoundPage ->
+      div [] [ text "not found" ]
+
+--
+
+type Msg
+  = RouterMsg RouterMsg
+  | UiMsg UiMsg
+  | CacheMsg CacheMsg
+  | PageMsg Int PageMsg
+
+type alias Flags = ()
+
+type alias Model =
+  { router : RouterModel
+  , ui     : UiModel
+  , cache  : CacheModel
+  , page   : Page
+  , pageId : Int
+  , user   : Maybe DataUser }
+
+insertAsRouterIn : Model -> RouterModel -> Update Model Msg a
+insertAsRouterIn model router = save { model | router = router }
+
+insertAsUiIn : Model -> UiModel -> Update Model Msg a
+insertAsUiIn model ui = save { model | ui = ui }
+
+insertAsPageIn : Model -> Page -> Update Model Msg a
+insertAsPageIn model page = save { model | page = page }
+
+insertAsCacheIn : Model -> CacheModel -> Update Model Msg a
+insertAsCacheIn model cache = save { model | cache = cache }
+
+setUser : Maybe DataUser -> Model -> Update Model Msg a
+setUser user model = save { model | user = user }
+
+incrementPageId : Model -> Update Model Msg a
+incrementPageId model = save { model | pageId = 1 + model.pageId }
+
+init : Flags -> Url -> Navigation.Key -> Update Model Msg a
+init flags url key =
+  let router = routerInit flags url key
+      ui     = uiInit flags url key
+      cache  = save { posts = Nothing }
+   in map6 Model
+        (router |> mapCmd RouterMsg)
+        (ui     |> mapCmd UiMsg)
+        (cache  |> mapCmd CacheMsg)
+        (save NotFoundPage)
+        (save 0)
+        (save Nothing)
+          |> andThen (update (RouterMsg (UrlChange url)))
+
+loadPage : Maybe Route -> Model -> Update Model Msg a
+loadPage route model =
+  case route of
+    Just Home ->
+      homePageInit model.cache.posts
+        |> mapCmd (PageMsg model.pageId << HomePageMsg)
+        |> andThen (\pageModel -> insertAsPageIn model (HomePage pageModel))
+        |> andThen (update (PageMsg model.pageId (HomePageMsg FetchPosts)))
+    Just NewPost ->
+      if Nothing == model.user
+          then model
+            |> updateRouterWith (Restricted "/posts/new")
+          else postsCreateInit
+            |> mapCmd (PageMsg model.pageId << PostsCreateMsg)
+            |> andThen (\pageModel -> insertAsPageIn model (NewPostPage pageModel))
+    Just (Post id) ->
+      postsShowInit id
+        |> mapCmd (PageMsg model.pageId << PostsShowMsg)
+        |> andThen (\pageModel -> insertAsPageIn model (ShowPostPage pageModel))
+    Just (CommentPost postId) ->
+      postsCommentInit postId
+        |> mapCmd (PageMsg model.pageId << PostsCommentMsg)
+        |> andThen (\pageModel -> insertAsPageIn model (CommentPostPage pageModel))
+    Just Login ->
+      authLoginInit
+        |> mapCmd (PageMsg model.pageId << AuthLoginMsg)
+        |> andThen (\pageModel -> insertAsPageIn model (LoginPage pageModel))
+    Just Register ->
+      authRegisterInit
+        |> mapCmd (PageMsg model.pageId << AuthRegisterMsg)
+        |> andThen (\pageModel -> insertAsPageIn model (RegisterPage pageModel))
+    _ ->
+      save { model | page = NotFoundPage }
+
+handleRouteChange : Maybe Route -> Model -> Update Model Msg a
+handleRouteChange route model =
+  model
+    |> incrementPageId
+    |> andThen (loadPage route)
+
 updateRouterWith : RouterMsg -> Model -> Update Model Msg a
 updateRouterWith msg model =
   model.router
@@ -1030,77 +1112,46 @@ updateCacheWith msg model =
     |> mapCmd CacheMsg
     |> andFinally (insertAsCacheIn model)
 
+handleUserAuthenticated : Maybe DataUser -> Model -> Update Model Msg a
+handleUserAuthenticated user model =
+  ( model
+      |> case user of
+           Nothing ->
+             save
+           Just _ ->
+             updateRouterWith ReturnToRestrictedRoute
+  ) |> andThen (setUser user)
+
 updatePageWith : PageMsg -> Model -> Update Model Msg a
 updatePageWith msg model =
   let handlers = { redirect    = update << RouterMsg << Redirect
                  , updateCache = update << CacheMsg
-                 , onUserAuth  = setUser }
+                 , onUserAuth  = handleUserAuthenticated }
    in model.page
     |> pageUpdate handlers msg
-    |> mapCmd PageMsg
+    |> mapCmd (PageMsg model.pageId)
     |> andFinally (insertAsPageIn model)
 
 update : Msg -> Model -> Update Model Msg a
 update msg model =
-  case msg of
-    RouterMsg routerMsg ->
-      model
-        |> updateRouterWith routerMsg
-    UiMsg uiMsg ->
-      model
-        |> updateUiWith uiMsg
-    CacheMsg cacheMsg ->
-      model
-        |> updateCacheWith cacheMsg
-    PageMsg pageMsg ->
-       model
-        |> updatePageWith pageMsg
-
-pageSubscriptions : Page -> Sub Msg
-pageSubscriptions page =
-  case page of
-    HomePage homePageModel ->
-      Sub.map (PageMsg << HomePageMsg) (homePageSubscriptions homePageModel)
-    NewPostPage postsCreateModel ->
-      Sub.map (PageMsg << PostsCreateMsg) (postsCreateSubscriptions postsCreateModel)
-    ShowPostPage postsShowModel ->
-      Sub.map (PageMsg << PostsShowMsg) (postsShowSubscriptions postsShowModel)
-    CommentPostPage postsCommentModel ->
-      Sub.map (PageMsg << PostsCommentMsg) (postsCommentSubscriptions postsCommentModel)
-    LoginPage authLoginModel ->
-      Sub.map (PageMsg << AuthLoginMsg) (authLoginSubscriptions authLoginModel)
-    RegisterPage authRegisterModel ->
-      Sub.map (PageMsg << AuthRegisterMsg) (authRegisterSubscriptions authRegisterModel)
-    AboutPage ->
-      Sub.none
-    NotFoundPage ->
-      Sub.none
+  model
+    |> case msg of
+         RouterMsg routerMsg ->
+           updateRouterWith routerMsg
+         UiMsg uiMsg ->
+           updateUiWith uiMsg
+         CacheMsg cacheMsg ->
+           updateCacheWith cacheMsg
+         PageMsg pageId pageMsg ->
+           if pageId == model.pageId
+               then updatePageWith pageMsg
+               else save
 
 subscriptions : Model -> Sub Msg
-subscriptions { page, router, ui } =
+subscriptions { page, pageId, router, ui } =
   Sub.batch
-    ( pageSubscriptions page :: [ Sub.map RouterMsg (routerSubscriptions router)
-                                , Sub.map UiMsg (uiSubscriptions ui) ] )
-
-pageView : Page -> Html Msg
-pageView page =
-  case page of
-    NewPostPage postsCreateModel ->
-      Html.map (PageMsg << PostsCreateMsg) (postsCreateView postsCreateModel)
-    ShowPostPage postsShowModel ->
-      Html.map (PageMsg << PostsShowMsg) (postsShowView postsShowModel)
-    CommentPostPage postsCommentModel ->
-      Html.map (PageMsg << PostsCommentMsg) (postsCommentView postsCommentModel)
-    HomePage homePageModel ->
-      Html.map (PageMsg << HomePageMsg) (homePageView homePageModel)
-    LoginPage authLoginModel ->
-      Html.map (PageMsg << AuthLoginMsg) (authLoginView authLoginModel)
-    RegisterPage authRegisterModel ->
-      Html.map (PageMsg << AuthRegisterMsg) (authRegisterView authRegisterModel)
-    AboutPage ->
-      div [] [ text "about" ]
-    NotFoundPage ->
-      div [] [ text "not found" ]
+    ( pageSubscriptions page pageId :: [ Sub.map RouterMsg (routerSubscriptions router)
+                                       , Sub.map UiMsg (uiSubscriptions ui) ] )
 
 view : Model -> Document Msg
 view model =
@@ -1113,7 +1164,7 @@ view model =
         , li [] [ a [ href "/posts/new" ] [ text "New post" ] ]
         , li [] [ a [ href "/login" ] [ text "Login" ] ]
         , li [] [ a [ href "/register" ] [ text "Register" ] ]
-        , pageView model.page ]
+        , pageView model.page model.pageId ]
       , text (Debug.toString model)
       ]
     ]
