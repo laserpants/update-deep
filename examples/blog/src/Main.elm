@@ -1,5 +1,10 @@
 module Main exposing (..)
 
+import Bootstrap.Button as Button
+import Bootstrap.Form.Input as Input
+import Bootstrap.Grid as Grid
+import Bootstrap.Navbar as Navbar
+import Bootstrap.Utilities.Spacing as Spacing
 import Browser
 import Browser exposing (Document, UrlRequest)
 import Browser.Navigation as Navigation
@@ -723,7 +728,8 @@ routerInit flags url key = save { route = Nothing, key = key, restricted = Nothi
 
 routerUpdate : { onRouteChange : Maybe Route -> a } -> RouterMsg -> RouterModel -> Update RouterModel RouterMsg a
 routerUpdate { onRouteChange } msg model =
-  case msg of
+  let redirect = routerUpdate { onRouteChange = onRouteChange } << Redirect
+   in case msg of
     UrlChange url ->
       let route = fromUrl url
        in model
@@ -741,15 +747,16 @@ routerUpdate { onRouteChange } msg model =
       model
         |> runCmd (Navigation.replaceUrl model.key href)
     Restricted route ->
-      save { model | restricted = Just route }
-        |> andThen (routerUpdate { onRouteChange = onRouteChange } (Redirect "/login"))
+      model
+        |> setRestricted (Just route)
+        |> andThen (redirect "/login")
     ReturnToRestricted ->
       model
         |> case model.returnUrl of
              Nothing ->
-               save
+               redirect "/"
              Just href ->
-               routerUpdate { onRouteChange = onRouteChange } (Redirect href)
+               redirect href
 
 routerSubscriptions : RouterModel -> Sub RouterMsg
 routerSubscriptions model = Sub.none
@@ -757,19 +764,56 @@ routerSubscriptions model = Sub.none
 --
 
 type UiMsg
-  = NoUiMsg
+  = NavbarMsg Navbar.State
+  | UiLogOut
 
 type alias UiModel =
-  {}
+  { navbar : Navbar.State }
 
 uiInit : Flags -> Url -> Navigation.Key -> Update UiModel UiMsg a
-uiInit flags url key = save {}
+uiInit flags url key =
+  let ( navbar, cmd ) = Navbar.initialState NavbarMsg
+   in Update.Deep.map UiModel
+        (runCmd cmd navbar)
 
-uiUpdate : UiMsg -> UiModel -> Update UiModel UiMsg a
-uiUpdate msg model = save model
+uiUpdate : { onLogOut : a } -> UiMsg -> UiModel -> Update UiModel UiMsg a
+uiUpdate { onLogOut } msg model =
+  case msg of
+    NavbarMsg navbarState ->
+      save { model | navbar = navbarState }
+    UiLogOut ->
+      model
+        |> invokeHandler onLogOut
 
 uiSubscriptions : UiModel -> Sub UiMsg
 uiSubscriptions model = Sub.none
+
+uiNavbarView : UiModel -> Maybe DataUser -> Html UiMsg
+uiNavbarView model maybeUser =
+  let button =
+        case maybeUser of
+          Nothing ->
+            Button.linkButton
+              [ Button.success
+              , Button.attrs [ href "/login", Spacing.ml2Sm ] ]
+              [ text "Log in"]
+          Just _ ->
+            Button.linkButton
+              [ Button.primary
+              , Button.attrs [ href "", Spacing.ml2Sm, onClick UiLogOut ] ]
+              [ text "Log out"]
+
+   in Navbar.config NavbarMsg
+    |> Navbar.withAnimation
+    |> Navbar.brand [ href "/"] [ text "FooPress"]
+    |> Navbar.items
+        [ Navbar.itemLink [ href "/posts/new" ] [ text "New post"]
+        , Navbar.itemLink [ href "/about" ] [ text "About" ] ]
+    |> Navbar.customItems
+        [ Navbar.formItem []
+          [ button ]
+        ]
+    |> Navbar.view model.navbar
 
 --
 
@@ -909,6 +953,7 @@ type Msg
   | UiMsg UiMsg
   | CacheMsg CacheMsg
   | PageMsg Int PageMsg
+  | LogOut
 
 type alias Flags = ()
 
@@ -992,6 +1037,12 @@ handleRouteChange route model =
     |> incrementPageId
     |> andThen (loadPage route)
 
+handleLogOut : Model -> Update Model Msg a
+handleLogOut model =
+  model
+    |> setUser Nothing
+    |> andRunCmd Navigation.reload
+
 updateRouterWith : RouterMsg -> Model -> Update Model Msg a
 updateRouterWith msg model =
   model.router
@@ -1002,7 +1053,7 @@ updateRouterWith msg model =
 updateUiWith : UiMsg -> Model -> Update Model Msg a
 updateUiWith msg model =
   model.ui
-    |> uiUpdate msg
+    |> uiUpdate { onLogOut = handleLogOut } msg
     |> mapCmd UiMsg
     |> andFinally (insertAsUiIn model)
 
@@ -1035,18 +1086,23 @@ updatePageWith msg model =
 
 update : Msg -> Model -> Update Model Msg a
 update msg model =
-  model
-    |> case msg of
-         RouterMsg routerMsg ->
-           updateRouterWith routerMsg
-         UiMsg uiMsg ->
-           updateUiWith uiMsg
-         CacheMsg cacheMsg ->
-           updateCacheWith cacheMsg
-         PageMsg pageId pageMsg ->
-           if pageId == model.pageId
+  case msg of
+    RouterMsg routerMsg ->
+      model
+        |> updateRouterWith routerMsg
+    UiMsg uiMsg ->
+      model
+        |> updateUiWith uiMsg
+    CacheMsg cacheMsg ->
+      model
+        |> updateCacheWith cacheMsg
+    PageMsg pageId pageMsg ->
+      model
+        |> if pageId == model.pageId
                then updatePageWith pageMsg
                else save
+    LogOut ->
+      save { model | user = Nothing }
 
 subscriptions : Model -> Sub Msg
 subscriptions { page, pageId, router, ui } =
@@ -1058,17 +1114,27 @@ view : Model -> Document Msg
 view model =
   { title = ""
   , body =
-    [ div []
-      [ text "Hello"
-      , ul []
-        [ li [] [ a [ href "/" ] [ text "Home" ] ]
-        , li [] [ a [ href "/posts/new" ] [ text "New post" ] ]
-        , li [] [ a [ href "/login" ] [ text "Login" ] ]
-        , li [] [ a [ href "/register" ] [ text "Register" ] ]
-        , pageView model.page model.pageId ]
+    [ Html.map UiMsg (uiNavbarView model.ui model.user)
+    , Grid.container []
+      [ Grid.row []
+        [ Grid.col []
+          [ pageView model.page model.pageId ]
+        ]
       , text (Debug.toString model)
       ]
     ]
+
+    --[ div []
+    --  [ text "Hello"
+    --  , ul []
+    --    [ li [] [ a [ href "/" ] [ text "Home" ] ]
+    --    , li [] [ a [ href "/posts/new" ] [ text "New post" ] ]
+    --    , li [] [ a [ href "/login" ] [ text "Login" ] ]
+    --    , li [] [ a [ href "/register" ] [ text "Register" ] ]
+    --    , pageView model.page model.pageId ]
+    --  , text (Debug.toString model)
+    --  ]
+    --]
   }
 
 --
