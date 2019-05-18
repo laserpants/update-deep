@@ -12,110 +12,11 @@ import Http exposing (emptyBody)
 import Json.Decode as Json exposing (Decoder, Value)
 import Json.Encode as Encode exposing (object)
 import UiFormView
+import Update.Deep exposing (..)
+import Update.Deep.Browser
 import Url exposing (Url)
 import Url.Parser as Parser exposing (Parser, parse, oneOf, (</>))
 
---
-
-type alias Update m c e = ( m, Cmd c, List e )
-
-save : m -> Update m c e
-save model = ( model, Cmd.none, [] )
-
-runCmd : Cmd c -> m -> Update m c e
-runCmd cmd state = ( state, cmd, [] )
-
-mapCmd : (c -> d) -> Update m c e -> Update m d e
-mapCmd f ( model, cmd, events ) = ( model, Cmd.map f cmd, events )
-
-invokeHandler : e -> m -> Update m c e
-invokeHandler handler state = ( state, Cmd.none, [ handler ] )
-
-ap : Update (a -> b) c e -> Update a c e -> Update b c e
-ap ( f, cmda, e ) ( model, cmdb, e2 ) = ( f model, Cmd.batch [ cmda, cmdb ], e ++ e2 )
-
-map : (a -> b) -> Update a c e -> Update b c e
-map f ( model, cmd, events ) = ( f model, cmd, events )
-
-map2 : (a -> b -> p) -> Update a c e -> Update b c e -> Update p c e
-map2 f = ap << map f
-
-map3 : (a -> b -> p -> q) -> Update a c e -> Update b c e -> Update p c e -> Update q c e
-map3 f x = ap << map2 f x
-
-map4 : (a -> b -> p -> q -> r) -> Update a c e -> Update b c e -> Update p c e -> Update q c e -> Update r c e
-map4 f x y = ap << map3 f x y
-
-map5 : (a -> b -> p -> q -> r -> s) -> Update a c e -> Update b c e -> Update p c e -> Update q c e -> Update r c e -> Update s c e
-map5 f x y z = ap << map4 f x y z
-
-map6 : (a -> b -> p -> q -> r -> s -> t) -> Update a c e -> Update b c e -> Update p c e -> Update q c e -> Update r c e -> Update s c e -> Update t c e
-map6 f x y z a = ap << map5 f x y z a
-
-join : Update (Update a c e) c e -> Update a c e
-join ( ( model, cmda, e ), cmdb, e2 ) = ( model, Cmd.batch [ cmda, cmdb ], e ++ e2 )
-
-andThen : (b -> Update a c e) -> Update b c e -> Update a c e
-andThen f = join << map f
-
-kleisli : (b -> Update d c e) -> (a -> Update b c e) -> (a -> Update d c e)
-kleisli f g = andThen f << g
-
-andRunCmd : Cmd c -> Update a c e -> Update a c e
-andRunCmd = andThen << runCmd
-
-andInvokeHandler : e -> Update a c e -> Update a c e
-andInvokeHandler = andThen << invokeHandler
-
-foldEvents : Update a c (a -> Update a c e) -> Update a c e
-foldEvents ( m, cmd, events ) = List.foldr andThen ( m, cmd, [] ) events
-
-andFinally : (m -> Update a c (a -> Update a c e)) -> Update m c (a -> Update a c e) -> Update a c e
-andFinally do = foldEvents << andThen do
-
-applicationInit : (d -> e -> f -> Update a b c) -> d -> e -> f -> ( a, Cmd b )
-applicationInit f a b c = let ( model, cmd, _ ) = f a b c in ( model, cmd )
-
-documentInit : (f -> Update a b c) -> f -> ( a, Cmd b )
-documentInit f a = let ( model, cmd, _ ) = f a in ( model, cmd )
-
-runUpdate : (d -> e -> Update a b c) -> d -> e -> ( a, Cmd b )
-runUpdate f a b = let ( model, cmd, _ ) = f a b in ( model, cmd )
-
---
-
-application : { init          : flags -> Url -> Navigation.Key -> Update model msg a
-              , onUrlChange   : Url -> msg
-              , onUrlRequest  : UrlRequest -> msg
-              , subscriptions : model -> Sub msg
-              , update        : msg -> model -> Update model msg a
-              , view          : model -> Document msg
-              } -> Program flags model msg
-application config =
-  Browser.application
-    { init          = applicationInit config.init
-    , update        = runUpdate config.update
-    , subscriptions = config.subscriptions
-    , view          = config.view
-    , onUrlChange   = config.onUrlChange
-    , onUrlRequest  = config.onUrlRequest }
-
-document : { init          : flags -> Update model msg a
-           , onUrlChange   : Url -> msg
-           , onUrlRequest  : UrlRequest -> msg
-           , subscriptions : model -> Sub msg
-           , update        : msg -> model -> Update model msg a
-           , view          : model -> Document msg
-           } -> Program flags model msg
-document config =
-  Browser.document
-    { init          = documentInit config.init
-    , update        = runUpdate config.update
-    , subscriptions = config.subscriptions
-    , view          = config.view }
-
---
---
 --
 
 type ApiMsg a
@@ -542,7 +443,7 @@ postsShowInit postId =
   let post = apiInit { endpoint = "/posts/" ++ String.fromInt postId
                      , method   = HttpGet
                      , decoder  = Json.field "post" dataPostDecoder }
-   in map PostsShowModel
+   in Update.Deep.map PostsShowModel
         (post |> mapCmd PostsShowApiMsg)
 
 postsShowUpdate : PostsShowMsg -> PostsShowModel -> Update PostsShowModel PostsShowMsg a
@@ -591,7 +492,7 @@ homePageInit maybePosts =
                       , method   = HttpGet
                       , decoder  = Json.field "posts" (Json.list dataPostDecoder) }
                 |> andThen (setResource resource)
-   in map HomePageModel
+   in Update.Deep.map HomePageModel
         (posts |> mapCmd HomePageApiMsg)
 
 homePageUpdate : { onPostsLoaded : List DataPost -> a } -> HomePageMsg -> HomePageModel -> Update HomePageModel HomePageMsg a
@@ -927,37 +828,37 @@ pageUpdate { redirect, onUserAuth, updateCache } msg page =
         |> postsCreateUpdate { onPostAdded = handlePostAdded { redirect = redirect, updateCache = updateCache } } postsCreateMsg
         |> mapCmd PostsCreateMsg
         |> foldEvents
-        |> map NewPostPage
+        |> Update.Deep.map NewPostPage
     ( HomePageMsg homePageMsg, HomePage homePageModel ) ->
       homePageModel
         |> homePageUpdate { onPostsLoaded = invokeHandler << updateCache << InsertData << CachePosts } homePageMsg
         |> mapCmd HomePageMsg
         |> foldEvents
-        |> map HomePage
+        |> Update.Deep.map HomePage
     ( PostsShowMsg postsShowMsg, ShowPostPage postsShowModel ) ->
       postsShowModel
         |> postsShowUpdate postsShowMsg
         |> mapCmd PostsShowMsg
         |> foldEvents
-        |> map ShowPostPage
+        |> Update.Deep.map ShowPostPage
     ( PostsCommentMsg postsCommentMsg, CommentPostPage postsCommentModel ) ->
       postsCommentModel
         |> postsCommentUpdate postsCommentMsg
         |> mapCmd PostsCommentMsg
         |> foldEvents
-        |> map CommentPostPage
+        |> Update.Deep.map CommentPostPage
     ( AuthLoginMsg authLoginMsg, LoginPage authLoginModel ) ->
       authLoginModel
         |> authLoginUpdate { onResponse = invokeHandler << onUserAuth } authLoginMsg
         |> mapCmd AuthLoginMsg
         |> foldEvents
-        |> map LoginPage
+        |> Update.Deep.map LoginPage
     ( AuthRegisterMsg authRegisterMsg, RegisterPage authRegisterModel ) ->
       authRegisterModel
         |> authRegisterUpdate authRegisterMsg
         |> mapCmd AuthRegisterMsg
         |> foldEvents
-        |> map RegisterPage
+        |> Update.Deep.map RegisterPage
     _ ->
       save page
 
@@ -1174,7 +1075,7 @@ view model =
 
 main : Program Flags Model Msg
 main =
-  application
+  Update.Deep.Browser.application
     { init          = init
     , update        = update
     , subscriptions = subscriptions

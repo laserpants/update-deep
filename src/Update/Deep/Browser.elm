@@ -2,37 +2,35 @@ module Update.Deep.Browser exposing (document, application)
 
 import Browser exposing (Document, UrlRequest)
 import Browser.Navigation as Navigation
-import Update.Deep exposing (Init, Update, documentInit, applicationInit, runUpdate)
+import Update.Deep exposing (Update, documentInit, applicationInit, runUpdate)
 import Url exposing (Url)
 
-{-| Used in the same way as `Browser.document`, but instead creates a `Program`
-where `init` and `update` are based on the `Init` and `Update` types of this library.
--}
-document : { a | init : flags -> Init m c
-               , subscriptions : m -> Sub c
-               , update : c -> m -> Update m c e
-               , view : m -> Document c } -> Program flags m c
-document { init, update, subscriptions, view } =
-  Browser.document
-    { init          = documentInit init
-    , update        = runUpdate update
-    , subscriptions = subscriptions
-    , view          = view }
-
-{-| Used in the same way as `Browser.application`, but instead creates a `Program`
-where `init` and `update` are based on the `Init` and `Update` types of this library.
--}
-application : { a | init : flags -> Url -> Navigation.Key -> Init m c
-                  , onUrlChange : Url -> c
-                  , onUrlRequest : UrlRequest -> c
-                  , subscriptions : m -> Sub c
-                  , update : c -> m -> Update m c e
-                  , view : m -> Document c } -> Program flags m c
-application { init, update, subscriptions, view, onUrlChange, onUrlRequest } =
+application : { init          : flags -> Url -> Navigation.Key -> Update model msg a
+              , onUrlChange   : Url -> msg
+              , onUrlRequest  : UrlRequest -> msg
+              , subscriptions : model -> Sub msg
+              , update        : msg -> model -> Update model msg a
+              , view          : model -> Document msg
+              } -> Program flags model msg
+application config =
   Browser.application
-    { init          = applicationInit init
-    , update        = runUpdate update
-    , subscriptions = subscriptions
-    , view          = view
-    , onUrlChange   = onUrlChange
-    , onUrlRequest  = onUrlRequest }
+    { init          = applicationInit config.init
+    , update        = runUpdate config.update
+    , subscriptions = config.subscriptions
+    , view          = config.view
+    , onUrlChange   = config.onUrlChange
+    , onUrlRequest  = config.onUrlRequest }
+
+document : { init          : flags -> Update model msg a
+           , onUrlChange   : Url -> msg
+           , onUrlRequest  : UrlRequest -> msg
+           , subscriptions : model -> Sub msg
+           , update        : msg -> model -> Update model msg a
+           , view          : model -> Document msg
+           } -> Program flags model msg
+document config =
+  Browser.document
+    { init          = documentInit config.init
+    , update        = runUpdate config.update
+    , subscriptions = config.subscriptions
+    , view          = config.view }
