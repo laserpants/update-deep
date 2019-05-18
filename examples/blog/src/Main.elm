@@ -1037,6 +1037,12 @@ handleRouteChange route model =
     |> incrementPageId
     |> andThen (loadPage route)
 
+handleLogOut : Model -> Update Model Msg a
+handleLogOut model =
+  model
+    |> setUser Nothing
+    |> andRunCmd Navigation.reload
+
 updateRouterWith : RouterMsg -> Model -> Update Model Msg a
 updateRouterWith msg model =
   model.router
@@ -1047,7 +1053,7 @@ updateRouterWith msg model =
 updateUiWith : UiMsg -> Model -> Update Model Msg a
 updateUiWith msg model =
   model.ui
-    |> uiUpdate { onLogOut = setUser Nothing } msg
+    |> uiUpdate { onLogOut = handleLogOut } msg
     |> mapCmd UiMsg
     |> andFinally (insertAsUiIn model)
 
