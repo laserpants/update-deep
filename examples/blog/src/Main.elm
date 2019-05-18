@@ -701,7 +701,7 @@ type RouterMsg
   | UrlRequest UrlRequest
   | Redirect String
   | Restricted String
-  | ReturnToRestrictedRoute
+  | ReturnToRestricted
 
 type alias RouterModel =
   { route      : Maybe Route
@@ -743,7 +743,7 @@ routerUpdate { onRouteChange } msg model =
     Restricted route ->
       save { model | restricted = Just route }
         |> andThen (routerUpdate { onRouteChange = onRouteChange } (Redirect "/login"))
-    ReturnToRestrictedRoute ->
+    ReturnToRestricted ->
       model
         |> case model.returnUrl of
              Nothing ->
@@ -1020,7 +1020,7 @@ handleUserAuthenticated user model =
            Nothing ->
              save
            Just _ ->
-             updateRouterWith ReturnToRestrictedRoute
+             updateRouterWith ReturnToRestricted
   ) |> andThen (setUser user)
 
 updatePageWith : PageMsg -> Model -> Update Model Msg a
