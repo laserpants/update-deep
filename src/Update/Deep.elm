@@ -1,4 +1,4 @@
-module Update.Deep exposing (Update, andFinally, andInvokeHandler, andRunCmd, andThen, ap, applicationInit, documentInit, foldEvents, invokeHandler, join, kleisli, map, map2, map3, map4, map5, map6, mapCmd, runCmd, runUpdate, save)
+module Update.Deep exposing (Update, andFinally, andInvokeHandler, andRunCmd, andThen, andThenIf, ap, applicationInit, documentInit, foldEvents, invokeHandler, join, kleisli, map, map2, map3, map4, map5, map6, map7, mapCmd, runCmd, runUpdate, save)
 
 
 type alias Update m c e =
@@ -60,6 +60,11 @@ map6 f x y z a =
     ap << map5 f x y z a
 
 
+map7 : (a -> b -> p -> q -> r -> s -> t -> u) -> Update a c e -> Update b c e -> Update p c e -> Update q c e -> Update r c e -> Update s c e -> Update t c e -> Update u c e
+map7 f x y z a b =
+    ap << map6 f x y z a b
+
+
 join : Update (Update a c e) c e -> Update a c e
 join ( ( model, cmda, e ), cmdb, e2 ) =
     ( model, Cmd.batch [ cmda, cmdb ], e ++ e2 )
@@ -68,6 +73,15 @@ join ( ( model, cmda, e ), cmdb, e2 ) =
 andThen : (b -> Update a c e) -> Update b c e -> Update a c e
 andThen f =
     join << map f
+
+
+andThenIf : Bool -> (a -> Update a c e) -> Update a c e -> Update a c e
+andThenIf b f do =
+    if b then
+        join (map f do)
+
+    else
+        do
 
 
 kleisli : (b -> Update d c e) -> (a -> Update b c e) -> (a -> Update d c e)
