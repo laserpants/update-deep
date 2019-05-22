@@ -786,7 +786,7 @@ uiUpdate { onLogOut } msg model =
         |> invokeHandler onLogOut
 
 uiSubscriptions : UiModel -> Sub UiMsg
-uiSubscriptions model = Sub.none
+uiSubscriptions model = Navbar.subscriptions model.navbar NavbarMsg
 
 uiNavbarView : UiModel -> Maybe DataUser -> Html UiMsg
 uiNavbarView model maybeUser =
