@@ -30,6 +30,11 @@ ap ( f, cmda, e ) ( model, cmdb, e2 ) =
     ( f model, Cmd.batch [ cmda, cmdb ], e ++ e2 )
 
 
+andMap : Update a c e -> Update (a -> b) c e -> Update b c e
+andMap a b =
+    ap b a
+
+
 map : (a -> b) -> Update a c e -> Update b c e
 map f ( model, cmd, events ) =
     ( f model, cmd, events )
