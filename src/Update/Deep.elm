@@ -1,4 +1,4 @@
-module Update.Deep exposing (Update, andFinally, andInvokeHandler, andRunCmd, andThen, andThenIf, ap, andMap, applicationInit, documentInit, foldEvents, invokeHandler, join, kleisli, map, map2, map3, map4, map5, map6, map7, mapCmd, runCmd, runUpdate, save)
+module Update.Deep exposing (Update, andFinally, andInvokeHandler, andMap, andRunCmd, andThen, andThenIf, ap, applicationInit, documentInit, foldEvents, invokeHandler, join, kleisli, map, map2, map3, map4, map5, map6, map7, mapCmd, runCmd, runUpdate, save)
 
 
 type alias Update m c e =
