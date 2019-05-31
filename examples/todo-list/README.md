@@ -23,7 +23,7 @@ The `Data.TodoItem` module defines the `TodoItem` type:
 type alias TodoItem = { text : String }
 ```
 
-In the following, we are mostly concerned with the four modules on the left side of the diagram; `Main`, `Notifications`, `Todos`, and `Todos.Form`.
+We are mostly concerned with the four modules on the left side of the diagram; `Main`, `Notifications`, `Todos`, and `Todos.Form`.
 Each one of these specifies its own `Msg` and `State` type, as well as `update` and `init` functions.
 Most of this is implemented as usual, but the return types of `update` and `init` are a bit different, and `update` takes an extra `EventHandlers` argument:
 
