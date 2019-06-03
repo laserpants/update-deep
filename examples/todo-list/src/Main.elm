@@ -60,7 +60,7 @@ update : Msg -> State -> Update State Msg a
 update msg =
     case msg of
         TodosMsg todosMsg ->
-            inTodos (Todos.update { onTaskAdded = handleItemAdded, onTaskDone = handleTaskDone } todosMsg TodosMsg)
+            inTodos (Todos.update { onTaskAdded = handleItemAdded, onTaskDone = handleTaskDone } todosMsg)
 
         NotificationsMsg notificationsMsg ->
             inNotifications (Notifications.update notificationsMsg NotificationsMsg)

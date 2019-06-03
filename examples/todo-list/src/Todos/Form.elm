@@ -27,26 +27,23 @@ type alias FormData =
     { text : String }
 
 
-submit : (FormData -> a) -> State -> Update FormData msg a
-submit handler state =
-    state
-        |> invokeHandler (handler { text = state.text })
-
-
 update : { onSubmit : FormData -> a } -> Msg -> State -> Update State msg a
-update { onSubmit } msg =
+update { onSubmit } msg state =
     case msg of
         Submit ->
-            submit onSubmit >> andThen (setText "")
+            state
+                |> invokeHandler (onSubmit { text = state.text })
+                |> andThen (setText "")
 
         Focus ->
-            save
+            save state
 
         Blur ->
-            save
+            save state
 
         Change text ->
-            setText text
+            state
+                |> setText text
 
 
 init : (Msg -> msg) -> Update State msg a

@@ -47,8 +47,8 @@ init toMsg =
         |> mapCmd toMsg
 
 
-update : { onTaskAdded : TodoItem -> a, onTaskDone : TodoItem -> a } -> Msg -> (Msg -> msg) -> State -> Update State msg a
-update { onTaskAdded, onTaskDone } msg toMsg =
+update : { onTaskAdded : TodoItem -> a, onTaskDone : TodoItem -> a } -> Msg -> State -> Update State msg a
+update { onTaskAdded, onTaskDone } msg =
     let
         handleSubmit data =
             let
