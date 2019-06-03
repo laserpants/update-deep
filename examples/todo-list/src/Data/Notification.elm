@@ -1,7 +1,11 @@
-module Data.Notification exposing (..)
+module Data.Notification exposing (Notification, NotificationId(..))
 
-type NotificationId = Id Int
+
+type NotificationId
+    = Id Int
+
 
 type alias Notification =
-  { id   : NotificationId 
-  , text : String }
+    { id : NotificationId
+    , text : String
+    }

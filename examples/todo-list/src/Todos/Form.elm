@@ -1,4 +1,4 @@
-module Todos.Form exposing (..)
+module Todos.Form exposing (FormData, Msg(..), State, init, setText, update, view)
 
 import Data.TodoItem exposing (..)
 import Html exposing (..)
@@ -6,61 +6,81 @@ import Html.Attributes exposing (..)
 import Html.Events exposing (..)
 import Update.Deep exposing (..)
 
+
 type Msg
-  = Submit
-  | Focus
-  | Blur
-  | Change String
+    = Submit
+    | Focus
+    | Blur
+    | Change String
+
 
 type alias State =
-  { text : String }
+    { text : String }
+
 
 setText : String -> State -> Update State msg a
-setText text state = save { state | text = text }
+setText text state =
+    save { state | text = text }
 
-type alias FormData = { text : String }
+
+type alias FormData =
+    { text : String }
+
+
+submit : (FormData -> e) -> State -> Update FormData c e
+submit handler state =
+    state
+        |> invokeHandler (handler { text = state.text })
+
 
 update : { onSubmit : FormData -> a } -> Msg -> State -> Update State msg a
-update { onSubmit } msg state =
-  state |> case msg of
-    Submit ->
-      setText "" >> andInvokeHandler (onSubmit { text = state.text })
-    Focus ->
-      save
-    Blur ->
-      save
-    Change text ->
-      setText text
+update { onSubmit } msg =
+    case msg of
+        Submit ->
+            setText "" >> andThen (submit onSubmit)
+
+        Focus ->
+            save
+
+        Blur ->
+            save
+
+        Change text ->
+            setText text
+
 
 init : (Msg -> msg) -> Update State msg a
 init toMsg =
-  save State
-    |> andMap (save "")
-    |> mapCmd toMsg
+    save State
+        |> andMap (save "")
+        |> mapCmd toMsg
+
 
 view : State -> (Msg -> msg) -> Html msg
 view { text } toMsg =
-  div [ class "box" ]
-    [ h4 [ class "title is-4" ] 
-      [ Html.text "New task" ]
-    , div [ class "field" ]
-      [ label [ class "label" ] [ Html.text "Description" ]
-      , div [ class "control" ]
-        [ input
-          [ class "input"
-          , placeholder "Describe your task here"
-          , onFocus (toMsg Focus)
-          , onBlur (toMsg Blur)
-          , onInput (toMsg << Change)
-          , Html.Attributes.value text 
-          ] []
+    div [ class "box" ]
+        [ h4 [ class "title is-4" ]
+            [ Html.text "New task" ]
+        , div [ class "field" ]
+            [ label [ class "label" ] [ Html.text "Description" ]
+            , div [ class "control" ]
+                [ input
+                    [ class "input"
+                    , placeholder "Describe your task here"
+                    , onFocus (toMsg Focus)
+                    , onBlur (toMsg Blur)
+                    , onInput (toMsg << Change)
+                    , Html.Attributes.value text
+                    ]
+                    []
+                ]
+            ]
+        , div []
+            [ button
+                [ class "button"
+                , disabled (String.isEmpty text)
+                , onClick (toMsg Submit)
+                ]
+                [ Html.text "Add" ]
+            ]
         ]
-      ]
-    , div []
-      [ button
-        [ class "button"
-        , disabled (String.isEmpty text)
-        , onClick (toMsg Submit) ]
-        [ Html.text "Add" ]
-      ]
-    ]
