@@ -28,8 +28,6 @@ application config =
 
 document :
     { init : flags -> Update model msg a
-    , onUrlChange : Url -> msg
-    , onUrlRequest : UrlRequest -> msg
     , subscriptions : model -> Sub msg
     , update : msg -> model -> Update model msg a
     , view : model -> Document msg

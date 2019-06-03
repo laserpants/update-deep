@@ -1,3 +1,5 @@
-module Data.TodoItem exposing (..)
+module Data.TodoItem exposing (TodoItem)
 
-type alias TodoItem = { text : String }
+
+type alias TodoItem =
+    { text : String }

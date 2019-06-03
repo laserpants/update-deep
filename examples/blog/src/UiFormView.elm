@@ -8,8 +8,8 @@ import Bootstrap.Form.Input as Input
 import Bootstrap.Form.Radio as Radio
 import Bootstrap.Form.Select as Select
 import Bootstrap.Form.Textarea as Textarea
-import Form.Error as Error exposing (..)
 import Form exposing (Form)
+import Form.Error as Error exposing (..)
 import Form.View exposing (..)
 import Html exposing (..)
 import Html.Attributes as Attributes exposing (placeholder)

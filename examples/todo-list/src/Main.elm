@@ -1,75 +1,96 @@
-module Main exposing (..)
+module Main exposing (Flags, Msg(..), State, handleItemAdded, handleTaskDone, inNotifications, inTodos, init, main, update, view)
 
 import Browser exposing (Document)
+import Data.TodoItem exposing (TodoItem)
 import Html exposing (..)
-import Html.Attributes exposing (..)
+import Html.Attributes exposing (attribute, class, disabled, href, placeholder, src, style)
 import Html.Events exposing (..)
+import Notifications
 import Todos
 import Todos.Form
-import Notifications
 import Update.Deep exposing (..)
 import Update.Deep.Browser as Deep
 
+
+type alias Flags =
+    ()
+
+
 type Msg
-   = TodosMsg Todos.Msg
-   | NotificationsMsg Notifications.Msg
+    = TodosMsg Todos.Msg
+    | NotificationsMsg Notifications.Msg
+
 
 type alias State =
-  { todos         : Todos.State
-  , notifications : Notifications.State }
+    { todos : Todos.State
+    , notifications : Notifications.State
+    }
 
-view : State -> Document Msg
-view { todos, notifications } =
-  { title = ""
-  , body  =
-    [ div []
-      [ Html.map (TodosMsg << Todos.FormMsg) (Todos.Form.view todos.form)
-      , hr [] []
-      , Html.map (NotificationsMsg) (Notifications.view notifications)
-      , Html.map TodosMsg (Todos.view todos) ]
-    ]
-  }
 
-subscriptions : State -> Sub Msg
-subscriptions _ = Sub.none
+inTodos : In State Todos.State msg a
+inTodos =
+    inState { get = .todos, set = \state todos -> { state | todos = todos } }
 
-init : () -> Init State Msg
+
+inNotifications : In State Notifications.State msg a
+inNotifications =
+    inState { get = .notifications, set = \state notifs -> { state | notifications = notifs } }
+
+
+init : Flags -> Update State Msg a
 init flags =
-  let todos         = Todos.init
-      notifications = Notifications.init
-   in { todos         = todos.state
-      , notifications = notifications.state }
-        |> initial
-        |> initCmd TodosMsg todos
-        |> initCmd NotificationsMsg notifications
+    save State
+        |> andMap (Todos.init TodosMsg)
+        |> andMap (Notifications.init NotificationsMsg)
 
-insertAsTodosIn : State -> Todos.State -> Update State Msg a
-insertAsTodosIn state todos = save { state | todos = todos }
 
-insertAsNotificationsIn : State -> Notifications.State -> Update State Msg a
-insertAsNotificationsIn state notifications = save { state | notifications = notifications }
+handleItemAdded : TodoItem -> State -> Update State Msg a
+handleItemAdded _ =
+    Notifications.addNotification "A new task was added to your list." NotificationsMsg
+        |> inNotifications
+
+
+handleTaskDone : TodoItem -> State -> Update State Msg a
+handleTaskDone item =
+    Notifications.addNotification ("The following task was completed: " ++ item.text) NotificationsMsg
+        |> inNotifications
+
 
 update : Msg -> State -> Update State Msg a
-update msg state =
-  case msg of
-    TodosMsg todosMsg ->
-      let notify text = update (NotificationsMsg (Notifications.Add text))
-          events = { onItemAdded = notify "A new task was added to your list."
-                   , onTaskDone  = \item -> notify ("The following task was completed: " ++ item.text) }
-       in state.todos
-        |> Todos.update events todosMsg
-        |> mapCmd TodosMsg
-        |> consumeEventsAnd (insertAsTodosIn state)
-    NotificationsMsg notificationsMsg ->
-      state.notifications
-        |> Notifications.update notificationsMsg
-        |> mapCmd NotificationsMsg
-        |> andThen (insertAsNotificationsIn state)
+update msg =
+    case msg of
+        TodosMsg todosMsg ->
+            inTodos (Todos.update { onTaskAdded = handleItemAdded, onTaskDone = handleTaskDone } todosMsg TodosMsg)
+
+        NotificationsMsg notificationsMsg ->
+            inNotifications (Notifications.update notificationsMsg NotificationsMsg)
+
+
+view : State -> Document Msg
+view { notifications, todos } =
+    { title = ""
+    , body =
+        [ nav [ class "navbar is-primary" ]
+            [ div [ class "navbar-brand" ]
+                [ a [ href "#", class "title is-5 navbar-item" ]
+                    [ text "Todo app" ]
+                ]
+            ]
+        , div [ class "columns" ]
+            [ div [ class "column" ]
+                [ Todos.view todos TodosMsg ]
+            , div [ class "column", style "margin" "1em" ]
+                [ Notifications.view notifications NotificationsMsg ]
+            ]
+        ]
+    }
+
 
 main : Program () State Msg
 main =
-  Deep.document
-    { init          = init
-    , update        = update
-    , subscriptions = subscriptions
-    , view          = view }
+    Deep.document
+        { init = init
+        , update = update
+        , subscriptions = always Sub.none
+        , view = view
+        }

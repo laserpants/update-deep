@@ -1,4 +1,4 @@
-module Update.Deep exposing (Update, andFinally, andInvokeHandler, andMap, andRunCmd, andThen, andThenIf, ap, applicationInit, documentInit, foldEvents, invokeHandler, join, kleisli, map, map2, map3, map4, map5, map6, map7, mapCmd, runCmd, runUpdate, save)
+module Update.Deep exposing (In, Update, addCmd, andAddCmd, andInvokeHandler, andMap, andThen, andThenIf, ap, applicationInit, documentInit, foldEvents, foldEventsAndThen, invokeHandler, join, kleisli, map, map2, map3, map4, map5, map6, map7, mapCmd, runUpdate, save, inState)
 
 
 type alias Update m c e =
@@ -10,8 +10,8 @@ save model =
     ( model, Cmd.none, [] )
 
 
-runCmd : Cmd c -> m -> Update m c e
-runCmd cmd state =
+addCmd : Cmd c -> m -> Update m c e
+addCmd cmd state =
     ( state, cmd, [] )
 
 
@@ -76,17 +76,21 @@ join ( ( model, cmda, e ), cmdb, e2 ) =
 
 
 andThen : (b -> Update a c e) -> Update b c e -> Update a c e
-andThen f =
-    join << map f
+andThen fun =
+    join << map fun
 
 
-andThenIf : Bool -> (a -> Update a c e) -> Update a c e -> Update a c e
-andThenIf b f do =
-    if b then
-        join (map f do)
+andThenIf : (a -> Bool) -> (a -> Update a c e) -> Update a c e -> Update a c e
+andThenIf pred fun upd =
+    map pred upd
+        |> andThen
+            (\cond ->
+                if cond then
+                    join (map fun upd)
 
-    else
-        do
+                else
+                    upd
+            )
 
 
 kleisli : (b -> Update d c e) -> (a -> Update b c e) -> (a -> Update d c e)
@@ -94,9 +98,9 @@ kleisli f g =
     andThen f << g
 
 
-andRunCmd : Cmd c -> Update a c e -> Update a c e
-andRunCmd =
-    andThen << runCmd
+andAddCmd : Cmd c -> Update a c e -> Update a c e
+andAddCmd =
+    andThen << addCmd
 
 
 andInvokeHandler : e -> Update a c e -> Update a c e
@@ -109,9 +113,18 @@ foldEvents ( m, cmd, events ) =
     List.foldr andThen ( m, cmd, [] ) events
 
 
-andFinally : (m -> Update a c (a -> Update a c e)) -> Update m c (a -> Update a c e) -> Update a c e
-andFinally do =
-    foldEvents << andThen do
+foldEventsAndThen : (m -> Update a c (a -> Update a c e)) -> Update m c (a -> Update a c e) -> Update a c e
+foldEventsAndThen fun =
+    foldEvents << andThen fun
+
+
+type alias In state slice msg a =
+    (slice -> Update slice msg (state -> Update state msg a)) -> state -> Update state msg a
+
+
+inState : { get : b -> d, set : b -> m -> a } -> (d -> Update m c (a -> Update a c e)) -> b -> Update a c e
+inState { get, set } fun state =
+    get state |> fun |> foldEventsAndThen (set state >> save)
 
 
 applicationInit : (d -> e -> f -> Update a b c) -> d -> e -> f -> ( a, Cmd b )
