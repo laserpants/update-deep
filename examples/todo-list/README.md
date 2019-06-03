@@ -23,8 +23,8 @@ The `Data.TodoItem` module defines the `TodoItem` type:
 type alias TodoItem = { text : String }
 ```
 
-We are mostly concerned with the four modules on the left side of the diagram; `Main`, `Notifications`, `Todos`, and `Todos.Form`.
-Each one of these specifies its own `Msg` and `State` type, as well as `update` and `init` functions.
+Let's concentrate on the four modules on the left side of the diagram; `Main`, `Notifications`, `Todos`, and `Todos.Form`.
+Each one of these specifies its own `Msg` and `State` type, as well as `update` and `init` functions. (Subscriptions are not used in this example.)
 Most of this is implemented as usual, but the return types of `update` and `init` are a bit different, and `update` takes an extra `EventHandlers` argument:
 
 ```elm
@@ -45,7 +45,7 @@ In this example, there are three event handlers involved:
                │    Main    │
                └── ▲ ─ ▲ ───┘
                    │   │
-                   │   │--- onItemAdded
+                   │   │--- onTaskAdded
      onTaskDone ---│   │
                    │   │   ┌───────────┐
                    └───┴───│   Todos   │
@@ -125,13 +125,13 @@ We then use `consumeEvents` to apply these actions in the context of `State.upda
         |> andThen doMoreStuff
 ```
 
-Finally, when the item is added, `onItemAdded` is invoked to pass the word to `Main`.
+Finally, when the item is added, `onTaskAdded` is invoked to pass the word to `Main`.
 
 ```elm
 -- src/Todos.elm (line 49)
     AddItem item ->
       state
         |> pushItem item
-        |> andInvoke events.onItemAdded
+        |> andInvoke events.onTaskAdded
      -- etc.
 ```
