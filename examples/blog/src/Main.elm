@@ -93,14 +93,20 @@ loginPageInit toMsg =
     |> mapCmd toMsg
 
 loginPageUpdate : LoginPageMsg -> LoginPageState -> Update LoginPageState msg a
-loginPageUpdate msg state = Debug.todo ""
+loginPageUpdate msg state =
+  case msg of
+    _ ->
+      save state
 
 loginPageSubscriptions : LoginPageState -> (LoginPageMsg -> msg) -> Sub msg
 loginPageSubscriptions state toMsg = Sub.none
 
 loginPageView : LoginPageState -> (LoginPageMsg -> msg) -> Html msg
 loginPageView state toMsg = 
-  div [] [ text "login" ]
+  div [] [ 
+    div [] [ input [] [] ]
+  , div [] [ input [] [] ]
+  ]
 
 --
 
@@ -123,7 +129,12 @@ registerPageSubscriptions state toMsg = Sub.none
 
 registerPageView : RegisterPageState -> (RegisterPageMsg -> msg) -> Html msg
 registerPageView state toMsg = 
-  div [] [ text "register" ]
+  div [] [ 
+    div [] [ input [] [] ]
+  , div [] [ input [] [] ]
+  , div [] [ input [] [] ]
+  , div [] [ input [] [] ]
+  ]
 
 --
 
@@ -331,15 +342,15 @@ init flags url key =
     |> andMap (save NotFoundPage)
     |> andThen (update (RouterMsg (UrlChange url)))
 
-redirect : String -> State -> Update State Msg a
+redirect : String -> State -> Update State msg a
 redirect = inRouter << routerRedirect
 
-ifAuthenticated : (State -> Update State Msg a) -> State -> Update State Msg a
+ifAuthenticated : (State -> Update State msg a) -> State -> Update State msg a
 ifAuthenticated gotoPage state =
   state 
     |> if Nothing == state.session then redirect "/login" else gotoPage
 
-unlessAuthenticated : (State -> Update State Msg a) -> State -> Update State Msg a
+unlessAuthenticated : (State -> Update State msg a) -> State -> Update State msg a
 unlessAuthenticated gotoPage state =
   state 
     |> if Nothing /= state.session then redirect "/" else gotoPage
@@ -347,7 +358,7 @@ unlessAuthenticated gotoPage state =
 loadPage : Update Page msg (State -> Update State msg a) -> State -> Update State msg a
 loadPage = inPage << always
 
-handleRouteChange : Maybe Route -> State -> Update State Msg a
+handleRouteChange : Maybe Route -> State -> Update State PageMsg a
 handleRouteChange maybeRoute =
   case maybeRoute of
     -- No route
@@ -356,24 +367,24 @@ handleRouteChange maybeRoute =
 
     -- Authenticated
     Just NewPost ->
-      loadPage (Update.Deep.map NewPostPage (newPostPageInit (PageMsg << NewPostPageMsg)))
+      loadPage (Update.Deep.map NewPostPage (newPostPageInit NewPostPageMsg))
         |> ifAuthenticated
 
     -- Don't show if already authenticated
     Just Login ->
-      loadPage (Update.Deep.map LoginPage (loginPageInit (PageMsg << LoginPageMsg)))
+      loadPage (Update.Deep.map LoginPage (loginPageInit LoginPageMsg))
         |> unlessAuthenticated
 
     Just Register ->
-      loadPage (Update.Deep.map RegisterPage (registerPageInit (PageMsg << RegisterPageMsg)))
+      loadPage (Update.Deep.map RegisterPage (registerPageInit RegisterPageMsg))
         |> unlessAuthenticated
 
     -- Other
     Just (Post id) ->
-      loadPage (Update.Deep.map ShowPostPage (showPostPageInit (PageMsg << ShowPostPageMsg)))
+      loadPage (Update.Deep.map ShowPostPage (showPostPageInit ShowPostPageMsg))
 
     Just Home ->
-      loadPage (Update.Deep.map HomePage (homePageInit (PageMsg << HomePageMsg)))
+      loadPage (Update.Deep.map HomePage (homePageInit HomePageMsg))
 
     Just Logout ->
       save
@@ -385,7 +396,7 @@ update : Msg -> State -> Update State Msg a
 update msg =
   case msg of
     RouterMsg routerMsg ->
-      inRouter (routerUpdate { onRouteChange = handleRouteChange } routerMsg)
+      inRouter (routerUpdate { onRouteChange = \route -> mapCmd PageMsg << handleRouteChange route } routerMsg)
     PageMsg pageMsg ->
       inPage (pageUpdate pageMsg PageMsg)
 
