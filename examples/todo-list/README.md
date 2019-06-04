@@ -1,4 +1,4 @@
-# To Do-List Example
+# To Do-List App Example
 
 #### Run this example in the browser [here](https://laserpants.github.io/update-deep/examples/todo-list).
 
@@ -25,24 +25,25 @@ type alias TodoItem = { text : String }
 
 which holds a description of the anticipated task. `Data.Notification` is similar. It represents a “toast” notification shown on the screen.
 
-Let's concentrate on the four modules on the left side of the diagram; `Main`, `Notifications`, `Todos`, and `Todos.Form`.
+Let's concentrate instead on the four modules on the left side of the diagram; `Main`, `Notifications`, `Todos`, and `Todos.Form`.
 Each one of these specifies its own `Msg` and `State` type, as well as `update` and `init` functions. (Subscriptions are not used in this example.)
 
 > Note that *state* is used here to refer to (what the Elm architecture calls) a *model*, and that these two terms are used more or less interchangeably in the following.
 
-a template
+It is useful to imagine these as instances of the following blueprint:
 
 ```elm
 module Template exposing (..)
 
 type Msg
-  = SomeMsg
-  | SomeOtherMsg
-  | -- etc.
+    = SomeMsg
+    | SomeOtherMsg
+    | -- etc.
 
 type alias State =
-  { ...
-  }
+    { 
+        -- ...
+    }
 
 init : Update State msg a
 init = 
@@ -56,16 +57,17 @@ update msg state =
 view = ...
 ```
 
-### The `Update` type
-
-The return type
+The only thing that makes this different is the return types of `update` and `init`.
+Here is the definition of the `Update` type alias:
 
 ```elm
 type alias Update m c e =
     ( m, Cmd c, List e )
 ```
 
-The third element of this tuple 
+This is just the usual model-`Cmd` pair with an extra, third element.
+As you may have guessed already, writing `save {}` in the above code, is the same as returning `( {}, Cmd.none, [] )`.
+We typically manipulate these values by composing functions of the form `something -> State -> Update State msg a` in the familiar pipes operator-style:
 
 ```elm
 save state
@@ -73,7 +75,14 @@ save state
     |> andThen doSomethingElse
 ```
 
-As usual, messages move down in the update tree. To pass information in the opposite direction, this library introduces a simple, callback-based event handling mechanism.
+```elm
+state
+    |> addCmd (Ports.clearSession ())
+    |> andThen doSomething
+```
+
+How is this useful then? Well, messages move down in the update tree. To pass information in the opposite direction, this library introduces a simple, callback-based event handling mechanism. That is what the third element of the `Update` tuple is for.
+
 In this example, there are three event handlers involved:
 
 ```
@@ -95,7 +104,7 @@ In this example, there are three event handlers involved:
 ```
 
 When a task is added or completed, `Main` gets a chance to update itself, in this case so that we can show a notification (toast).
-Similarly, `Todos` is told when the form is submitted, so that it can add the new `TodoItem` to the list. Let's look at `update` in `Todos.Form`:
+Similarly, `Todos` is told when the form is submitted, so that it can add the new `TodoItem` to its list. Let's look at `update` in `Todos.Form`:
 
 ```elm
 -- src/Todos/Form.elm (line 30)
