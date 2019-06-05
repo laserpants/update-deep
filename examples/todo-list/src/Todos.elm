@@ -58,7 +58,7 @@ update { onTaskAdded, onTaskDone } msg =
             addItem item
                 >> andInvokeHandler (onTaskAdded item)
 
-        removeItem ix shouldNotify state =
+        removeItem ix flags state =
             state
                 |> (case List.drop ix state.items of
                         [] ->
@@ -66,7 +66,7 @@ update { onTaskAdded, onTaskDone } msg =
 
                         item :: rest ->
                             setItems (List.take ix state.items ++ rest)
-                                >> andThenIf (always shouldNotify) (invokeHandler <| onTaskDone item)
+                                >> andThenIf (always flags.notify) (invokeHandler <| onTaskDone item)
                    )
     in
     case msg of
@@ -74,10 +74,10 @@ update { onTaskAdded, onTaskDone } msg =
             inForm (Form.update { onSubmit = handleSubmit } formMsg)
 
         MarkDone ix ->
-            removeItem ix True
+            removeItem ix { notify = True }
 
         Delete ix ->
-            removeItem ix False
+            removeItem ix { notify = False }
 
 
 view : State -> (Msg -> msg) -> Html msg
