@@ -30,3 +30,23 @@ if (app.ports && app.ports.clearSession) {
     sessionStorage.removeItem(storageKey);
   });
 }
+
+var usernamesTaken = ['bob', 'laserpants', 'neo', 'admin', 'speedo'];
+
+var delay = 300;
+
+if (app.ports && app.ports.websocketOut && app.ports.websocketIn) {
+  app.ports.websocketOut.subscribe(function(data) {
+    var message = JSON.parse(data);
+    if ('username_available_query' === message.type) {
+      setTimeout(function() {
+        var response = {
+          type: 'username_available_response',
+          username: message.username,
+          available: (-1 === usernamesTaken.indexOf(message.username))
+        };
+        app.ports.websocketIn.send(JSON.stringify(response));
+      }, delay);
+    }
+  });
+}

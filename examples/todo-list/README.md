@@ -67,7 +67,7 @@ type alias Update m c e =
 
 This is just the usual model-`Cmd` pair with an extra, third element.
 As you may have guessed already, writing `save {}` in the above code, is the same as returning `( {}, Cmd.none, [] )`.
-We typically manipulate these values by composing functions of the form `something -> State -> Update State msg a` in the familiar pipes operator-style:
+We typically manipulate these values by composing functions of the form `something -> State -> Update State msg a` in the familiar style using pipes:
 
 ```elm
 save state

@@ -2,6 +2,7 @@ module Main exposing (..)
 
 import Browser exposing (Document, UrlRequest)
 import Browser.Navigation as Navigation
+import Dict exposing (Dict)
 import Form exposing (Form)
 import Form.Error exposing (ErrorValue(..), Error)
 import Form.Field as Field exposing (Field, FieldValue(..))
@@ -19,6 +20,37 @@ import Update.Deep exposing (..)
 import Update.Deep.Browser as Deep
 import Url exposing (Url)
 import Url.Parser as Parser exposing (Parser, parse, oneOf, (</>))
+
+--
+
+-- custom errors
+-- redirect after login
+
+--
+
+type alias WebSocketUsernameAvailableResponsePayload =
+  { username : String
+  , available : Bool 
+  }
+
+webSocketUsernameAvailableResponseDecoder : Json.Decoder WebSocketUsernameAvailableResponsePayload
+webSocketUsernameAvailableResponseDecoder =
+  Json.map2 WebSocketUsernameAvailableResponsePayload
+    (Json.field "username" Json.string)
+    (Json.field "available" Json.bool)
+
+type WebSocketMessage
+  = WebSocketUsernameAvailableResponse WebSocketUsernameAvailableResponsePayload
+
+websocketMessageDecoder : Json.Decoder WebSocketMessage
+websocketMessageDecoder =
+  let payloadDecoder type_ =
+        case type_ of
+          "username_available_response" ->
+            Json.map WebSocketUsernameAvailableResponse webSocketUsernameAvailableResponseDecoder
+          _ ->
+            Json.fail "Unrecognized message type"
+   in Json.field "type" Json.string |> Json.andThen payloadDecoder
 
 --
 
@@ -282,7 +314,7 @@ type NewPostPageMsg
 
 type alias NewPostPageState =
   { api : ApiModel Post
-  , form : FormModel () NewPostForm }
+  , formModel : FormModel () NewPostForm }
 
 newPostPageInApi : In NewPostPageState (ApiModel Post) msg a
 newPostPageInApi =
@@ -290,7 +322,7 @@ newPostPageInApi =
 
 newPostPageInForm : In NewPostPageState (FormModel () NewPostForm) msg a
 newPostPageInForm =
-    inState { get = .form, set = \state form -> { state | form = form } }
+    inState { get = .formModel, set = \state form -> { state | formModel = form } }
 
 newPostPageInit : (NewPostPageMsg -> msg) -> Update NewPostPageState msg a
 newPostPageInit toMsg = 
@@ -366,8 +398,8 @@ newPostPageFormView { form, disabled } toMsg =
     |> Html.map toMsg
 
 newPostPageView : NewPostPageState -> (NewPostPageMsg -> msg) -> Html msg
-newPostPageView { form } toMsg = 
-  div [] [ newPostPageFormView form (toMsg << NewPostFormMsg) ]
+newPostPageView { formModel } toMsg = 
+  div [] [ newPostPageFormView formModel (toMsg << NewPostFormMsg) ]
 
 --
 
@@ -420,7 +452,7 @@ type LoginPageMsg
 
 type alias LoginPageState =
   { api : ApiModel Session
-  , form : FormModel () LoginForm 
+  , formModel : FormModel () LoginForm 
   }
 
 loginPageInApi : In LoginPageState (ApiModel Session) msg a
@@ -429,7 +461,7 @@ loginPageInApi =
 
 loginPageInForm : In LoginPageState (FormModel () LoginForm) msg a
 loginPageInForm =
-    inState { get = .form, set = \state form -> { state | form = form } }
+    inState { get = .formModel, set = \state form -> { state | formModel = form } }
 
 loginPageInit : (LoginPageMsg -> msg) -> Update LoginPageState msg a
 loginPageInit toMsg = 
@@ -501,8 +533,8 @@ loginPageFormView { form, disabled } toMsg =
     |> Html.map toMsg
 
 loginPageView : LoginPageState -> (LoginPageMsg -> msg) -> Html msg
-loginPageView { form } toMsg = 
-  div [] [ loginPageFormView form (toMsg << LoginFormMsg) ]
+loginPageView { formModel } toMsg = 
+  div [] [ loginPageFormView formModel (toMsg << LoginFormMsg) ]
 
 --
 
@@ -585,10 +617,22 @@ registerFormToJson { name, email, username, phoneNumber, password, agreeWithTerm
 type RegisterPageMsg 
   = RegisterPageApiMsg (ApiMsg User)
   | RegisterFormMsg Form.Msg
+  | RegisterPageWebsocketMsg String
+
+type UsernameStatus
+  = UsernameBlank
+  | UsernameAvailable Bool
+  | Unknown
 
 type alias RegisterPageState =
   { api : ApiModel User 
-  , form : FormModel () RegisterForm }
+  , formModel : FormModel () RegisterForm 
+  , usernames : Dict String Bool 
+  , usernameStatus : UsernameStatus
+  }
+
+saveUsernameStatus : String -> Bool -> RegisterPageState -> Update RegisterPageState msg a
+saveUsernameStatus username available state = save { state | usernames = Dict.insert username available state.usernames }
 
 registerPageInApi : In RegisterPageState (ApiModel User) msg a
 registerPageInApi =
@@ -596,7 +640,10 @@ registerPageInApi =
 
 registerPageInForm : In RegisterPageState (FormModel () RegisterForm) msg a
 registerPageInForm =
-    inState { get = .form, set = \state form -> { state | form = form } }
+    inState { get = .formModel, set = \state form -> { state | formModel = form } }
+
+setUsernameStatus : UsernameStatus -> RegisterPageState -> Update RegisterPageState msg a
+setUsernameStatus status state = save { state | usernameStatus = status }
 
 registerPageInit : (RegisterPageMsg -> msg) -> Update RegisterPageState msg a
 registerPageInit toMsg = 
@@ -611,7 +658,40 @@ registerPageInit toMsg =
       save RegisterPageState
         |> andMap api
         |> andMap form
+        |> andMap (save Dict.empty)
+        |> andMap (save UsernameBlank)
         |> mapCmd toMsg
+
+websocketUsernameAvailableQuery : String -> Json.Value
+websocketUsernameAvailableQuery username =
+  Json.Encode.object
+    [ ( "type"  , Json.Encode.string "username_available_query" )
+    , ( "username" , Json.Encode.string username ) 
+    ]
+
+checkIfUsernameAvailable : String -> RegisterPageState -> Update RegisterPageState msg a
+checkIfUsernameAvailable username ({ usernames } as state) = 
+  if String.isEmpty username
+      then 
+        state
+          |> setUsernameStatus UsernameBlank
+      else 
+        case Dict.get username usernames of
+          Just isAvailable ->
+            state
+              |> setUsernameStatus (UsernameAvailable isAvailable)
+          Nothing ->
+            state
+              |> setUsernameStatus Unknown
+              |> andAddCmd (Ports.websocketOut (Json.Encode.encode 0 (websocketUsernameAvailableQuery username)))
+
+usernameFieldSpy : Form.Msg -> RegisterPageState -> Update RegisterPageState msg a
+usernameFieldSpy formMsg =
+  case formMsg of
+    Form.Input "username" Form.Text (String username) ->
+      checkIfUsernameAvailable username 
+    _ ->
+      save 
 
 registerPageUpdate : RegisterPageMsg -> (RegisterPageMsg -> msg) -> RegisterPageState -> Update RegisterPageState msg a
 registerPageUpdate msg toMsg state = 
@@ -620,7 +700,7 @@ registerPageUpdate msg toMsg state =
       handleSubmit form = 
           let json = form |> registerFormToJson |> Http.jsonBody 
            in registerPageInApi (apiSendRequest "" (Just json) (toMsg << RegisterPageApiMsg))
- 
+
    in 
       case msg of
         RegisterPageApiMsg apiMsg ->
@@ -629,12 +709,24 @@ registerPageUpdate msg toMsg state =
         RegisterFormMsg formMsg ->
           state
             |> registerPageInForm (formUpdate { onSubmit = handleSubmit } formMsg)
+            |> andThen (usernameFieldSpy formMsg)
+        RegisterPageWebsocketMsg wsMsg ->
+          case Json.decodeString websocketMessageDecoder wsMsg of
+            Ok (WebSocketUsernameAvailableResponse { username, available }) ->
+              let 
+                  usernameField = Form.getFieldAsString "username" state.formModel.form
+               in 
+                  state
+                    |> saveUsernameStatus username available
+                    |> andThen (checkIfUsernameAvailable <| Maybe.withDefault "" usernameField.value)
+            _ ->
+              save state
 
 registerPageSubscriptions : RegisterPageState -> (RegisterPageMsg -> msg) -> Sub msg
-registerPageSubscriptions state toMsg = Sub.none
+registerPageSubscriptions state toMsg = Ports.websocketIn (toMsg << RegisterPageWebsocketMsg)
 
-registerPageFormView : FormModel () RegisterForm -> (Form.Msg -> msg) -> Html msg
-registerPageFormView { form, disabled } toMsg =
+registerPageFormView : FormModel () RegisterForm -> UsernameStatus -> (Form.Msg -> msg) -> Html msg
+registerPageFormView { form, disabled } usernameStatus toMsg =
 
   let 
       name                 = form |> Form.getFieldAsString "name"
@@ -656,19 +748,34 @@ registerPageFormView { form, disabled } toMsg =
         field.liveError 
           |> Maybe.unpack (always "") errorToString
 
+      usernameStatusText =
+        case usernameStatus of
+          UsernameBlank ->
+            text "[blank]"
+          UsernameAvailable isAvailable ->
+            text (if isAvailable then "Available" else "Not available")
+          Unknown ->
+            text "..."
+
    in
 
       [ fieldset [ Html.Attributes.disabled disabled ]
-        [ div [] [ inputField [] name ] 
+        [ div [] [ text "Name" ] 
+        , div [] [ inputField [] name ] 
         , div [] [ Html.text (errorMessage name) ]
+        , div [] [ text "Email" ] 
         , div [] [ inputField [] email ]
         , div [] [ Html.text (errorMessage email) ]
-        , div [] [ inputField [] username ]
+        , div [] [ text "Username" ] 
+        , div [] [ inputField [] username, usernameStatusText ]
         , div [] [ Html.text (errorMessage username) ]
+        , div [] [ text "Phone number" ] 
         , div [] [ inputField [] phoneNumber ]
         , div [] [ Html.text (errorMessage phoneNumber) ]
+        , div [] [ text "Password" ] 
         , div [] [ inputField [ type_ "password" ] password ]
         , div [] [ Html.text (errorMessage password) ]
+        , div [] [ text "Password confirmation" ] 
         , div [] [ inputField [ type_ "password" ] passwordConfirmation ]
         , div [] [ Html.text (errorMessage passwordConfirmation) ]
         , div [] 
@@ -692,14 +799,14 @@ registerPageFormView { form, disabled } toMsg =
     |> Html.map toMsg
 
 registerPageView : RegisterPageState -> (RegisterPageMsg -> msg) -> Html msg
-registerPageView { api, form } toMsg = 
+registerPageView { api, formModel, usernameStatus } toMsg = 
   case api.resource of
     Available response ->
       div [] [ text "Thanks!" ]
     Error error ->
       div [] [ text "error" ]
     _ ->
-      div [] [ registerPageFormView form (toMsg << RegisterFormMsg) ]
+      div [] [ registerPageFormView formModel usernameStatus (toMsg << RegisterFormMsg) ]
 
 --
 
@@ -840,15 +947,15 @@ pageSubscriptions : Page -> (PageMsg -> msg) -> Sub msg
 pageSubscriptions page toMsg = 
   case page of
     HomePage homePageState ->
-      Sub.none
+      homePageSubscriptions homePageState (toMsg << HomePageMsg)
     NewPostPage newPostPageState ->
-      Sub.none
+      newPostPageSubscriptions newPostPageState (toMsg << NewPostPageMsg)
     ShowPostPage showPostPageState ->
-      Sub.none
+      showPostPageSubscriptions showPostPageState (toMsg << ShowPostPageMsg)
     LoginPage loginPageState ->
-      Sub.none
+      loginPageSubscriptions loginPageState (toMsg << LoginPageMsg)
     RegisterPage registerPageState ->
-      Sub.none
+      registerPageSubscriptions registerPageState (toMsg << RegisterPageMsg)
     AboutPage ->
       Sub.none
     NotFoundPage ->
@@ -943,14 +1050,14 @@ redirect : String -> State -> Update State msg a
 redirect = inRouter << routerRedirect
 
 ifAuthenticated : (State -> Update State msg a) -> State -> Update State msg a
-ifAuthenticated gotoPage state =
+ifAuthenticated gotoPage ({ session } as state) =
   state 
-    |> if Nothing == state.session then redirect "/login" else gotoPage
+    |> if Nothing == session then redirect "/login" else gotoPage
 
 unlessAuthenticated : (State -> Update State msg a) -> State -> Update State msg a
-unlessAuthenticated gotoPage state =
+unlessAuthenticated gotoPage ({ session } as state) =
   state 
-    |> if Nothing /= state.session then redirect "/" else gotoPage
+    |> if Nothing /= session then redirect "/" else gotoPage
 
 loadPage : Update Page msg (State -> Update State msg a) -> State -> Update State msg a
 loadPage = inPage << always
@@ -990,6 +1097,7 @@ handleRouteChange maybeRoute =
 
     Just Home ->
       homePageInit HomePageMsg
+        |> andThen (homePageUpdate FetchPosts HomePageMsg)
         |> Update.Deep.map HomePage
         |> loadPage 
 
