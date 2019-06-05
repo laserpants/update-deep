@@ -2,13 +2,141 @@ module Main exposing (..)
 
 import Browser exposing (Document, UrlRequest)
 import Browser.Navigation as Navigation
-import Update.Deep exposing (..)
-import Update.Deep.Browser as Deep
+import Form exposing (Form)
+import Form.Error exposing (ErrorValue(..), Error)
+import Form.Field as Field exposing (Field, FieldValue(..))
+import Form.Input as Input
+import Form.Validate as Validate exposing (Validation, succeed, field)
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (..)
+import Http exposing (emptyBody)
+import Json.Decode as Json
+import Json.Encode exposing (object)
+import Maybe.Extra as Maybe
+import Update.Deep exposing (..)
+import Update.Deep.Browser as Deep
 import Url exposing (Url)
 import Url.Parser as Parser exposing (Parser, parse, oneOf, (</>))
+
+--
+
+-- type FormMsg
+--   = 
+-- 
+-- type alias FormModel =
+--   {}
+
+--
+
+type ApiMsg a
+  = Response (Result Http.Error a)
+  | Reset
+
+type ApiResource a
+  = NotRequested
+  | Requested
+  | Error Http.Error
+  | Available a
+
+type alias Request a = String -> Maybe Http.Body -> Cmd (ApiMsg a)
+
+type alias ApiModel a =
+  { resource : ApiResource a
+  , request  : Request a }
+
+setResource : ApiResource a -> ApiModel a -> Update (ApiModel a) msg b
+setResource resource state = save { state | resource = resource }
+
+type HttpMethod
+  = HttpGet
+  | HttpPost
+  | HttpPut
+
+type alias RequestConfig a =
+  { endpoint : String
+  , method   : HttpMethod
+  , decoder  : Json.Decoder a }
+
+apiInit : RequestConfig a -> Update (ApiModel a) msg b
+apiInit { endpoint, method, decoder } =
+  let expect = Http.expectJson Response decoder
+      request suffix body =
+        Http.request
+          { method  = case method of
+                        HttpGet  -> "GET"
+                        HttpPost -> "POST"
+                        HttpPut  -> "PUT"
+          , headers = []
+          , url     = endpoint ++ suffix
+          , expect  = expect
+          , body    = Maybe.withDefault emptyBody body
+          , timeout = Nothing
+          , tracker = Nothing }
+   in save { resource = NotRequested, request = request }
+
+type alias ApiEventHandlers a b = { onSuccess : a -> b, onError : Http.Error -> b }
+
+apiSendRequest : String -> Maybe Http.Body -> (ApiMsg a -> msg) -> ApiModel a -> Update (ApiModel a) msg b
+apiSendRequest url maybeBody toMsg model =
+  model
+    |> setResource Requested
+    |> andAddCmd (model.request url maybeBody)
+    |> mapCmd toMsg
+
+apiResetResource : ApiModel a -> Update (ApiModel a) msg b
+apiResetResource = setResource NotRequested
+
+apiUpdate : ApiEventHandlers a b -> ApiMsg a -> (ApiMsg a -> msg) -> ApiModel a -> Update (ApiModel a) msg b
+apiUpdate { onSuccess, onError } msg toMsg model =
+  case msg of
+    Response (Ok resource) ->
+      model
+        |> setResource (Available resource)
+        |> andInvokeHandler (onSuccess resource)
+    Response (Err error) ->
+      model
+        |> setResource (Error error)
+        |> andInvokeHandler (onError error)
+    Reset ->
+      model
+        |> apiResetResource
+
+--
+
+errorToString : ErrorValue a -> String
+errorToString error =
+  case error of
+    Empty ->
+      "This field is required"
+    InvalidString ->
+      "Not a valid string"
+    InvalidEmail ->
+      "Please enter a valid email address"
+    InvalidFormat ->
+      "Invalid format"
+    InvalidInt ->
+      "This value must be an integer"
+    InvalidFloat ->
+      "This value must be a real number"
+    InvalidBool ->
+      "Error"
+    SmallerIntThan int ->
+      "Error"
+    GreaterIntThan int ->
+      "Error"
+    SmallerFloatThan float ->
+      "Error"
+    GreaterFloatThan float ->
+      "Error"
+    ShorterStringThan int ->
+      "Must be at least " ++ String.fromInt int ++ " characters"
+    LongerStringThan int ->
+      "Must be no more than " ++ String.fromInt int ++ " characters"
+    NotIncludedIn ->
+      "Error"
+    CustomError e ->
+      Debug.toString e -- TODO
 
 --
 
@@ -81,60 +209,313 @@ showPostPageView state toMsg =
 
 --
 
+type alias LoginForm =
+  { username : String
+  , password : String 
+  }
+
+validateStringNonEmpty : Field -> Result (Error e) String
+validateStringNonEmpty = 
+  [ Validate.string, Validate.emptyString ]
+    |> Validate.oneOf  
+    |> Validate.andThen Validate.nonEmpty
+
+loginFormValidate : Validation () LoginForm
+loginFormValidate =
+  succeed LoginForm
+    |> Validate.andMap (field "username" validateStringNonEmpty)
+    |> Validate.andMap (field "password" validateStringNonEmpty)
+
+loginFormToJson : LoginForm -> Json.Value
+loginFormToJson { username, password } = 
+  object 
+    [ ( "username" , Json.Encode.string username )
+    , ( "password" , Json.Encode.string password )
+    ]
+
+--
+
 type LoginPageMsg 
-  = NoLoginPageMsg
+  = LoginFormMsg Form.Msg
+  | LoginPageApiMsg (ApiMsg Session)
 
 type alias LoginPageState =
-  {}
+  { api : ApiModel Session
+  , form : Form () LoginForm 
+  , closed : Bool 
+  }
+
+loginPageInsertAsFormIn : LoginPageState -> Form () LoginForm -> Update LoginPageState msg a
+loginPageInsertAsFormIn state form = save { state | form = form }
+
+loginPageFormSetClosed : Bool -> LoginPageState -> Update LoginPageState msg a
+loginPageFormSetClosed closed state = save { state | closed = closed }
+
+loginPageInApi : In LoginPageState (ApiModel Session) msg a
+loginPageInApi =
+    inState { get = .api, set = \state api -> { state | api = api } }
 
 loginPageInit : (LoginPageMsg -> msg) -> Update LoginPageState msg a
 loginPageInit toMsg = 
-  save LoginPageState
-    |> mapCmd toMsg
 
-loginPageUpdate : LoginPageMsg -> LoginPageState -> Update LoginPageState msg a
-loginPageUpdate msg state =
-  case msg of
-    _ ->
-      save state
+  let fields = []
+
+      api = apiInit { endpoint = "/auth/login"
+                    , method   = HttpPost
+                    , decoder  = Json.field "session" sessionDecoder }
+
+   in 
+      save LoginPageState
+        |> andMap api
+        |> andMap (Form.initial fields loginFormValidate |> save)
+        |> andMap (save False)
+        |> mapCmd toMsg
+
+loginPageUpdate : { onAuthResponse : Maybe Session -> a } -> LoginPageMsg -> (LoginPageMsg -> msg) -> LoginPageState -> Update LoginPageState msg a
+loginPageUpdate { onAuthResponse } msg toMsg state =
+  let 
+      handleSubmit : LoginForm -> LoginPageState -> Update LoginPageState msg a
+      handleSubmit form = 
+          let json = Http.jsonBody (loginFormToJson form)
+           in apiSendRequest "" (Just json) (toMsg << LoginPageApiMsg) 
+                |> loginPageInApi
+
+      handleApiResponse : Maybe Session -> LoginPageState -> Update LoginPageState msg a
+      handleApiResponse maybeSession = 
+        loginPageUpdate { onAuthResponse = onAuthResponse } (LoginFormMsg (Form.Reset [])) toMsg
+          >> andThen (loginPageFormSetClosed False)
+          >> andInvokeHandler (onAuthResponse maybeSession)
+
+      eventHandlers = 
+        { onSuccess = handleApiResponse << Just
+        , onError   = handleApiResponse Nothing |> always 
+        }
+
+   in case msg of
+     LoginPageApiMsg apiMsg -> 
+       state
+         |> loginPageInApi (apiUpdate eventHandlers apiMsg (toMsg << LoginPageApiMsg))
+     LoginFormMsg formMsg ->
+       case ( formMsg, Form.getOutput state.form ) of
+         ( Form.Submit, Just form ) ->
+           state
+             |> loginPageFormSetClosed True
+             |> andThen (handleSubmit form)
+         _ ->
+           state.form
+             |> Form.update loginFormValidate formMsg
+             |> loginPageInsertAsFormIn state
 
 loginPageSubscriptions : LoginPageState -> (LoginPageMsg -> msg) -> Sub msg
 loginPageSubscriptions state toMsg = Sub.none
 
+loginPageFormView : Form () LoginForm -> Bool -> (Form.Msg -> msg) -> Html msg
+loginPageFormView form closed toMsg =
+
+  let username = form |> Form.getFieldAsString "username"
+      password = form |> Form.getFieldAsString "password"
+
+      inputField attributes field = input 
+        ( [ onFocus (Form.Focus field.path)
+          , onBlur (Form.Blur field.path)
+          , onInput (String >> Form.Input field.path Form.Text)
+          , value (Maybe.withDefault "" field.value)
+          ] ++ attributes ) []
+
+      errorMessage field = 
+        field.liveError 
+          |> Maybe.unpack (always "") errorToString
+
+   in
+
+      [ fieldset [ disabled closed ]
+        [ div [] [ inputField [] username ]
+        , div [] [ Html.text (errorMessage username) ]
+        , div [] [ inputField [ type_ "password" ] password ]
+        , div [] [ Html.text (errorMessage password) ]
+        , div []
+          [ button [ type_ "submit" ] [ text (if closed then "Please wait" else "Log in") ] 
+          ]
+        ]
+      ]
+
+    |> Html.form [ onSubmit Form.Submit ]
+    |> Html.map toMsg
+
 loginPageView : LoginPageState -> (LoginPageMsg -> msg) -> Html msg
-loginPageView state toMsg = 
-  div [] [ 
-    div [] [ input [] [] ]
-  , div [] [ input [] [] ]
-  ]
+loginPageView { form, closed } toMsg = 
+  div [] [ loginPageFormView form closed (toMsg << LoginFormMsg) ]
+
+--
+
+type alias RegisterForm =
+  { name : String
+  , email : String
+  , phoneNumber : String
+  , password : String
+  , passwordConfirmation : String 
+  , agreeWithTerms : Bool 
+  }
+
+validatePassword : Field -> Result (Error e) String
+validatePassword = 
+  validateStringNonEmpty
+    |> Validate.andThen (Validate.minLength 8)
+    |> field "password"
+
+validatePasswordConfirmation : Field -> Result (Error e) String
+validatePasswordConfirmation = 
+
+  let match password confirmation = 
+        if password == confirmation
+            then Validate.succeed confirmation
+            else Validate.fail (Form.Error.value InvalidBool)
+
+   in 
+       [ field "password" Validate.string
+       , field "password" Validate.emptyString 
+       ]
+         |> Validate.oneOf
+         |> Validate.andThen (\value -> 
+             validateStringNonEmpty
+               |> Validate.andThen (match value)
+               |> field "passwordConfirmation")
+
+validateAgreeWithTerms : Field -> Result (Error e) Bool
+validateAgreeWithTerms = 
+
+  let 
+      mustBeChecked checked =
+        if checked
+            then Validate.succeed True
+            else Validate.fail (Form.Error.value InvalidBool)
+   in
+      Validate.bool 
+        |> Validate.andThen mustBeChecked
+        |> field "agreeWithTerms" 
+
+validateEmail : Field -> Result (Error e) String
+validateEmail = 
+  Validate.sequence [ field "email" Validate.email, field "email" validateStringNonEmpty ]
+    |> Validate.map (Maybe.withDefault "" << List.head)
+
+registerFormValidate : Validation () RegisterForm
+registerFormValidate =
+  succeed RegisterForm
+    |> Validate.andMap (field "name" validateStringNonEmpty)
+    |> Validate.andMap validateEmail 
+    |> Validate.andMap (field "phoneNumber" validateStringNonEmpty)
+    |> Validate.andMap validatePassword
+    |> Validate.andMap validatePasswordConfirmation
+    |> Validate.andMap validateAgreeWithTerms
+
+registerFormToJson : RegisterForm -> Json.Value
+registerFormToJson { name, email, phoneNumber, password, agreeWithTerms } = 
+  object 
+    [ ( "name" , Json.Encode.string name )
+    , ( "email" , Json.Encode.string email )
+    , ( "phoneNumber" , Json.Encode.string phoneNumber )
+    , ( "password" , Json.Encode.string password )
+    , ( "agreeWithTerms" , Json.Encode.bool agreeWithTerms )
+    ]
 
 --
 
 type RegisterPageMsg 
-  = NoRegisterPageMsg
+  = RegisterFormMsg Form.Msg
 
 type alias RegisterPageState =
-  {}
+  { form : Form () RegisterForm 
+  , closed : Bool }
+
+registerPageInsertAsFormIn : RegisterPageState -> Form () RegisterForm -> Update RegisterPageState msg a
+registerPageInsertAsFormIn state form = save { state | form = form }
+
+registerPageCloseForm : RegisterPageState -> Update RegisterPageState msg a
+registerPageCloseForm state = save { state | closed = True }
 
 registerPageInit : (RegisterPageMsg -> msg) -> Update RegisterPageState msg a
 registerPageInit toMsg = 
-  save RegisterPageState
+  let fields = []
+   in save RegisterPageState
+    |> andMap (Form.initial fields registerFormValidate |> save)
+    |> andMap (save False)
     |> mapCmd toMsg
 
 registerPageUpdate : RegisterPageMsg -> RegisterPageState -> Update RegisterPageState msg a
-registerPageUpdate msg state = Debug.todo ""
+registerPageUpdate msg state = 
+  case msg of
+    RegisterFormMsg formMsg ->
+      case ( formMsg, Form.getOutput state.form ) of
+        ( Form.Submit, Just form ) ->
+          state
+            |> registerPageCloseForm
+        _ ->
+          state.form
+            |> Form.update registerFormValidate formMsg
+            |> registerPageInsertAsFormIn state
 
 registerPageSubscriptions : RegisterPageState -> (RegisterPageMsg -> msg) -> Sub msg
 registerPageSubscriptions state toMsg = Sub.none
 
+registerPageFormView : Form () RegisterForm -> Bool -> (Form.Msg -> msg) -> Html msg
+registerPageFormView form closed toMsg =
+
+  let 
+      name                 = form |> Form.getFieldAsString "name"
+      email                = form |> Form.getFieldAsString "email"
+      phoneNumber          = form |> Form.getFieldAsString "phoneNumber"
+      password             = form |> Form.getFieldAsString "password"
+      passwordConfirmation = form |> Form.getFieldAsString "passwordConfirmation"
+      agreeWithTerms       = form |> Form.getFieldAsBool   "agreeWithTerms"
+
+      inputField attributes field = input 
+        ( [ onFocus (Form.Focus field.path)
+          , onBlur (Form.Blur field.path)
+          , onInput (String >> Form.Input field.path Form.Text)
+          , value (Maybe.withDefault "" field.value)
+          ] ++ attributes ) []
+
+      errorMessage field = 
+        field.liveError 
+          |> Maybe.unpack (always "") errorToString
+
+   in
+
+      [ fieldset [ disabled closed ]
+        [ div [] [ inputField [] name ] 
+        , div [] [ Html.text (errorMessage name) ]
+        , div [] [ inputField [] email ]
+        , div [] [ Html.text (errorMessage email) ]
+        , div [] [ inputField [] phoneNumber ]
+        , div [] [ Html.text (errorMessage phoneNumber) ]
+        , div [] [ inputField [ type_ "password" ] password ]
+        , div [] [ Html.text (errorMessage password) ]
+        , div [] [ inputField [ type_ "password" ] passwordConfirmation ]
+        , div [] [ Html.text (errorMessage passwordConfirmation) ]
+        , div [] 
+          [ input 
+            [ type_ "checkbox"
+            , onFocus (Form.Focus agreeWithTerms.path)
+            , onBlur (Form.Blur agreeWithTerms.path)
+            , onCheck (Bool >> Form.Input agreeWithTerms.path Form.Checkbox)
+            , checked (Maybe.withDefault False agreeWithTerms.value)
+            ] 
+            []
+          ]
+        , div [] [ Html.text (agreeWithTerms.liveError |> Maybe.unpack (always "") errorToString) ]
+        , div []
+          [ button [ type_ "submit" ] [ text "Log in" ] 
+          ]
+        ]
+      ]
+
+    |> Html.form [ onSubmit Form.Submit ]
+    |> Html.map toMsg
+
 registerPageView : RegisterPageState -> (RegisterPageMsg -> msg) -> Html msg
-registerPageView state toMsg = 
-  div [] [ 
-    div [] [ input [] [] ]
-  , div [] [ input [] [] ]
-  , div [] [ input [] [] ]
-  , div [] [ input [] [] ]
-  ]
+registerPageView { form, closed } toMsg = 
+  div [] [ registerPageFormView form closed (toMsg << RegisterFormMsg) ]
 
 --
 
@@ -254,8 +635,9 @@ pageUpdate msg toMsg page =
       case msg of
         LoginPageMsg loginPageMsg ->
           loginPageState
-            |> loginPageUpdate loginPageMsg 
+            |> loginPageUpdate { onAuthResponse = always save } loginPageMsg (toMsg << LoginPageMsg)
             |> Update.Deep.map LoginPage 
+            |> foldEvents
         _ -> 
           save page
     RegisterPage registerPageState ->
@@ -309,8 +691,24 @@ pageView page toMsg =
 
 --
 
+type alias User =
+  { username : String
+  , name : String
+  , email : String 
+  }
+
 type alias Session =
-  {}
+  { user : User
+  }
+
+sessionDecoder : Json.Decoder Session
+sessionDecoder = 
+  let userDecoder = 
+        Json.map3 User
+          (Json.field "username" Json.string)
+          (Json.field "name" Json.string)
+          (Json.field "email" Json.string)
+   in Json.map Session (Json.field "user" userDecoder)
 
 --
 
@@ -365,26 +763,36 @@ handleRouteChange maybeRoute =
     Nothing ->
       loadPage (save NotFoundPage)
 
-    -- Authenticated
+    -- Authenticated only
     Just NewPost ->
-      loadPage (Update.Deep.map NewPostPage (newPostPageInit NewPostPageMsg))
+      newPostPageInit NewPostPageMsg
+        |> Update.Deep.map NewPostPage
+        |> loadPage 
         |> ifAuthenticated
 
-    -- Don't show if already authenticated
+    -- Redirect if already authenticated
     Just Login ->
-      loadPage (Update.Deep.map LoginPage (loginPageInit LoginPageMsg))
+      loginPageInit LoginPageMsg
+        |> Update.Deep.map LoginPage
+        |> loadPage 
         |> unlessAuthenticated
 
     Just Register ->
-      loadPage (Update.Deep.map RegisterPage (registerPageInit RegisterPageMsg))
+      registerPageInit RegisterPageMsg
+        |> Update.Deep.map RegisterPage
+        |> loadPage 
         |> unlessAuthenticated
 
     -- Other
     Just (Post id) ->
-      loadPage (Update.Deep.map ShowPostPage (showPostPageInit ShowPostPageMsg))
+      showPostPageInit ShowPostPageMsg
+        |> Update.Deep.map ShowPostPage 
+        |> loadPage 
 
     Just Home ->
-      loadPage (Update.Deep.map HomePage (homePageInit HomePageMsg))
+      homePageInit HomePageMsg
+        |> Update.Deep.map HomePage
+        |> loadPage 
 
     Just Logout ->
       save
@@ -407,7 +815,7 @@ subscriptions { router, page } =
     , pageSubscriptions page PageMsg ]
 
 view : State -> Document Msg
-view { page } = 
+view ({ page } as state) = 
   { title = ""
   , body =
     [ text "hello"
@@ -419,6 +827,7 @@ view { page } =
       , a [ href "/register" ] [ text "Register" ]
       , a [ href "/about" ] [ text "About" ]
       , a [ href "/posts/new" ] [ text "New post" ]
+      , Html.text (Debug.toString state)
       ]
     ] 
   }

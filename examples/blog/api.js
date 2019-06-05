@@ -6,8 +6,8 @@ var users =
     id: 1,
     name: 'Mr. Test',
     password: 'test',
-    email: 'test@test.com',
-    login: 'test'
+    username: 'test',
+    email: 'test@test.com'
   }
 ];
 
@@ -21,7 +21,7 @@ var posts =
   }
 ];
 
-var postsId = 1;
+var postId = 1;
 var delay = 300;
 
 xhook.before(function(request, callback) {
@@ -39,14 +39,14 @@ xhook.before(function(request, callback) {
     setTimeout(function() {
       var params = JSON.parse(request.body);
       var filtered = users.filter(function(user) {
-        return user.login === params.login && user.password === params.password;
+        return user.username === params.username && user.password === params.password;
       });
       if (filtered.length > 0) {
-        var response = filtered[0];
-        response.token = 'fake-jwt-token';
+        var user = filtered[0],
+            response = { session: { user: user } };
         callback({
           status: 200,
-          data: JSON.stringify({ user: response }),
+          data: JSON.stringify(response),
           headers: { 'Content-Type': 'application/json' }
         });
       } else {
@@ -70,7 +70,7 @@ xhook.before(function(request, callback) {
     } else if ('POST' === request.method) {
       setTimeout(function() {
         var post = JSON.parse(request.body);
-        post.id = ++postsId;
+        post.id = ++postId;
         post.comments = [];
         posts.push(post);
         callback({
