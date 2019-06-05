@@ -23,11 +23,6 @@ import Url.Parser as Parser exposing (Parser, parse, oneOf, (</>))
 
 --
 
--- custom errors
--- redirect after login
-
---
-
 type alias WebSocketUsernameAvailableResponsePayload =
   { username : String
   , available : Bool 
@@ -187,8 +182,8 @@ apiUpdate { onSuccess, onError } msg toMsg =
 
 --
 
-errorToString : ErrorValue a -> String
-errorToString error =
+errorToString : (a -> String) -> ErrorValue a -> String
+errorToString customErrorToString error =
   case error of
     Empty ->
       "This field is required"
@@ -219,7 +214,7 @@ errorToString error =
     NotIncludedIn ->
       "Error"
     CustomError e ->
-      Debug.toString e -- TODO
+      customErrorToString e
 
 --
 
@@ -361,11 +356,13 @@ newPostPageFormView : FormModel () NewPostForm -> (Form.Msg -> msg) -> Html msg
 newPostPageFormView { form, disabled } toMsg =
 
   let title = form |> Form.getFieldAsString "title"
-      body = form |> Form.getFieldAsString "body"
+      body  = form |> Form.getFieldAsString "body"
+
+      alwaysEmpty = always ""
 
       errorMessage field = 
         field.liveError 
-          |> Maybe.unpack (always "") errorToString
+          |> Maybe.unpack alwaysEmpty (errorToString alwaysEmpty)
 
    in
 
@@ -512,9 +509,11 @@ loginPageFormView { form, disabled } toMsg =
           , value (Maybe.withDefault "" field.value)
           ] ++ attributes ) []
 
+      alwaysEmpty = always ""
+
       errorMessage field = 
         field.liveError 
-          |> Maybe.unpack (always "") errorToString
+          |> Maybe.unpack alwaysEmpty (errorToString alwaysEmpty)
 
    in
 
@@ -537,6 +536,18 @@ loginPageView { formModel } toMsg =
   div [] [ loginPageFormView formModel (toMsg << LoginFormMsg) ]
 
 --
+
+type RegisterFormError
+  = PasswordConfirmationMismatch
+  | MustAgreeWithTerms
+
+registerFormErrorToString : RegisterFormError -> String
+registerFormErrorToString error =
+  case error of
+    PasswordConfirmationMismatch ->
+      "Password confirmation doesn’t match password"
+    MustAgreeWithTerms ->
+      "You must agree with the terms of this service to complete the registration"
 
 type alias RegisterForm =
   { name : String
@@ -590,7 +601,7 @@ validateEmail =
   Validate.sequence [ field "email" Validate.email, field "email" validateStringNonEmpty ]
     |> Validate.map (Maybe.withDefault "" << List.head)
 
-registerFormValidate : Validation () RegisterForm
+registerFormValidate : Validation RegisterFormError RegisterForm
 registerFormValidate =
   succeed RegisterForm
     |> Validate.andMap (field "name" validateStringNonEmpty)
@@ -626,7 +637,7 @@ type UsernameStatus
 
 type alias RegisterPageState =
   { api : ApiModel User 
-  , formModel : FormModel () RegisterForm 
+  , formModel : FormModel RegisterFormError RegisterForm 
   , usernames : Dict String Bool 
   , usernameStatus : UsernameStatus
   }
@@ -638,7 +649,7 @@ registerPageInApi : In RegisterPageState (ApiModel User) msg a
 registerPageInApi =
     inState { get = .api, set = \state api -> { state | api = api } }
 
-registerPageInForm : In RegisterPageState (FormModel () RegisterForm) msg a
+registerPageInForm : In RegisterPageState (FormModel RegisterFormError RegisterForm) msg a
 registerPageInForm =
     inState { get = .formModel, set = \state form -> { state | formModel = form } }
 
@@ -725,7 +736,7 @@ registerPageUpdate msg toMsg state =
 registerPageSubscriptions : RegisterPageState -> (RegisterPageMsg -> msg) -> Sub msg
 registerPageSubscriptions state toMsg = Ports.websocketIn (toMsg << RegisterPageWebsocketMsg)
 
-registerPageFormView : FormModel () RegisterForm -> UsernameStatus -> (Form.Msg -> msg) -> Html msg
+registerPageFormView : FormModel RegisterFormError RegisterForm -> UsernameStatus -> (Form.Msg -> msg) -> Html msg
 registerPageFormView { form, disabled } usernameStatus toMsg =
 
   let 
@@ -746,7 +757,7 @@ registerPageFormView { form, disabled } usernameStatus toMsg =
 
       errorMessage field = 
         field.liveError 
-          |> Maybe.unpack (always "") errorToString
+          |> Maybe.unpack (always "") (errorToString registerFormErrorToString)
 
       usernameStatusText =
         case usernameStatus of
@@ -788,7 +799,7 @@ registerPageFormView { form, disabled } usernameStatus toMsg =
             ] 
             []
           ]
-        , div [] [ Html.text (agreeWithTerms.liveError |> Maybe.unpack (always "") errorToString) ]
+        , div [] [ Html.text (errorMessage agreeWithTerms) ]
         , div []
           [ button [ type_ "submit" ] [ text (if disabled then "Please wait" else "Submit") ] 
           ]
@@ -873,9 +884,6 @@ routerUpdate { onRouteChange } msg state =
     UrlRequest (Browser.External href) ->
       state
         |> addCmd (Navigation.load href)
-
-routerSubscriptions : RouterState -> (RouterMsg -> msg) -> Sub msg
-routerSubscriptions state toMsg = Sub.none
 
 --
 
@@ -1016,8 +1024,12 @@ type Msg
 type alias State =
   { session : Maybe Session 
   , router : RouterState
+  , rejectedRoute : Maybe Route
   , page   : Page
   }
+
+setRejectedRoute : Maybe Route -> State -> Update State msg a
+setRejectedRoute route state = save { state | rejectedRoute = route }
 
 setSession : Maybe Session -> State -> Update State msg a
 setSession session state = save { state | session = session }
@@ -1043,6 +1055,7 @@ init flags url key =
   save State
     |> andMap (initSession flags |> save)
     |> andMap (routerInit key RouterMsg)
+    |> andMap (save Nothing)
     |> andMap (save NotFoundPage)
     |> andThen (update (RouterMsg (UrlChange url)))
 
@@ -1051,8 +1064,14 @@ redirect = inRouter << routerRedirect
 
 ifAuthenticated : (State -> Update State msg a) -> State -> Update State msg a
 ifAuthenticated gotoPage ({ session } as state) =
-  state 
-    |> if Nothing == session then redirect "/login" else gotoPage
+  if Nothing == session 
+      then 
+        state
+          |> setRejectedRoute state.router.route
+          |> andThen (redirect "/login")
+      else 
+        state
+          |> gotoPage
 
 unlessAuthenticated : (State -> Update State msg a) -> State -> Update State msg a
 unlessAuthenticated gotoPage ({ session } as state) =
@@ -1060,7 +1079,13 @@ unlessAuthenticated gotoPage ({ session } as state) =
     |> if Nothing /= session then redirect "/" else gotoPage
 
 loadPage : Update Page msg (State -> Update State msg a) -> State -> Update State msg a
-loadPage = inPage << always
+loadPage update_ state = 
+  let 
+      isLoginRoute = always (Just Login == state.router.route)
+   in 
+      state
+        |> inPage (always update_)
+        |> andThenIf (not << isLoginRoute) (setRejectedRoute Nothing)
 
 handleRouteChange : Maybe Route -> State -> Update State PageMsg a
 handleRouteChange maybeRoute =
@@ -1117,11 +1142,25 @@ updateSessionStorage maybeSession =
     Just session ->
       addCmd (Ports.setSession session)
 
+returnToRejectedRoute : State -> Update State Msg a
+returnToRejectedRoute ({ rejectedRoute } as state) =
+  case rejectedRoute of
+    Nothing ->
+      state
+        |> redirect "/"
+    _ ->
+      state
+        |> inRouter (setRoute rejectedRoute)
+        |> andThen (mapCmd PageMsg << handleRouteChange rejectedRoute)
+
 handleAuthResponse : Maybe Session -> State -> Update State Msg a
 handleAuthResponse maybeSession = 
-  setSession maybeSession
-    >> andThen (updateSessionStorage maybeSession)
-    >> andThenIf (Maybe.isJust maybeSession |> always) (redirect "/")
+  let 
+      authenticated = always (Maybe.isJust maybeSession)
+   in 
+      setSession maybeSession
+        >> andThen (updateSessionStorage maybeSession)
+        >> andThenIf authenticated returnToRejectedRoute
 
 update : Msg -> State -> Update State Msg a
 update msg =
@@ -1132,10 +1171,7 @@ update msg =
       inPage (pageUpdate { onAuthResponse = handleAuthResponse, onPostAdded = always (redirect "/") } pageMsg PageMsg)
 
 subscriptions : State -> Sub Msg
-subscriptions { router, page } = 
-  Sub.batch 
-    [ routerSubscriptions router RouterMsg 
-    , pageSubscriptions page PageMsg ]
+subscriptions { page } = pageSubscriptions page PageMsg
 
 view : State -> Document Msg
 view ({ page } as state) = 
