@@ -306,21 +306,21 @@ newPostPageInit toMsg =
         |> andMap form
         |> mapCmd toMsg
 
-newPostPageUpdate : NewPostPageMsg -> (NewPostPageMsg -> msg) -> NewPostPageState -> Update NewPostPageState msg a
-newPostPageUpdate msg toMsg state = 
+newPostPageUpdate : { onPostAdded : Post -> a } -> NewPostPageMsg -> (NewPostPageMsg -> msg) -> NewPostPageState -> Update NewPostPageState msg a
+newPostPageUpdate { onPostAdded } msg toMsg state = 
 
   let
       handleSubmit form = 
-          let json = form |> loginFormToJson |> Http.jsonBody 
+          let json = form |> newPostFormToJson |> Http.jsonBody 
            in newPostPageInApi (apiSendRequest "" (Just json) (toMsg << NewPostPageApiMsg))
    in
       case msg of
         NewPostPageApiMsg apiMsg ->
            state
-             |> newPostPageInApi (apiUpdate { onSuccess = always save, onError = always save } apiMsg (toMsg << NewPostPageApiMsg))
+             |> newPostPageInApi (apiUpdate { onSuccess = invokeHandler << onPostAdded, onError = always save } apiMsg (toMsg << NewPostPageApiMsg))
         NewPostFormMsg formMsg ->
           state
-            |> newPostPageInForm (formUpdate { onSubmit = always save } formMsg)
+            |> newPostPageInForm (formUpdate { onSubmit = handleSubmit } formMsg)
 
 newPostPageSubscriptions : NewPostPageState -> (NewPostPageMsg -> msg) -> Sub msg
 newPostPageSubscriptions state toMsg = Sub.none
@@ -509,6 +509,7 @@ loginPageView { form } toMsg =
 type alias RegisterForm =
   { name : String
   , email : String
+  , username: String
   , phoneNumber : String
   , password : String
   , passwordConfirmation : String 
@@ -562,16 +563,18 @@ registerFormValidate =
   succeed RegisterForm
     |> Validate.andMap (field "name" validateStringNonEmpty)
     |> Validate.andMap validateEmail 
+    |> Validate.andMap (field "username" validateStringNonEmpty)
     |> Validate.andMap (field "phoneNumber" validateStringNonEmpty)
     |> Validate.andMap validatePassword
     |> Validate.andMap validatePasswordConfirmation
     |> Validate.andMap validateAgreeWithTerms
 
 registerFormToJson : RegisterForm -> Json.Value
-registerFormToJson { name, email, phoneNumber, password, agreeWithTerms } = 
+registerFormToJson { name, email, username, phoneNumber, password, agreeWithTerms } = 
   object 
     [ ( "name" , Json.Encode.string name )
     , ( "email" , Json.Encode.string email )
+    , ( "username" , Json.Encode.string username )
     , ( "phoneNumber" , Json.Encode.string phoneNumber )
     , ( "password" , Json.Encode.string password )
     , ( "agreeWithTerms" , Json.Encode.bool agreeWithTerms )
@@ -580,10 +583,16 @@ registerFormToJson { name, email, phoneNumber, password, agreeWithTerms } =
 --
 
 type RegisterPageMsg 
-  = RegisterFormMsg Form.Msg
+  = RegisterPageApiMsg (ApiMsg User)
+  | RegisterFormMsg Form.Msg
 
 type alias RegisterPageState =
-  { form : FormModel () RegisterForm }
+  { api : ApiModel User 
+  , form : FormModel () RegisterForm }
+
+registerPageInApi : In RegisterPageState (ApiModel User) msg a
+registerPageInApi =
+    inState { get = .api, set = \state api -> { state | api = api } }
 
 registerPageInForm : In RegisterPageState (FormModel () RegisterForm) msg a
 registerPageInForm =
@@ -591,17 +600,35 @@ registerPageInForm =
 
 registerPageInit : (RegisterPageMsg -> msg) -> Update RegisterPageState msg a
 registerPageInit toMsg = 
-  let form = formInit [] registerFormValidate
-   in save RegisterPageState
-    |> andMap form
-    |> mapCmd toMsg
+  let 
+      api = apiInit { endpoint = "/auth/register"
+                    , method   = HttpPost
+                    , decoder  = Json.field "user" userDecoder }
 
-registerPageUpdate : RegisterPageMsg -> RegisterPageState -> Update RegisterPageState msg a
-registerPageUpdate msg state = 
-  case msg of
-    RegisterFormMsg formMsg ->
-     state
-       |> registerPageInForm (formUpdate { onSubmit = always save } formMsg)
+      form = formInit [] registerFormValidate
+
+   in 
+      save RegisterPageState
+        |> andMap api
+        |> andMap form
+        |> mapCmd toMsg
+
+registerPageUpdate : RegisterPageMsg -> (RegisterPageMsg -> msg) -> RegisterPageState -> Update RegisterPageState msg a
+registerPageUpdate msg toMsg state = 
+
+  let
+      handleSubmit form = 
+          let json = form |> registerFormToJson |> Http.jsonBody 
+           in registerPageInApi (apiSendRequest "" (Just json) (toMsg << RegisterPageApiMsg))
+ 
+   in 
+      case msg of
+        RegisterPageApiMsg apiMsg ->
+          state
+            |> registerPageInApi (apiUpdate { onSuccess = always save, onError = always save } apiMsg (toMsg << RegisterPageApiMsg))
+        RegisterFormMsg formMsg ->
+          state
+            |> registerPageInForm (formUpdate { onSubmit = handleSubmit } formMsg)
 
 registerPageSubscriptions : RegisterPageState -> (RegisterPageMsg -> msg) -> Sub msg
 registerPageSubscriptions state toMsg = Sub.none
@@ -612,6 +639,7 @@ registerPageFormView { form, disabled } toMsg =
   let 
       name                 = form |> Form.getFieldAsString "name"
       email                = form |> Form.getFieldAsString "email"
+      username             = form |> Form.getFieldAsString "username"
       phoneNumber          = form |> Form.getFieldAsString "phoneNumber"
       password             = form |> Form.getFieldAsString "password"
       passwordConfirmation = form |> Form.getFieldAsString "passwordConfirmation"
@@ -635,6 +663,8 @@ registerPageFormView { form, disabled } toMsg =
         , div [] [ Html.text (errorMessage name) ]
         , div [] [ inputField [] email ]
         , div [] [ Html.text (errorMessage email) ]
+        , div [] [ inputField [] username ]
+        , div [] [ Html.text (errorMessage username) ]
         , div [] [ inputField [] phoneNumber ]
         , div [] [ Html.text (errorMessage phoneNumber) ]
         , div [] [ inputField [ type_ "password" ] password ]
@@ -662,8 +692,14 @@ registerPageFormView { form, disabled } toMsg =
     |> Html.map toMsg
 
 registerPageView : RegisterPageState -> (RegisterPageMsg -> msg) -> Html msg
-registerPageView { form } toMsg = 
-  div [] [ registerPageFormView form (toMsg << RegisterFormMsg) ]
+registerPageView { api, form } toMsg = 
+  case api.resource of
+    Available response ->
+      div [] [ text "Thanks!" ]
+    Error error ->
+      div [] [ text "error" ]
+    _ ->
+      div [] [ registerPageFormView form (toMsg << RegisterFormMsg) ]
 
 --
 
@@ -752,8 +788,8 @@ type Page
   | AboutPage
   | NotFoundPage
 
-pageUpdate : { onAuthResponse : Maybe Session -> a } -> PageMsg -> (PageMsg -> msg) -> Page -> Update Page msg a
-pageUpdate { onAuthResponse } msg toMsg page = 
+pageUpdate : { onAuthResponse : Maybe Session -> a, onPostAdded : Post -> a } -> PageMsg -> (PageMsg -> msg) -> Page -> Update Page msg a
+pageUpdate { onAuthResponse, onPostAdded } msg toMsg page = 
   case page of
     HomePage homePageState ->
       case msg of
@@ -767,7 +803,7 @@ pageUpdate { onAuthResponse } msg toMsg page =
       case msg of
         NewPostPageMsg newPostPageMsg ->
           newPostPageState
-            |> newPostPageUpdate newPostPageMsg (toMsg << NewPostPageMsg)
+            |> newPostPageUpdate { onPostAdded = onPostAdded } newPostPageMsg (toMsg << NewPostPageMsg)
             |> Update.Deep.map NewPostPage 
         _ ->
           save page
@@ -791,7 +827,7 @@ pageUpdate { onAuthResponse } msg toMsg page =
       case msg of
         RegisterPageMsg registerPageMsg ->
           registerPageState
-            |> registerPageUpdate registerPageMsg 
+            |> registerPageUpdate registerPageMsg (toMsg << RegisterPageMsg)
             |> Update.Deep.map RegisterPage 
         _ ->
           save page
@@ -839,23 +875,26 @@ pageView page toMsg =
 --
 
 type alias User =
-  { username : String
+  { id : Int
+  , username : String
   , name : String
   , email : String 
   }
+
+userDecoder : Json.Decoder User
+userDecoder = 
+  Json.map4 User
+    (Json.field "id" Json.int)
+    (Json.field "username" Json.string)
+    (Json.field "name" Json.string)
+    (Json.field "email" Json.string)
 
 type alias Session =
   { user : User
   }
 
 sessionDecoder : Json.Decoder Session
-sessionDecoder = 
-  let userDecoder = 
-        Json.map3 User
-          (Json.field "username" Json.string)
-          (Json.field "name" Json.string)
-          (Json.field "email" Json.string)
-   in Json.map Session (Json.field "user" userDecoder)
+sessionDecoder = Json.map Session (Json.field "user" userDecoder)
 
 --
 
@@ -982,7 +1021,7 @@ update msg =
     RouterMsg routerMsg ->
       inRouter (routerUpdate { onRouteChange = \route -> mapCmd PageMsg << handleRouteChange route } routerMsg)
     PageMsg pageMsg ->
-      inPage (pageUpdate { onAuthResponse = handleAuthResponse } pageMsg PageMsg)
+      inPage (pageUpdate { onAuthResponse = handleAuthResponse, onPostAdded = always (redirect "/") } pageMsg PageMsg)
 
 subscriptions : State -> Sub Msg
 subscriptions { router, page } = 

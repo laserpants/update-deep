@@ -21,6 +21,7 @@ var posts =
   }
 ];
 
+var userId = 1;
 var postId = 1;
 var delay = 300;
 
@@ -28,17 +29,27 @@ xhook.before(function(request, callback) {
 
   if (request.url.endsWith('auth/register') && 'POST' === request.method) {
     setTimeout(function() {
+      var params = JSON.parse(request.body);
+      params.id = ++userId;
+      users.push(params);
+      var user = {
+        id: params.id,
+        name: params.name,
+        username: params.username,
+        email: params.email,
+        phoneNumber: params.phoneNumber
+      };
       callback({
         status: 200,
-        data: JSON.stringify({ status: 'success' }),
+        data: JSON.stringify({ status: 'success', user: user }),
         headers: { 'Content-Type': 'application/json' }
       });
     }, delay);
   }
   else if (request.url.endsWith('auth/login') && 'POST' === request.method) {
     setTimeout(function() {
-      var params = JSON.parse(request.body);
-      var filtered = users.filter(function(user) {
+      var params = JSON.parse(request.body),
+          filtered = users.filter(function(user) {
         return user.username === params.username && user.password === params.password;
       });
       if (filtered.length > 0) {
@@ -78,13 +89,12 @@ xhook.before(function(request, callback) {
           data: JSON.stringify({ post: post }),
           headers: { 'Content-Type': 'application/json' }
         });
-        //console.log(posts);
       }, delay);
     }
   } else if (/posts\/\d+$/.test(request.url) && 'GET' === request.method) {
     setTimeout(function() {
-      var id = request.url.match(/posts\/(\d+)$/)[1];
-      var filtered = posts.filter(function(post) { return post.id == id; });
+      var id = request.url.match(/posts\/(\d+)$/)[1],
+          filtered = posts.filter(function(post) { return post.id == id; });
       if (filtered.length > 0) {
         var response = filtered[0];
         callback({
@@ -106,9 +116,7 @@ xhook.before(function(request, callback) {
     callback();
 
   } else {
-
     callback();
-
   }
 
 });

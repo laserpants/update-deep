@@ -1,7 +1,8 @@
 port module Ports exposing (..)
 
 type alias User =
-  { username : String
+  { id : Int
+  , username : String
   , name : String
   , email : String 
   }
