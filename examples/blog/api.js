@@ -120,7 +120,7 @@ xhook.before(function(request, callback) {
         var post = filtered[0];
         post.comments = post.comments || [];
         comment.id = ++commentId;
-        post.comments.push(comment);
+        post.comments.unshift(comment);
         callback({
           status: 200,
           data: JSON.stringify({ post: post, comment: comment }),
