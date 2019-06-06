@@ -23,6 +23,7 @@ var posts =
 
 var userId = 1;
 var postId = 1;
+var commentId = 0;
 var delay = 300;
 
 xhook.before(function(request, callback) {
@@ -111,10 +112,29 @@ xhook.before(function(request, callback) {
         });
       }
     }, delay);
-  } else if (/posts\/d+\/comments\/new$/.test(request.url) && 'POST' === request.method) {
-
-    callback();
-
+  } else if (/posts\/\d+\/comments$/.test(request.url) && 'POST' === request.method) {
+    setTimeout(function() {
+      var comment = JSON.parse(request.body);
+          filtered = posts.filter(function(post) { return post.id == comment.postId; });
+      if (filtered.length > 0) {
+        var post = filtered[0];
+        post.comments = post.comments || [];
+        comment.id = ++commentId;
+        post.comments.push(comment);
+        callback({
+          status: 200,
+          data: JSON.stringify({ post: post, comment: comment }),
+          headers: { 'Content-Type': 'application/json' }
+        });
+      } else {
+        console.log('Not Found');
+        callback({
+          status: 404,
+          data: JSON.stringify({ error: 'Not Found' }),
+          headers: { 'Content-Type': 'application/json' }
+        });
+      }
+    }, delay);
   } else {
     callback();
   }

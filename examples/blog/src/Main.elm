@@ -34,10 +34,11 @@ commentFormValidate =
     |> Validate.andMap (field "email" validateEmail)
     |> Validate.andMap (field "body" validateStringNonEmpty)
 
-commentFormToJson : CommentForm -> Json.Value
-commentFormToJson { email, body } = 
+commentFormToJson : Int -> CommentForm -> Json.Value
+commentFormToJson postId { email, body } = 
   object 
-    [ ( "email" , Json.Encode.string email )
+    [ ( "postId" , Json.Encode.int postId )
+    , ( "email" , Json.Encode.string email )
     , ( "body" , Json.Encode.string body )
     ]
 
@@ -69,17 +70,37 @@ websocketMessageDecoder =
 
 --
 
+type alias Comment =
+  { id : Int
+  , postId : Int
+  , email : String
+  , body : String
+  }
+
+commentDecoder : Json.Decoder Comment
+commentDecoder =
+  Json.map4 Comment
+    (Json.field "id"    Json.int)
+    (Json.field "postId" Json.int)
+    (Json.field "email" Json.string)
+    (Json.field "body"  Json.string)
+
+--
+
 type alias Post =
   { id    : Int
   , title : String
-  , body  : String }
+  , body  : String 
+  , comments : List Comment
+  }
 
 postDecoder : Json.Decoder Post
 postDecoder =
-  Json.map3 Post
+  Json.map4 Post
     (Json.field "id"    Json.int)
     (Json.field "title" Json.string)
     (Json.field "body"  Json.string)
+    (Json.field "comments" (Json.list commentDecoder))
 
 --
 
@@ -91,8 +112,8 @@ validateStringNonEmpty =
 
 validateEmail : Field -> Result (Error e) String
 validateEmail = 
-  Validate.sequence [ field "email" Validate.email, field "email" validateStringNonEmpty ]
-    |> Validate.map (Maybe.withDefault "" << List.head)
+  validateStringNonEmpty 
+    |> Validate.andThen (always Validate.email) 
 
 --
 
@@ -286,6 +307,7 @@ homePagePostsList { resource } =
         div [] 
           [ h3 [] [ text post.title ] 
           , p [] [ text post.body ] 
+          , p [] [ text (let count = List.length post.comments in if count > 0 then (String.fromInt count ++ " comment(s)") else "No comments") ] 
           , a [ href ("/posts/" ++ String.fromInt post.id) ] [ text "Show post" ]
           ]
 
@@ -303,9 +325,8 @@ homePagePostsList { resource } =
 homePageView : HomePageState -> (HomePageMsg -> msg) -> Html msg
 homePageView state toMsg = 
   div [] 
-    [ h2 [] [ text "x" ]
+    [ h2 [] [ text "Posts" ]
     , homePagePostsList state.posts
-    , button [ onClick (toMsg FetchPosts) ] [ text "fetch" ]
     ]
 
 --
@@ -370,8 +391,8 @@ newPostPageUpdate { onPostAdded } msg toMsg state =
    in
       case msg of
         NewPostPageApiMsg apiMsg ->
-           state
-             |> newPostPageInApi (apiUpdate { onSuccess = invokeHandler << onPostAdded, onError = always save } apiMsg (toMsg << NewPostPageApiMsg))
+          state
+            |> newPostPageInApi (apiUpdate { onSuccess = invokeHandler << onPostAdded, onError = always save } apiMsg (toMsg << NewPostPageApiMsg))
         NewPostFormMsg formMsg ->
           state
             |> newPostPageInForm (formUpdate { onSubmit = handleSubmit } formMsg)
@@ -429,15 +450,27 @@ newPostPageView { formModel } toMsg =
 
 type ShowPostPageMsg 
   = ShowPostPageApiMsg (ApiMsg Post)
+  | ShowPostPageCommentApiMsg (ApiMsg Comment)
   | FetchPost
+  | ShowPostPageCommentFormMsg Form.Msg
 
 type alias ShowPostPageState =
   { id : Int
-  , post : ApiModel Post }
+  , post : ApiModel Post 
+  , comment : ApiModel Comment
+  , commentForm : FormModel () CommentForm }
 
 showPostPageInApi : In ShowPostPageState (ApiModel Post) msg a
 showPostPageInApi =
     inState { get = .post, set = \state post -> { state | post = post } }
+
+showPostPageInCommentApi : In ShowPostPageState (ApiModel Comment) msg a
+showPostPageInCommentApi =
+    inState { get = .comment, set = \state comment -> { state | comment = comment } }
+
+showPostPageInCommentForm : In ShowPostPageState (FormModel () CommentForm) msg a
+showPostPageInCommentForm =
+    inState { get = .commentForm, set = \state form -> { state | commentForm = form } }
 
 showPostPageInit : Int -> (ShowPostPageMsg -> msg) -> Update ShowPostPageState msg a
 showPostPageInit id toMsg = 
@@ -447,39 +480,128 @@ showPostPageInit id toMsg =
                      , method   = HttpGet
                      , decoder  = Json.field "post" postDecoder }
 
+      comment = apiInit { endpoint = "/posts/" ++ String.fromInt id ++ "/comments"
+                        , method   = HttpPost
+                        , decoder  = Json.field "comment" commentDecoder }
+
+      form = formInit [] commentFormValidate
    in 
       save ShowPostPageState
         |> andMap (save id)
         |> andMap post
+        |> andMap comment
+        |> andMap form
         |> mapCmd toMsg
 
 showPostPageUpdate : ShowPostPageMsg -> (ShowPostPageMsg -> msg) -> ShowPostPageState -> Update ShowPostPageState msg a
 showPostPageUpdate msg toMsg state = 
-  case msg of
-    ShowPostPageApiMsg apiMsg ->
-      state
-        |> showPostPageInApi (apiUpdate { onSuccess = always save, onError = always save } apiMsg (toMsg << ShowPostPageApiMsg))
-    FetchPost ->
-      state
-        |> showPostPageInApi (apiSendRequest "" Nothing (toMsg << ShowPostPageApiMsg))
+
+  let 
+      handleSubmit form = 
+          let json = form |> commentFormToJson state.id |> Http.jsonBody 
+           in showPostPageInCommentApi (apiSendRequest "" (Just json) (toMsg << ShowPostPageCommentApiMsg))
+
+      commentCreated comment = 
+        showPostPageInCommentForm (formReset [])
+          >> andThen (showPostPageUpdate FetchPost toMsg)
+   in 
+      case msg of
+        ShowPostPageApiMsg apiMsg ->
+          state
+            |> showPostPageInApi (apiUpdate { onSuccess = always save, onError = always save } apiMsg (toMsg << ShowPostPageApiMsg))
+        FetchPost ->
+          state
+            |> showPostPageInApi (apiSendRequest "" Nothing (toMsg << ShowPostPageApiMsg))
+        ShowPostPageCommentFormMsg formMsg ->
+          state
+            |> showPostPageInCommentForm (formUpdate { onSubmit = handleSubmit } formMsg)
+        ShowPostPageCommentApiMsg apiMsg ->
+          state
+            |> showPostPageInCommentApi (apiUpdate { onSuccess = commentCreated, onError = always save } apiMsg (toMsg << ShowPostPageCommentApiMsg))
 
 showPostPageSubscriptions : ShowPostPageState -> (ShowPostPageMsg -> msg) -> Sub msg
 showPostPageSubscriptions state toMsg = Sub.none
 
+newPostPageCommentFormView : FormModel () CommentForm -> (Form.Msg -> msg) -> Html msg
+newPostPageCommentFormView { form, disabled } toMsg =
+
+  let email = form |> Form.getFieldAsString "email"
+      body  = form |> Form.getFieldAsString "body"
+
+      alwaysEmpty = always ""
+
+      errorMessage field = 
+        field.liveError 
+          |> Maybe.unpack alwaysEmpty (errorToString alwaysEmpty)
+
+   in
+
+      [ fieldset [ Html.Attributes.disabled disabled ]
+        [ div [] 
+          [ input 
+            [ onFocus (Form.Focus email.path)
+            , onBlur (Form.Blur email.path)
+            , onInput (String >> Form.Input email.path Form.Text)
+            , value (Maybe.withDefault "" email.value)  
+            ] [] 
+          ]
+        , div [] [ Html.text (errorMessage email) ]
+        , div [] 
+          [ textarea 
+            [ onFocus (Form.Focus body.path)
+            , onBlur (Form.Blur body.path)
+            , onInput (String >> Form.Input body.path Form.Text)
+            , value (Maybe.withDefault "" body.value) 
+            ] []
+          ]
+        , div [] [ Html.text (errorMessage body) ]
+        , div []
+          [ button [ type_ "submit" ] [ text (if disabled then "Please wait" else "Send comment") ] 
+          ]
+        ]
+      ]
+
+    |> Html.form [ onSubmit Form.Submit ]
+    |> Html.map toMsg
+
+showPostPageCommentsView : List Comment -> (ShowPostPageMsg -> msg) -> Html msg
+showPostPageCommentsView comments toMsg =
+  let
+      commentItem comment =
+        div [] 
+          [ div [] [ text comment.email ]
+          , div [] [ p [] [ text comment.body ] ]
+          , hr [] [] 
+          ]
+   in
+      if List.isEmpty comments
+          then 
+            p [] [ text "No comments" ]
+          else
+            div [] (List.map commentItem comments)
+
 showPostPageView : ShowPostPageState -> (ShowPostPageMsg -> msg) -> Html msg
-showPostPageView { post } toMsg = 
-   case post.resource of
-     NotRequested ->
-       div [] []
-     Requested ->
-       div [] [ text "Loading" ]
-     Error error ->
-       div [] [ text "error" ]
-     Available post_ ->
-       div [] 
-         [ h2 [] [ text post_.title ]
-         , p [] [ text post_.body ]
-         ]
+showPostPageView { post, commentForm } toMsg = 
+  if Requested == post.resource || commentForm.disabled
+      then
+        div [] [ text "Loading..." ]
+      else
+       case post.resource of
+         NotRequested ->
+           div [] []
+         Requested ->
+           div [] [ text "Loading" ]
+         Error error ->
+           div [] [ text "error" ]
+         Available post_ ->
+           div [] 
+             [ h2 [] [ text post_.title ]
+             , p [] [ text post_.body ]
+             , h4 [] [ text "Comments" ]
+             , showPostPageCommentsView post_.comments toMsg
+             , h4 [] [ text "Post a comment" ]
+             , newPostPageCommentFormView commentForm (toMsg << ShowPostPageCommentFormMsg)
+             ]
 
 --
 
@@ -623,15 +745,14 @@ validatePassword : Field -> Result (Error e) String
 validatePassword = 
   validateStringNonEmpty
     |> Validate.andThen (Validate.minLength 8)
-    |> field "password"
 
-validatePasswordConfirmation : Field -> Result (Error e) String
+validatePasswordConfirmation : Field -> Result (Error RegisterFormError) String
 validatePasswordConfirmation = 
 
   let match password confirmation = 
         if password == confirmation
             then Validate.succeed confirmation
-            else Validate.fail (Form.Error.value InvalidBool)
+            else Validate.fail (Validate.customError PasswordConfirmationMismatch)
 
    in 
        [ field "password" Validate.string
@@ -643,14 +764,14 @@ validatePasswordConfirmation =
                |> Validate.andThen (match value)
                |> field "passwordConfirmation")
 
-validateAgreeWithTerms : Field -> Result (Error e) Bool
+validateAgreeWithTerms : Field -> Result (Error RegisterFormError) Bool
 validateAgreeWithTerms = 
 
   let 
       mustBeChecked checked =
         if checked
             then Validate.succeed True
-            else Validate.fail (Form.Error.value InvalidBool)
+            else Validate.fail (Validate.customError MustAgreeWithTerms)
    in
       Validate.bool 
         |> Validate.andThen mustBeChecked
@@ -660,10 +781,10 @@ registerFormValidate : Validation RegisterFormError RegisterForm
 registerFormValidate =
   succeed RegisterForm
     |> Validate.andMap (field "name" validateStringNonEmpty)
-    |> Validate.andMap validateEmail 
+    |> Validate.andMap (field "email" validateEmail)
     |> Validate.andMap (field "username" validateStringNonEmpty)
     |> Validate.andMap (field "phoneNumber" validateStringNonEmpty)
-    |> Validate.andMap validatePassword
+    |> Validate.andMap (field "password" validatePassword)
     |> Validate.andMap validatePasswordConfirmation
     |> Validate.andMap validateAgreeWithTerms
 
@@ -1081,12 +1202,12 @@ type Msg
 type alias State =
   { session : Maybe Session 
   , router : RouterState Route
-  , rejectedRoute : Maybe Route
+  , restrictedRoute : Maybe Route
   , page : Page
   }
 
-setRejectedRoute : Maybe Route -> State -> Update State msg a
-setRejectedRoute route state = save { state | rejectedRoute = route }
+setRestrictedRoute : Maybe Route -> State -> Update State msg a
+setRestrictedRoute route state = save { state | restrictedRoute = route }
 
 setSession : Maybe Session -> State -> Update State msg a
 setSession session state = save { state | session = session }
@@ -1124,7 +1245,7 @@ ifAuthenticated gotoPage ({ session } as state) =
   if Nothing == session 
       then 
         state
-          |> setRejectedRoute state.router.route
+          |> setRestrictedRoute state.router.route
           |> andThen (redirect "/login")
       else 
         state
@@ -1142,7 +1263,7 @@ loadPage update_ state =
    in 
       state
         |> inPage (always update_)
-        |> andThenIf (not << isLoginRoute) (setRejectedRoute Nothing)
+        |> andThenIf (not << isLoginRoute) (setRestrictedRoute Nothing)
 
 handleRouteChange : Maybe Route -> State -> Update State PageMsg a
 handleRouteChange maybeRoute =
@@ -1200,16 +1321,16 @@ updateSessionStorage maybeSession =
     Just session ->
       addCmd (Ports.setSession session)
 
-returnToRejectedRoute : State -> Update State Msg a
-returnToRejectedRoute ({ rejectedRoute } as state) =
-  case rejectedRoute of
+returnToRestrictedRoute : State -> Update State Msg a
+returnToRestrictedRoute ({ restrictedRoute } as state) =
+  case restrictedRoute of
     Nothing ->
       state
         |> redirect "/"
     _ ->
       state
-        |> inRouter (setRoute rejectedRoute)
-        |> andThen (mapCmd PageMsg << handleRouteChange rejectedRoute)
+        |> inRouter (setRoute restrictedRoute)
+        |> andThen (mapCmd PageMsg << handleRouteChange restrictedRoute)
 
 handleAuthResponse : Maybe Session -> State -> Update State Msg a
 handleAuthResponse maybeSession = 
@@ -1218,7 +1339,7 @@ handleAuthResponse maybeSession =
    in 
       setSession maybeSession
         >> andThen (updateSessionStorage maybeSession)
-        >> andThenIf authenticated returnToRejectedRoute
+        >> andThenIf authenticated returnToRestrictedRoute
 
 update : Msg -> State -> Update State Msg a
 update msg =
