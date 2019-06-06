@@ -851,30 +851,32 @@ type RouterMsg
  = UrlChange Url
  | UrlRequest UrlRequest
 
-type alias RouterState =
- { route : Maybe Route
+type alias RouterState route =
+ { route : Maybe route
  , key   : Navigation.Key
+ , fromUrl : Url -> Maybe route
  }
 
-setRoute : Maybe Route -> RouterState -> Update RouterState msg a
+setRoute : Maybe route -> RouterState route -> Update (RouterState route) msg a
 setRoute route state = save { state | route = route }
 
-routerInit : Navigation.Key -> (RouterMsg -> msg) -> Update RouterState msg a
-routerInit key toMsg = 
+routerInit : (Url -> Maybe route) -> Navigation.Key -> (RouterMsg -> msg) -> Update (RouterState route) msg a
+routerInit fromUrl_ key toMsg = 
   save RouterState
     |> andMap (save Nothing)
     |> andMap (save key)
+    |> andMap (save fromUrl_)
 
-routerRedirect : String -> RouterState -> Update RouterState msg a
+routerRedirect : String -> RouterState route -> Update (RouterState route) msg a
 routerRedirect href state = 
   state
     |> addCmd (Navigation.replaceUrl state.key href)
 
-routerUpdate : { onRouteChange : Maybe Route -> a } -> RouterMsg -> RouterState -> Update RouterState msg a
+routerUpdate : { onRouteChange : Maybe route -> a } -> RouterMsg -> RouterState route -> Update (RouterState route) msg a
 routerUpdate { onRouteChange } msg state = 
   case msg of
     UrlChange url ->
-      let route = fromUrl url
+      let route = state.fromUrl url
        in state
         |> setRoute route
         |> andInvokeHandler (onRouteChange route)
@@ -1023,7 +1025,7 @@ type Msg
 
 type alias State =
   { session : Maybe Session 
-  , router : RouterState
+  , router : RouterState Route
   , rejectedRoute : Maybe Route
   , page   : Page
   }
@@ -1034,7 +1036,7 @@ setRejectedRoute route state = save { state | rejectedRoute = route }
 setSession : Maybe Session -> State -> Update State msg a
 setSession session state = save { state | session = session }
 
-inRouter : In State RouterState msg a
+inRouter : In State (RouterState Route) msg a
 inRouter =
     inState { get = .router, set = \state router -> { state | router = router } }
 
@@ -1054,7 +1056,7 @@ init : Flags -> Url -> Navigation.Key -> Update State Msg a
 init flags url key = 
   save State
     |> andMap (initSession flags |> save)
-    |> andMap (routerInit key RouterMsg)
+    |> andMap (routerInit fromUrl key RouterMsg)
     |> andMap (save Nothing)
     |> andMap (save NotFoundPage)
     |> andThen (update (RouterMsg (UrlChange url)))
