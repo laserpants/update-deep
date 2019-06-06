@@ -755,17 +755,16 @@ validatePasswordConfirmation =
             else Validate.fail (Validate.customError PasswordConfirmationMismatch)
 
    in 
-       [ field "password" Validate.string
-       , field "password" Validate.emptyString 
-       ]
+       [ Validate.string, Validate.emptyString ]
          |> Validate.oneOf
+         |> field "password"
          |> Validate.andThen (\value -> 
-             validateStringNonEmpty
-               |> Validate.andThen (match value)
-               |> field "passwordConfirmation")
+              validateStringNonEmpty
+                |> Validate.andThen (match value)
+                |> field "passwordConfirmation")
 
-validateAgreeWithTerms : Field -> Result (Error RegisterFormError) Bool
-validateAgreeWithTerms = 
+validateChecked : Field -> Result (Error RegisterFormError) Bool
+validateChecked = 
 
   let 
       mustBeChecked checked =
@@ -775,7 +774,6 @@ validateAgreeWithTerms =
    in
       Validate.bool 
         |> Validate.andThen mustBeChecked
-        |> field "agreeWithTerms" 
 
 registerFormValidate : Validation RegisterFormError RegisterForm
 registerFormValidate =
@@ -786,7 +784,7 @@ registerFormValidate =
     |> Validate.andMap (field "phoneNumber" validateStringNonEmpty)
     |> Validate.andMap (field "password" validatePassword)
     |> Validate.andMap validatePasswordConfirmation
-    |> Validate.andMap validateAgreeWithTerms
+    |> Validate.andMap (field "agreeWithTerms" validateChecked)
 
 registerFormToJson : RegisterForm -> Json.Value
 registerFormToJson { name, email, username, phoneNumber, password, agreeWithTerms } = 
