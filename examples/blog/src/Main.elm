@@ -28,7 +28,7 @@ type alias CommentForm =
   , body : String 
   }
 
-commentFormValidate : Validation () CommentForm
+commentFormValidate : Validation Never CommentForm
 commentFormValidate =
   succeed CommentForm
     |> Validate.andMap (field "email" validateEmail)
@@ -336,7 +336,7 @@ type alias NewPostForm =
   , body : String 
   }
 
-newPostFormValidate : Validation () NewPostForm
+newPostFormValidate : Validation Never NewPostForm
 newPostFormValidate =
   succeed NewPostForm
     |> Validate.andMap (field "title" validateStringNonEmpty)
@@ -357,13 +357,13 @@ type NewPostPageMsg
 
 type alias NewPostPageState =
   { api : ApiModel Post
-  , formModel : FormModel () NewPostForm }
+  , formModel : FormModel Never NewPostForm }
 
 newPostPageInApi : In NewPostPageState (ApiModel Post) msg a
 newPostPageInApi =
     inState { get = .api, set = \state api -> { state | api = api } }
 
-newPostPageInForm : In NewPostPageState (FormModel () NewPostForm) msg a
+newPostPageInForm : In NewPostPageState (FormModel Never NewPostForm) msg a
 newPostPageInForm =
     inState { get = .formModel, set = \state form -> { state | formModel = form } }
 
@@ -400,7 +400,7 @@ newPostPageUpdate { onPostAdded } msg toMsg state =
 newPostPageSubscriptions : NewPostPageState -> (NewPostPageMsg -> msg) -> Sub msg
 newPostPageSubscriptions state toMsg = Sub.none
 
-newPostPageFormView : FormModel () NewPostForm -> (Form.Msg -> msg) -> Html msg
+newPostPageFormView : FormModel Never NewPostForm -> (Form.Msg -> msg) -> Html msg
 newPostPageFormView { form, disabled } toMsg =
 
   let title = form |> Form.getFieldAsString "title"
@@ -458,7 +458,7 @@ type alias ShowPostPageState =
   { id : Int
   , post : ApiModel Post 
   , comment : ApiModel Comment
-  , commentForm : FormModel () CommentForm }
+  , commentForm : FormModel Never CommentForm }
 
 showPostPageInApi : In ShowPostPageState (ApiModel Post) msg a
 showPostPageInApi =
@@ -468,7 +468,7 @@ showPostPageInCommentApi : In ShowPostPageState (ApiModel Comment) msg a
 showPostPageInCommentApi =
     inState { get = .comment, set = \state comment -> { state | comment = comment } }
 
-showPostPageInCommentForm : In ShowPostPageState (FormModel () CommentForm) msg a
+showPostPageInCommentForm : In ShowPostPageState (FormModel Never CommentForm) msg a
 showPostPageInCommentForm =
     inState { get = .commentForm, set = \state form -> { state | commentForm = form } }
 
@@ -522,7 +522,7 @@ showPostPageUpdate msg toMsg state =
 showPostPageSubscriptions : ShowPostPageState -> (ShowPostPageMsg -> msg) -> Sub msg
 showPostPageSubscriptions state toMsg = Sub.none
 
-newPostPageCommentFormView : FormModel () CommentForm -> (Form.Msg -> msg) -> Html msg
+newPostPageCommentFormView : FormModel Never CommentForm -> (Form.Msg -> msg) -> Html msg
 newPostPageCommentFormView { form, disabled } toMsg =
 
   let email = form |> Form.getFieldAsString "email"
@@ -610,7 +610,7 @@ type alias LoginForm =
   , password : String 
   }
 
-loginFormValidate : Validation () LoginForm
+loginFormValidate : Validation Never LoginForm
 loginFormValidate =
   succeed LoginForm
     |> Validate.andMap (field "username" validateStringNonEmpty)
@@ -631,14 +631,14 @@ type LoginPageMsg
 
 type alias LoginPageState =
   { api : ApiModel Session
-  , formModel : FormModel () LoginForm 
+  , formModel : FormModel Never LoginForm 
   }
 
 loginPageInApi : In LoginPageState (ApiModel Session) msg a
 loginPageInApi =
     inState { get = .api, set = \state api -> { state | api = api } }
 
-loginPageInForm : In LoginPageState (FormModel () LoginForm) msg a
+loginPageInForm : In LoginPageState (FormModel Never LoginForm) msg a
 loginPageInForm =
     inState { get = .formModel, set = \state form -> { state | formModel = form } }
 
@@ -678,7 +678,7 @@ loginPageUpdate { onAuthResponse } msg toMsg state =
 loginPageSubscriptions : LoginPageState -> (LoginPageMsg -> msg) -> Sub msg
 loginPageSubscriptions state toMsg = Sub.none
 
-loginPageFormView : FormModel () LoginForm -> (Form.Msg -> msg) -> Html msg
+loginPageFormView : FormModel Never LoginForm -> (Form.Msg -> msg) -> Html msg
 loginPageFormView { form, disabled } toMsg =
 
   let username = form |> Form.getFieldAsString "username"
@@ -1202,12 +1202,12 @@ type Msg
 type alias State =
   { session : Maybe Session 
   , router : RouterState Route
-  , restrictedRoute : Maybe Route
+  , restricted : Maybe Route
   , page : Page
   }
 
 setRestrictedRoute : Maybe Route -> State -> Update State msg a
-setRestrictedRoute route state = save { state | restrictedRoute = route }
+setRestrictedRoute route state = save { state | restricted = route }
 
 setSession : Maybe Session -> State -> Update State msg a
 setSession session state = save { state | session = session }
@@ -1245,7 +1245,7 @@ ifAuthenticated gotoPage ({ session } as state) =
   if Nothing == session 
       then 
         state
-          |> setRestrictedRoute state.router.route
+          |> setRestrictedRoute state.router.route  -- Redirect back here after successful login
           |> andThen (redirect "/login")
       else 
         state
@@ -1322,15 +1322,15 @@ updateSessionStorage maybeSession =
       addCmd (Ports.setSession session)
 
 returnToRestrictedRoute : State -> Update State Msg a
-returnToRestrictedRoute ({ restrictedRoute } as state) =
-  case restrictedRoute of
+returnToRestrictedRoute ({ restricted } as state) =
+  case restricted of
     Nothing ->
       state
         |> redirect "/"
     _ ->
       state
-        |> inRouter (setRoute restrictedRoute)
-        |> andThen (mapCmd PageMsg << handleRouteChange restrictedRoute)
+        |> inRouter (setRoute restricted)
+        |> andThen (mapCmd PageMsg << handleRouteChange restricted)
 
 handleAuthResponse : Maybe Session -> State -> Update State Msg a
 handleAuthResponse maybeSession = 
