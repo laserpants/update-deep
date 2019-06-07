@@ -21,9 +21,11 @@ import Update.Deep.Browser as Deep
 import Url exposing (Url)
 import Url.Parser as Parser exposing (Parser, parse, oneOf, (</>))
 import Bulma.CDN as Bulma
-import Bulma.Elements as Bulma
+import Bulma.Layout exposing (SectionSpacing(..), hero,heroBody,container, fluidContainer)
+import Bulma.Elements as Bulma exposing (TitleSize(..), title)
 import Bulma.Components exposing (..)
 import Bulma.Modifiers exposing (..)
+import Bulma.Form
 
 --
 
@@ -41,15 +43,18 @@ myNavbar page { menuOpen } toMsg =
 
   let 
       burger = 
-        navbarBurger menuOpen [ onClick ToggleBurgerMenu ] 
+        navbarBurger menuOpen [ class "has-text-white", onClick ToggleBurgerMenu ] 
           [ span [] [], span [] [], span [] [] ]
 
       currentPage = current page
 
+      defaultButton = Bulma.buttonModifiers
+      defaultNavbar = navbarModifiers
+
    in
-        navbar navbarModifiers []
+        navbar { defaultNavbar | color = Info } []
           [ navbarBrand [] burger
-            [ navbarItem False [] [ text "hello" ] ]
+            [ navbarItem False [] [ h5 [ class "title is-5" ] [ a [ class "has-text-white", href "/" ] [ text "Hello" ] ] ] ]
           , navbarMenu menuOpen []
             [ navbarStart [] 
               [ navbarItemLink currentPage.isHomePage [ href "/" ] [ text "Home" ]
@@ -59,8 +64,10 @@ myNavbar page { menuOpen } toMsg =
               , navbarEnd [] 
                 [ navbarItem False [] 
                   [ div [ class "field is-grouped" ] 
-                    [ p [ class "control" ] [ Bulma.easyButton Bulma.buttonModifiers [] ToggleBurgerMenu "Log in" ] 
-                    , p [ class "control" ] [ Bulma.easyButton Bulma.buttonModifiers [] ToggleBurgerMenu "Register" ] 
+                    [ p [ class "control" ] 
+                      [ a [ class "button is-primary", href "/register" ] [ text "Register" ] ] 
+                    , p [ class "control" ] 
+                      [ a [ class "button is-light", href "/login" ] [ text "Log in" ] ] 
                     ] 
                   ] 
                 ]
@@ -196,10 +203,13 @@ formInit fields validation =
 
 formReset : List ( String, Field ) -> FormModel a b -> Update (FormModel a b) msg c
 formReset fields model = 
-  model.form
-    |> Form.update model.validation (Form.Reset fields)
+  Debug.log (Debug.toString fields) (
+  Form.initial fields model.validation
+--  model.form
+--    |> Form.update model.validation (Form.Reset fields)
     |> formInsertAsFormIn model
     |> andThen (formSetDisabled False)
+  )
 
 formUpdate : { onSubmit : b -> c } -> Form.Msg -> FormModel a b -> Update (FormModel a b) msg c
 formUpdate { onSubmit } msg model = 
@@ -491,7 +501,7 @@ newPostPageFormView { form, disabled } toMsg =
           ]
         , div [] [ Html.text (errorMessage body) ]
         , div []
-          [ button [ type_ "submit" ] [ text (if disabled then "Please wait" else "Log in") ] 
+          [ button [ type_ "submit" ] [ text (if disabled then "Please wait" else "Publish") ] 
           ]
         ]
       ]
@@ -723,7 +733,7 @@ loginPageUpdate { onAuthResponse } msg toMsg =
 
   let 
       handleApiResponse maybeSession = 
-        loginPageInForm (formReset []) 
+        loginPageInForm (formReset [ ( "username", Field.value (String "baz")) ]) 
           >> andInvokeHandler (onAuthResponse maybeSession)
 
    in case msg of
@@ -757,10 +767,29 @@ loginPageFormView { form, disabled } toMsg =
    in
 
       [ fieldset [ Html.Attributes.disabled disabled ]
-        [ div [] [ inputField [] username ]
-        , div [] [ Html.text (errorMessage username) ]
-        , div [] [ inputField [ type_ "password" ] password ]
-        , div [] [ Html.text (errorMessage password) ]
+        [ Bulma.Form.field [] 
+          [ Bulma.Form.controlLabel [] [ text "Username" ] 
+          , Bulma.Form.controlInput Bulma.Form.controlInputModifiers
+            [ onFocus (Form.Focus username.path)
+            , onBlur (Form.Blur username.path)
+            , onInput (String >> Form.Input username.path Form.Text)
+            , value (Maybe.withDefault "" username.value)
+            ] [] [] 
+          ]
+        , Bulma.Form.field [] 
+          [ Bulma.Form.controlLabel [] [ text "Password" ] 
+          , Bulma.Form.controlPassword Bulma.Form.controlInputModifiers
+            [ onFocus (Form.Focus password.path)
+            , onBlur (Form.Blur password.path)
+            , onInput (String >> Form.Input password.path Form.Text)
+            , value (Maybe.withDefault "" password.value)
+            ] [] [] 
+          ]
+          
+--        , div [] [ inputField [] username ]
+--        , div [] [ Html.text (errorMessage username) ]
+--        , div [] [ inputField [ type_ "password" ] password ]
+--        , div [] [ Html.text (errorMessage password) ]
         , div []
           [ button [ type_ "submit" ] [ text (if disabled then "Please wait" else "Log in") ] 
           ]
@@ -1437,9 +1466,9 @@ view : State -> Document Msg
 view ({ page } as state) = 
   { title = ""
   , body =
-    [ Bulma.stylesheet
-    , myNavbar state.page state.ui UiMsg
-    , pageView page PageMsg 
+    [ myNavbar state.page state.ui UiMsg
+    , Bulma.Layout.section NotSpaced [] 
+      [ container [] [ pageView page PageMsg ] ]
     , div [] 
       [ a [ href "/" ] [ text "Home" ]
       , a [ href "/login" ] [ text "Login" ] 
