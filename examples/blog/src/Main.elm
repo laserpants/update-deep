@@ -40,14 +40,16 @@ myNavbar : Page -> UiState -> (UiMsg -> msg) -> Html msg
 myNavbar page { menuOpen } toMsg = 
 
   let 
-      burger = navbarBurger menuOpen [ href "#", onClick ToggleBurgerMenu ] [ span [] [], span [] [], span [] [] ]
+      burger = 
+        navbarBurger menuOpen [ onClick ToggleBurgerMenu ] 
+          [ span [] [], span [] [], span [] [] ]
+
       currentPage = current page
 
    in
         navbar navbarModifiers []
           [ navbarBrand [] burger
-            [ navbarItem False [] [ text "x" ]
-            ]
+            [ navbarItem False [] [ text "hello" ] ]
           , navbarMenu menuOpen []
             [ navbarStart [] 
               [ navbarItemLink currentPage.isHomePage [ href "/" ] [ text "Home" ]
@@ -1110,6 +1112,9 @@ routerUpdate { onRouteChange } msg state =
     UrlRequest (Browser.Internal url) ->
       state
         |> addCmd (Navigation.pushUrl state.key (Url.toString url))
+    UrlRequest (Browser.External "") ->
+      state
+        |> save
     UrlRequest (Browser.External href) ->
       state
         |> addCmd (Navigation.load href)
