@@ -20,6 +20,63 @@ import Update.Deep exposing (..)
 import Update.Deep.Browser as Deep
 import Url exposing (Url)
 import Url.Parser as Parser exposing (Parser, parse, oneOf, (</>))
+import Bulma.CDN as Bulma
+import Bulma.Elements as Bulma
+import Bulma.Components exposing (..)
+import Bulma.Modifiers exposing (..)
+
+--
+
+type UiMsg
+  = ToggleBurgerMenu
+
+type alias UiState =
+  { menuOpen : Bool }
+
+toggleMenuOpen : UiState -> Update UiState msg a
+toggleMenuOpen state = save { state | menuOpen = not state.menuOpen }
+
+myNavbar : Page -> UiState -> (UiMsg -> msg) -> Html msg
+myNavbar page { menuOpen } toMsg = 
+
+  let 
+      burger = navbarBurger menuOpen [ href "#", onClick ToggleBurgerMenu ] [ span [] [], span [] [], span [] [] ]
+      currentPage = current page
+
+   in
+        navbar navbarModifiers []
+          [ navbarBrand [] burger
+            [ navbarItem False [] [ text "x" ]
+            ]
+          , navbarMenu menuOpen []
+            [ navbarStart [] 
+              [ navbarItemLink currentPage.isHomePage [ href "/" ] [ text "Home" ]
+              , navbarItemLink currentPage.isAboutPage [ href "/about" ] [ text "About" ]
+              , navbarItemLink currentPage.isNewPostPage [ href "/posts/new" ] [ text "New post" ]
+              ]
+              , navbarEnd [] 
+                [ navbarItem False [] 
+                  [ div [ class "field is-grouped" ] 
+                    [ p [ class "control" ] [ Bulma.easyButton Bulma.buttonModifiers [] ToggleBurgerMenu "Log in" ] 
+                    , p [ class "control" ] [ Bulma.easyButton Bulma.buttonModifiers [] ToggleBurgerMenu "Register" ] 
+                    ] 
+                  ] 
+                ]
+            ]
+          ]
+        |> Html.map toMsg
+
+uiInit : Update UiState msg a
+uiInit = 
+  save UiState
+    |> andMap (save False)
+
+uiUpdate : UiMsg -> (UiMsg -> msg) -> UiState -> Update UiState msg a
+uiUpdate msg toMsg state =
+  case msg of
+    ToggleBurgerMenu ->
+      state
+        |> toggleMenuOpen
 
 --
 
@@ -277,6 +334,7 @@ homePageInPosts =
 
 homePageInit : (HomePageMsg -> msg) -> Update HomePageState msg a
 homePageInit toMsg = 
+
   let 
       api = apiInit { endpoint = "/posts"
                     , method   = HttpGet
@@ -381,21 +439,18 @@ newPostPageInit toMsg =
         |> andMap form
         |> mapCmd toMsg
 
-newPostPageUpdate : { onPostAdded : Post -> a } -> NewPostPageMsg -> (NewPostPageMsg -> msg) -> NewPostPageState -> Update NewPostPageState msg a
-newPostPageUpdate { onPostAdded } msg toMsg state = 
+newPostPageHandleSubmit : (NewPostPageMsg -> msg) -> NewPostForm -> NewPostPageState -> Update NewPostPageState msg a
+newPostPageHandleSubmit toMsg form = 
+  let json = form |> newPostFormToJson |> Http.jsonBody 
+   in newPostPageInApi (apiSendRequest "" (Just json) (toMsg << NewPostPageApiMsg))
 
-  let
-      handleSubmit form = 
-          let json = form |> newPostFormToJson |> Http.jsonBody 
-           in newPostPageInApi (apiSendRequest "" (Just json) (toMsg << NewPostPageApiMsg))
-   in
-      case msg of
-        NewPostPageApiMsg apiMsg ->
-          state
-            |> newPostPageInApi (apiUpdate { onSuccess = invokeHandler << onPostAdded, onError = always save } apiMsg (toMsg << NewPostPageApiMsg))
-        NewPostFormMsg formMsg ->
-          state
-            |> newPostPageInForm (formUpdate { onSubmit = handleSubmit } formMsg)
+newPostPageUpdate : { onPostAdded : Post -> a } -> NewPostPageMsg -> (NewPostPageMsg -> msg) -> NewPostPageState -> Update NewPostPageState msg a
+newPostPageUpdate { onPostAdded } msg toMsg = 
+  case msg of
+    NewPostPageApiMsg apiMsg ->
+      newPostPageInApi (apiUpdate { onSuccess = invokeHandler << onPostAdded, onError = always save } apiMsg (toMsg << NewPostPageApiMsg))
+    NewPostFormMsg formMsg ->
+      newPostPageInForm (formUpdate { onSubmit = newPostPageHandleSubmit toMsg } formMsg)
 
 newPostPageSubscriptions : NewPostPageState -> (NewPostPageMsg -> msg) -> Sub msg
 newPostPageSubscriptions state toMsg = Sub.none
@@ -493,31 +548,31 @@ showPostPageInit id toMsg =
         |> andMap form
         |> mapCmd toMsg
 
+showPostPageHandleSubmit : (ShowPostPageMsg -> msg) -> CommentForm -> ShowPostPageState -> Update ShowPostPageState msg a
+showPostPageHandleSubmit toMsg form state = 
+  let 
+      json = form |> commentFormToJson state.id |> Http.jsonBody 
+   in 
+      state 
+        |> showPostPageInCommentApi (apiSendRequest "" (Just json) (toMsg << ShowPostPageCommentApiMsg))
+
 showPostPageUpdate : ShowPostPageMsg -> (ShowPostPageMsg -> msg) -> ShowPostPageState -> Update ShowPostPageState msg a
-showPostPageUpdate msg toMsg state = 
+showPostPageUpdate msg toMsg = 
 
   let 
-      handleSubmit form = 
-          let json = form |> commentFormToJson state.id |> Http.jsonBody 
-           in showPostPageInCommentApi (apiSendRequest "" (Just json) (toMsg << ShowPostPageCommentApiMsg))
-
       commentCreated comment = 
         showPostPageInCommentForm (formReset [])
           >> andThen (showPostPageUpdate FetchPost toMsg)
    in 
       case msg of
         ShowPostPageApiMsg apiMsg ->
-          state
-            |> showPostPageInApi (apiUpdate { onSuccess = always save, onError = always save } apiMsg (toMsg << ShowPostPageApiMsg))
+          showPostPageInApi (apiUpdate { onSuccess = always save, onError = always save } apiMsg (toMsg << ShowPostPageApiMsg))
         FetchPost ->
-          state
-            |> showPostPageInApi (apiSendRequest "" Nothing (toMsg << ShowPostPageApiMsg))
+          showPostPageInApi (apiSendRequest "" Nothing (toMsg << ShowPostPageApiMsg))
         ShowPostPageCommentFormMsg formMsg ->
-          state
-            |> showPostPageInCommentForm (formUpdate { onSubmit = handleSubmit } formMsg)
+          showPostPageInCommentForm (formUpdate { onSubmit = showPostPageHandleSubmit toMsg } formMsg)
         ShowPostPageCommentApiMsg apiMsg ->
-          state
-            |> showPostPageInCommentApi (apiUpdate { onSuccess = commentCreated, onError = always save } apiMsg (toMsg << ShowPostPageCommentApiMsg))
+          showPostPageInCommentApi (apiUpdate { onSuccess = commentCreated, onError = always save } apiMsg (toMsg << ShowPostPageCommentApiMsg))
 
 showPostPageSubscriptions : ShowPostPageState -> (ShowPostPageMsg -> msg) -> Sub msg
 showPostPageSubscriptions state toMsg = Sub.none
@@ -656,24 +711,24 @@ loginPageInit toMsg =
         |> andMap form
         |> mapCmd toMsg
 
-loginPageUpdate : { onAuthResponse : Maybe Session -> a } -> LoginPageMsg -> (LoginPageMsg -> msg) -> LoginPageState -> Update LoginPageState msg a
-loginPageUpdate { onAuthResponse } msg toMsg state =
-  let 
-      handleSubmit form = 
-          let json = form |> loginFormToJson |> Http.jsonBody 
-           in loginPageInApi (apiSendRequest "" (Just json) (toMsg << LoginPageApiMsg))
+loginPageHandleSubmit : (LoginPageMsg -> msg) -> LoginForm -> LoginPageState -> Update LoginPageState msg a
+loginPageHandleSubmit toMsg form = 
+  let json = form |> loginFormToJson |> Http.jsonBody 
+   in loginPageInApi (apiSendRequest "" (Just json) (toMsg << LoginPageApiMsg))
 
+loginPageUpdate : { onAuthResponse : Maybe Session -> a } -> LoginPageMsg -> (LoginPageMsg -> msg) -> LoginPageState -> Update LoginPageState msg a
+loginPageUpdate { onAuthResponse } msg toMsg =
+
+  let 
       handleApiResponse maybeSession = 
         loginPageInForm (formReset []) 
           >> andInvokeHandler (onAuthResponse maybeSession)
 
    in case msg of
      LoginPageApiMsg apiMsg -> 
-       state
-         |> loginPageInApi (apiUpdate { onSuccess = handleApiResponse << Just, onError = handleApiResponse Nothing |> always } apiMsg (toMsg << LoginPageApiMsg))
+       loginPageInApi (apiUpdate { onSuccess = handleApiResponse << Just, onError = handleApiResponse Nothing |> always } apiMsg (toMsg << LoginPageApiMsg))
      LoginFormMsg formMsg ->
-       state
-         |> loginPageInForm (formUpdate { onSubmit = handleSubmit } formMsg)
+       loginPageInForm (formUpdate { onSubmit = loginPageHandleSubmit toMsg } formMsg)
 
 loginPageSubscriptions : LoginPageState -> (LoginPageMsg -> msg) -> Sub msg
 loginPageSubscriptions state toMsg = Sub.none
@@ -832,13 +887,13 @@ setUsernameStatus status state = save { state | usernameStatus = status }
 
 registerPageInit : (RegisterPageMsg -> msg) -> Update RegisterPageState msg a
 registerPageInit toMsg = 
+
   let 
       api = apiInit { endpoint = "/auth/register"
                     , method   = HttpPost
                     , decoder  = Json.field "user" userDecoder }
 
       form = formInit [] registerFormValidate
-
    in 
       save RegisterPageState
         |> andMap api
@@ -878,34 +933,32 @@ usernameFieldSpy formMsg =
     _ ->
       save 
 
+registerPageHandleSubmit : (RegisterPageMsg -> msg) -> RegisterForm -> RegisterPageState -> Update RegisterPageState msg a
+registerPageHandleSubmit toMsg form =
+  let json = form |> registerFormToJson |> Http.jsonBody 
+   in registerPageInApi (apiSendRequest "" (Just json) (toMsg << RegisterPageApiMsg))
+
 registerPageUpdate : RegisterPageMsg -> (RegisterPageMsg -> msg) -> RegisterPageState -> Update RegisterPageState msg a
 registerPageUpdate msg toMsg state = 
-
-  let
-      handleSubmit form = 
-          let json = form |> registerFormToJson |> Http.jsonBody 
-           in registerPageInApi (apiSendRequest "" (Just json) (toMsg << RegisterPageApiMsg))
-
-   in 
-      case msg of
-        RegisterPageApiMsg apiMsg ->
-          state
-            |> registerPageInApi (apiUpdate { onSuccess = always save, onError = always save } apiMsg (toMsg << RegisterPageApiMsg))
-        RegisterFormMsg formMsg ->
-          state
-            |> registerPageInForm (formUpdate { onSubmit = handleSubmit } formMsg)
-            |> andThen (usernameFieldSpy formMsg)
-        RegisterPageWebsocketMsg wsMsg ->
-          case Json.decodeString websocketMessageDecoder wsMsg of
-            Ok (WebSocketUsernameAvailableResponse { username, available }) ->
-              let 
-                  usernameField = Form.getFieldAsString "username" state.formModel.form
-               in 
-                  state
-                    |> saveUsernameStatus username available
-                    |> andThen (checkIfUsernameAvailable <| Maybe.withDefault "" usernameField.value)
-            _ ->
-              save state
+  case msg of
+    RegisterPageApiMsg apiMsg ->
+      state
+        |> registerPageInApi (apiUpdate { onSuccess = always save, onError = always save } apiMsg (toMsg << RegisterPageApiMsg))
+    RegisterFormMsg formMsg ->
+      state
+        |> registerPageInForm (formUpdate { onSubmit = registerPageHandleSubmit toMsg } formMsg)
+        |> andThen (usernameFieldSpy formMsg)
+    RegisterPageWebsocketMsg wsMsg ->
+      case Json.decodeString websocketMessageDecoder wsMsg of
+        Ok (WebSocketUsernameAvailableResponse { username, available }) ->
+          let 
+              usernameField = Form.getFieldAsString "username" state.formModel.form
+           in 
+              state
+                |> saveUsernameStatus username available
+                |> andThen (checkIfUsernameAvailable <| Maybe.withDefault "" usernameField.value)
+        _ ->
+          save state
 
 registerPageSubscriptions : RegisterPageState -> (RegisterPageMsg -> msg) -> Sub msg
 registerPageSubscriptions state toMsg = Ports.websocketIn (toMsg << RegisterPageWebsocketMsg)
@@ -1046,14 +1099,14 @@ routerRedirect href state =
   state
     |> addCmd (Navigation.replaceUrl state.key href)
 
-routerUpdate : { onRouteChange : Maybe route -> a } -> RouterMsg -> RouterState route -> Update (RouterState route) msg a
+routerUpdate : { onRouteChange : Url -> Maybe route -> a } -> RouterMsg -> RouterState route -> Update (RouterState route) msg a
 routerUpdate { onRouteChange } msg state = 
   case msg of
     UrlChange url ->
       let route = state.fromUrl url
        in state
         |> setRoute route
-        |> andInvokeHandler (onRouteChange route)
+        |> andInvokeHandler (onRouteChange url route)
     UrlRequest (Browser.Internal url) ->
       state
         |> addCmd (Navigation.pushUrl state.key (Url.toString url))
@@ -1078,6 +1131,28 @@ type Page
   | RegisterPage RegisterPageState
   | AboutPage
   | NotFoundPage
+
+current : Page -> { isHomePage : Bool, isNewPostPage : Bool, isShowPostPage : Bool, isLoginPage : Bool, isRegisterPage : Bool, isAboutPage : Bool, isNotFoundPage : Bool }
+current page =
+  
+  let 
+      default = { isHomePage = False, isNewPostPage = False, isShowPostPage = False, isLoginPage = False, isRegisterPage = False, isAboutPage = False, isNotFoundPage = False }
+   in 
+      case page of
+        HomePage _ ->
+          { default | isHomePage = True }
+        NewPostPage _ ->
+          { default | isNewPostPage = True }
+        ShowPostPage _ ->
+          { default | isShowPostPage = True }
+        LoginPage _ ->
+          { default | isLoginPage = True }
+        RegisterPage _ ->
+          { default | isRegisterPage = True }
+        AboutPage ->
+          { default | isAboutPage = True }
+        NotFoundPage ->
+          { default | isNotFoundPage = True }
 
 pageUpdate : { onAuthResponse : Maybe Session -> a, onPostAdded : Post -> a } -> PageMsg -> (PageMsg -> msg) -> Page -> Update Page msg a
 pageUpdate { onAuthResponse, onPostAdded } msg toMsg page = 
@@ -1196,16 +1271,18 @@ type alias Flags =
 type Msg
   = RouterMsg RouterMsg
   | PageMsg PageMsg
+  | UiMsg UiMsg
 
 type alias State =
   { session : Maybe Session 
   , router : RouterState Route
-  , restricted : Maybe Route
+  , ui : UiState
+  , restrictedUrl : Maybe String
   , page : Page
   }
 
-setRestrictedRoute : Maybe Route -> State -> Update State msg a
-setRestrictedRoute route state = save { state | restricted = route }
+setRestrictedUrl : Maybe String -> State -> Update State msg a
+setRestrictedUrl url state = save { state | restrictedUrl = url }
 
 setSession : Maybe Session -> State -> Update State msg a
 setSession session state = save { state | session = session }
@@ -1213,6 +1290,10 @@ setSession session state = save { state | session = session }
 inRouter : In State (RouterState Route) msg a
 inRouter =
     inState { get = .router, set = \state router -> { state | router = router } }
+
+inUi : In State UiState msg a
+inUi =
+    inState { get = .ui, set = \state ui -> { state | ui = ui } }
 
 inPage : In State Page msg a
 inPage =
@@ -1231,28 +1312,13 @@ init flags url key =
   save State
     |> andMap (initSession flags |> save)
     |> andMap (routerInit fromUrl key RouterMsg)
+    |> andMap uiInit
     |> andMap (save Nothing)
     |> andMap (save NotFoundPage)
     |> andThen (update (RouterMsg (UrlChange url)))
 
 redirect : String -> State -> Update State msg a
 redirect = inRouter << routerRedirect
-
-ifAuthenticated : (State -> Update State msg a) -> State -> Update State msg a
-ifAuthenticated gotoPage ({ session } as state) =
-  if Nothing == session 
-      then 
-        state
-          |> setRestrictedRoute state.router.route  -- Redirect back here after successful login
-          |> andThen (redirect "/login")
-      else 
-        state
-          |> gotoPage
-
-unlessAuthenticated : (State -> Update State msg a) -> State -> Update State msg a
-unlessAuthenticated gotoPage ({ session } as state) =
-  state 
-    |> if Nothing /= session then redirect "/" else gotoPage
 
 loadPage : Update Page msg (State -> Update State msg a) -> State -> Update State msg a
 loadPage update_ state = 
@@ -1261,56 +1327,73 @@ loadPage update_ state =
    in 
       state
         |> inPage (always update_)
-        |> andThenIf (not << isLoginRoute) (setRestrictedRoute Nothing)
+        |> andThenIf (not << isLoginRoute) (setRestrictedUrl Nothing)
 
-handleRouteChange : Maybe Route -> State -> Update State PageMsg a
-handleRouteChange maybeRoute =
-  case maybeRoute of
-    -- No route
-    Nothing ->
-      loadPage (save NotFoundPage)
+handleRouteChange : Url -> Maybe Route -> State -> Update State PageMsg a
+handleRouteChange url maybeRoute =
 
-    -- Authenticated only
-    Just NewPost ->
-      newPostPageInit NewPostPageMsg
-        |> Update.Deep.map NewPostPage
-        |> loadPage 
-        |> ifAuthenticated
+  let 
+      ifAuthenticated gotoPage ({ session } as state) =
+        if Nothing == session 
+            then 
+              state
+                |> setRestrictedUrl (Just url.path)  -- Redirect back here after successful login
+                |> andThen (redirect "/login")
+            else 
+              state
+                |> gotoPage
 
-    -- Redirect if already authenticated
-    Just Login ->
-      loginPageInit LoginPageMsg
-        |> Update.Deep.map LoginPage
-        |> loadPage 
-        |> unlessAuthenticated
+      unlessAuthenticated gotoPage ({ session } as state) =
+        state 
+          |> if Nothing /= session then redirect "/" else gotoPage
 
-    Just Register ->
-      registerPageInit RegisterPageMsg
-        |> Update.Deep.map RegisterPage
-        |> loadPage 
-        |> unlessAuthenticated
-
-    -- Other
-    Just (ShowPost id) ->
-      showPostPageInit id ShowPostPageMsg
-        |> andThen (showPostPageUpdate FetchPost ShowPostPageMsg)
-        |> Update.Deep.map ShowPostPage 
-        |> loadPage 
-
-    Just Home ->
-      homePageInit HomePageMsg
-        |> andThen (homePageUpdate FetchPosts HomePageMsg)
-        |> Update.Deep.map HomePage
-        |> loadPage 
-
-    Just Logout ->
-      setSession Nothing
-        >> andThen (updateSessionStorage Nothing)
-        >> andThen (redirect "/")
-
-    Just About ->
-      loadPage (save AboutPage)
-
+   in 
+      case maybeRoute of
+        -- No route
+        Nothing ->
+          loadPage (save NotFoundPage)
+ 
+        -- Authenticated only
+        Just NewPost ->
+          newPostPageInit NewPostPageMsg
+            |> Update.Deep.map NewPostPage
+            |> loadPage 
+            |> ifAuthenticated
+ 
+        -- Redirect if already authenticated
+        Just Login ->
+          loginPageInit LoginPageMsg
+            |> Update.Deep.map LoginPage
+            |> loadPage 
+            |> unlessAuthenticated
+ 
+        Just Register ->
+          registerPageInit RegisterPageMsg
+            |> Update.Deep.map RegisterPage
+            |> loadPage 
+            |> unlessAuthenticated
+ 
+        -- Other
+        Just (ShowPost id) ->
+          showPostPageInit id ShowPostPageMsg
+            |> andThen (showPostPageUpdate FetchPost ShowPostPageMsg)
+            |> Update.Deep.map ShowPostPage 
+            |> loadPage 
+ 
+        Just Home ->
+          homePageInit HomePageMsg
+            |> andThen (homePageUpdate FetchPosts HomePageMsg)
+            |> Update.Deep.map HomePage
+            |> loadPage 
+ 
+        Just Logout ->
+          setSession Nothing
+            >> andThen (updateSessionStorage Nothing)
+            >> andThen (redirect "/")
+ 
+        Just About ->
+          loadPage (save AboutPage)
+ 
 updateSessionStorage : Maybe Session -> State -> Update State msg a
 updateSessionStorage maybeSession =
   case maybeSession of
@@ -1319,16 +1402,9 @@ updateSessionStorage maybeSession =
     Just session ->
       addCmd (Ports.setSession session)
 
-returnToRestrictedRoute : State -> Update State Msg a
-returnToRestrictedRoute ({ restricted } as state) =
-  case restricted of
-    Nothing ->
-      state
-        |> redirect "/"
-    _ ->
-      state
-        |> inRouter (setRoute restricted)
-        |> andThen (mapCmd PageMsg << handleRouteChange restricted)
+returnToRestrictedUrl : State -> Update State Msg a
+returnToRestrictedUrl ({ restrictedUrl } as state) =
+  redirect (Maybe.withDefault "/" restrictedUrl) state
 
 handleAuthResponse : Maybe Session -> State -> Update State Msg a
 handleAuthResponse maybeSession = 
@@ -1337,15 +1413,17 @@ handleAuthResponse maybeSession =
    in 
       setSession maybeSession
         >> andThen (updateSessionStorage maybeSession)
-        >> andThenIf authenticated returnToRestrictedRoute
+        >> andThenIf authenticated returnToRestrictedUrl
 
 update : Msg -> State -> Update State Msg a
 update msg =
   case msg of
     RouterMsg routerMsg ->
-      inRouter (routerUpdate { onRouteChange = \route -> mapCmd PageMsg << handleRouteChange route } routerMsg)
+      inRouter (routerUpdate { onRouteChange = \url route -> mapCmd PageMsg << handleRouteChange url route } routerMsg)
     PageMsg pageMsg ->
       inPage (pageUpdate { onAuthResponse = handleAuthResponse, onPostAdded = always (redirect "/") } pageMsg PageMsg)
+    UiMsg uiMsg ->
+      inUi (uiUpdate uiMsg UiMsg)
 
 subscriptions : State -> Sub Msg
 subscriptions { page } = pageSubscriptions page PageMsg
@@ -1354,7 +1432,9 @@ view : State -> Document Msg
 view ({ page } as state) = 
   { title = ""
   , body =
-    [ pageView page PageMsg
+    [ Bulma.stylesheet
+    , myNavbar state.page state.ui UiMsg
+    , pageView page PageMsg 
     , div [] 
       [ a [ href "/" ] [ text "Home" ]
       , a [ href "/login" ] [ text "Login" ] 
@@ -1362,7 +1442,7 @@ view ({ page } as state) =
       , a [ href "/register" ] [ text "Register" ]
       , a [ href "/about" ] [ text "About" ]
       , a [ href "/posts/new" ] [ text "New post" ]
-      , Html.text (Debug.toString state)
+--      , Html.text (Debug.toString state)
       ]
     ] 
   }
