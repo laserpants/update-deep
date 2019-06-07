@@ -25,7 +25,7 @@ import Bulma.Layout exposing (SectionSpacing(..), hero,heroBody,container, fluid
 import Bulma.Elements as Bulma exposing (TitleSize(..), title)
 import Bulma.Components exposing (..)
 import Bulma.Modifiers exposing (..)
-import Bulma.Form
+import Bulma.Form exposing (controlInputModifiers)
 
 --
 
@@ -38,39 +38,44 @@ type alias UiState =
 toggleMenuOpen : UiState -> Update UiState msg a
 toggleMenuOpen state = save { state | menuOpen = not state.menuOpen }
 
-myNavbar : Page -> UiState -> (UiMsg -> msg) -> Html msg
-myNavbar page { menuOpen } toMsg = 
+closeBurgerMenu : UiState -> Update UiState msg a
+closeBurgerMenu state = save { state | menuOpen = False }
+
+myNavbar : Maybe Session -> Page -> UiState -> (UiMsg -> msg) -> Html msg
+myNavbar session page { menuOpen } toMsg = 
 
   let 
       burger = 
         navbarBurger menuOpen [ class "has-text-white", onClick ToggleBurgerMenu ] 
           [ span [] [], span [] [], span [] [] ]
 
+      buttons =
+        if Maybe.isNothing session
+            then
+              [ p [ class "control" ] 
+                [ a [ class "button is-primary", href "/register" ] [ text "Register" ] ] 
+              , p [ class "control" ] 
+                [ a [ class "button is-light", href "/login" ] [ text "Log in" ] ] 
+              ] 
+            else
+              [ p [ class "control" ] 
+                [ a [ class "button is-primary", href "/logout" ] [ text "Log out" ] ] 
+              ] 
+
       currentPage = current page
 
-      defaultButton = Bulma.buttonModifiers
-      defaultNavbar = navbarModifiers
-
    in
-        navbar { defaultNavbar | color = Info } []
+        navbar { navbarModifiers | color = Info } []
           [ navbarBrand [] burger
             [ navbarItem False [] [ h5 [ class "title is-5" ] [ a [ class "has-text-white", href "/" ] [ text "Hello" ] ] ] ]
           , navbarMenu menuOpen []
-            [ navbarStart [] 
+            [ navbarStart [ class "noselect" ] 
               [ navbarItemLink currentPage.isHomePage [ href "/" ] [ text "Home" ]
               , navbarItemLink currentPage.isAboutPage [ href "/about" ] [ text "About" ]
               , navbarItemLink currentPage.isNewPostPage [ href "/posts/new" ] [ text "New post" ]
               ]
               , navbarEnd [] 
-                [ navbarItem False [] 
-                  [ div [ class "field is-grouped" ] 
-                    [ p [ class "control" ] 
-                      [ a [ class "button is-primary", href "/register" ] [ text "Register" ] ] 
-                    , p [ class "control" ] 
-                      [ a [ class "button is-light", href "/login" ] [ text "Log in" ] ] 
-                    ] 
-                  ] 
-                ]
+                [ navbarItem False [] [ div [ class "field is-grouped" ] buttons ] ]
             ]
           ]
         |> Html.map toMsg
@@ -203,13 +208,9 @@ formInit fields validation =
 
 formReset : List ( String, Field ) -> FormModel a b -> Update (FormModel a b) msg c
 formReset fields model = 
-  Debug.log (Debug.toString fields) (
   Form.initial fields model.validation
---  model.form
---    |> Form.update model.validation (Form.Reset fields)
     |> formInsertAsFormIn model
     |> andThen (formSetDisabled False)
-  )
 
 formUpdate : { onSubmit : b -> c } -> Form.Msg -> FormModel a b -> Update (FormModel a b) msg c
 formUpdate { onSubmit } msg model = 
@@ -733,7 +734,7 @@ loginPageUpdate { onAuthResponse } msg toMsg =
 
   let 
       handleApiResponse maybeSession = 
-        loginPageInForm (formReset [ ( "username", Field.value (String "baz")) ]) 
+        loginPageInForm (formReset []) 
           >> andInvokeHandler (onAuthResponse maybeSession)
 
    in case msg of
@@ -748,50 +749,57 @@ loginPageSubscriptions state toMsg = Sub.none
 loginPageFormView : FormModel Never LoginForm -> (Form.Msg -> msg) -> Html msg
 loginPageFormView { form, disabled } toMsg =
 
-  let username = form |> Form.getFieldAsString "username"
-      password = form |> Form.getFieldAsString "password"
+  let 
+      fieldInfo { liveError, path, value } =
+        case liveError of
+          Nothing -> 
+            { path = path
+            , value = value
+            , hasError = False
+            , modifiers = controlInputModifiers
+            , errorMessage = "" 
+            }
+          Just error ->
+            { path = path
+            , value = value
+            , hasError = True
+            , modifiers = { controlInputModifiers | color = Danger }
+            , errorMessage = errorToString (always "") error 
+            }
 
-      inputField attributes field = input 
-        ( [ onFocus (Form.Focus field.path)
-          , onBlur (Form.Blur field.path)
-          , onInput (String >> Form.Input field.path Form.Text)
-          , value (Maybe.withDefault "" field.value)
-          ] ++ attributes ) []
-
-      alwaysEmpty = always ""
-
-      errorMessage field = 
-        field.liveError 
-          |> Maybe.unpack alwaysEmpty (errorToString alwaysEmpty)
+      username = form |> Form.getFieldAsString "username" |> fieldInfo 
+      password = form |> Form.getFieldAsString "password" |> fieldInfo 
 
    in
 
       [ fieldset [ Html.Attributes.disabled disabled ]
         [ Bulma.Form.field [] 
           [ Bulma.Form.controlLabel [] [ text "Username" ] 
-          , Bulma.Form.controlInput Bulma.Form.controlInputModifiers
-            [ onFocus (Form.Focus username.path)
+          , Bulma.Form.controlInput username.modifiers [] 
+            [ placeholder "Username"
+            , onFocus (Form.Focus username.path)
             , onBlur (Form.Blur username.path)
             , onInput (String >> Form.Input username.path Form.Text)
             , value (Maybe.withDefault "" username.value)
-            ] [] [] 
+            ] [] 
+          , Bulma.Form.controlHelp Danger [] [ Html.text username.errorMessage ]
           ]
         , Bulma.Form.field [] 
           [ Bulma.Form.controlLabel [] [ text "Password" ] 
-          , Bulma.Form.controlPassword Bulma.Form.controlInputModifiers
-            [ onFocus (Form.Focus password.path)
+          , Bulma.Form.controlPassword password.modifiers [] 
+            [ placeholder "Password"
+            , onFocus (Form.Focus password.path)
             , onBlur (Form.Blur password.path)
             , onInput (String >> Form.Input password.path Form.Text)
             , value (Maybe.withDefault "" password.value)
-            ] [] [] 
+            ] [] 
+          , Bulma.Form.controlHelp Danger [] [ Html.text password.errorMessage ]
           ]
-          
---        , div [] [ inputField [] username ]
---        , div [] [ Html.text (errorMessage username) ]
---        , div [] [ inputField [ type_ "password" ] password ]
---        , div [] [ Html.text (errorMessage password) ]
-        , div []
-          [ button [ type_ "submit" ] [ text (if disabled then "Please wait" else "Log in") ] 
+        , Bulma.Form.field [] 
+          [ div [ class "control" ] 
+            [ button [ type_ "submit", class "button is-primary" ] 
+              [ text (if disabled then "Please wait" else "Log in") ] 
+            ]
           ]
         ]
       ]
@@ -801,7 +809,10 @@ loginPageFormView { form, disabled } toMsg =
 
 loginPageView : LoginPageState -> (LoginPageMsg -> msg) -> Html msg
 loginPageView { formModel } toMsg = 
-  div [] [ loginPageFormView formModel (toMsg << LoginFormMsg) ]
+  div [] 
+    [ h3 [ class "title is-3" ] [ text "Log in" ] 
+    , loginPageFormView formModel (toMsg << LoginFormMsg) 
+    ]
 
 --
 
@@ -1069,13 +1080,16 @@ registerPageFormView { form, disabled } usernameStatus toMsg =
 
 registerPageView : RegisterPageState -> (RegisterPageMsg -> msg) -> Html msg
 registerPageView { api, formModel, usernameStatus } toMsg = 
-  case api.resource of
-    Available response ->
-      div [] [ text "Thanks!" ]
-    Error error ->
-      div [] [ text "error" ]
-    _ ->
-      div [] [ registerPageFormView formModel usernameStatus (toMsg << RegisterFormMsg) ]
+  div []
+    [ h3 [ class "title is-3" ] [ text "Register" ] 
+    , case api.resource of
+        Available response ->
+          div [] [ text "Thanks!" ]
+        Error error ->
+          div [] [ text "error" ]
+        _ ->
+          div [] [ registerPageFormView formModel usernameStatus (toMsg << RegisterFormMsg) ]
+    ]
 
 --
 
@@ -1362,9 +1376,10 @@ loadPage update_ state =
       state
         |> inPage (always update_)
         |> andThenIf (not << isLoginRoute) (setRestrictedUrl Nothing)
+        |> andThen (inUi closeBurgerMenu)
 
-handleRouteChange : Url -> Maybe Route -> State -> Update State PageMsg a
-handleRouteChange url maybeRoute =
+handleRouteChange : (PageMsg -> msg) -> Url -> Maybe Route -> State -> Update State msg a
+handleRouteChange toMsg url maybeRoute =
 
   let 
       ifAuthenticated gotoPage ({ session } as state) =
@@ -1382,7 +1397,8 @@ handleRouteChange url maybeRoute =
           |> if Nothing /= session then redirect "/" else gotoPage
 
    in 
-      case maybeRoute of
+      mapCmd toMsg << case maybeRoute of
+
         -- No route
         Nothing ->
           loadPage (save NotFoundPage)
@@ -1427,7 +1443,7 @@ handleRouteChange url maybeRoute =
  
         Just About ->
           loadPage (save AboutPage)
- 
+
 updateSessionStorage : Maybe Session -> State -> Update State msg a
 updateSessionStorage maybeSession =
   case maybeSession of
@@ -1437,8 +1453,9 @@ updateSessionStorage maybeSession =
       addCmd (Ports.setSession session)
 
 returnToRestrictedUrl : State -> Update State Msg a
-returnToRestrictedUrl ({ restrictedUrl } as state) =
-  redirect (Maybe.withDefault "/" restrictedUrl) state
+returnToRestrictedUrl state =
+  state
+    |> redirect (Maybe.withDefault "/" state.restrictedUrl) 
 
 handleAuthResponse : Maybe Session -> State -> Update State Msg a
 handleAuthResponse maybeSession = 
@@ -1453,7 +1470,7 @@ update : Msg -> State -> Update State Msg a
 update msg =
   case msg of
     RouterMsg routerMsg ->
-      inRouter (routerUpdate { onRouteChange = \url route -> mapCmd PageMsg << handleRouteChange url route } routerMsg)
+      inRouter (routerUpdate { onRouteChange = handleRouteChange PageMsg } routerMsg)
     PageMsg pageMsg ->
       inPage (pageUpdate { onAuthResponse = handleAuthResponse, onPostAdded = always (redirect "/") } pageMsg PageMsg)
     UiMsg uiMsg ->
@@ -1466,7 +1483,7 @@ view : State -> Document Msg
 view ({ page } as state) = 
   { title = ""
   , body =
-    [ myNavbar state.page state.ui UiMsg
+    [ myNavbar state.session state.page state.ui UiMsg
     , Bulma.Layout.section NotSpaced [] 
       [ container [] [ pageView page PageMsg ] ]
     , div [] 
