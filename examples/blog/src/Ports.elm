@@ -5,6 +5,7 @@ type alias User =
   , username : String
   , name : String
   , email : String 
+  , rememberMe : Bool
   }
 
 type alias Session =

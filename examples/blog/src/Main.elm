@@ -29,7 +29,6 @@ import Bulma.Form exposing (controlInputModifiers, controlTextAreaModifiers)
 
 -- 
 
--- remember me
 -- flash message
 
 --
@@ -739,6 +738,7 @@ showPostPageView { post, commentForm } toMsg =
 type alias LoginForm =
   { username : String
   , password : String 
+  , rememberMe : Bool
   }
 
 loginFormValidate : Validation Never LoginForm
@@ -746,12 +746,14 @@ loginFormValidate =
   succeed LoginForm
     |> Validate.andMap (field "username" validateStringNonEmpty)
     |> Validate.andMap (field "password" validateStringNonEmpty)
+    |> Validate.andMap (field "rememberMe" Validate.bool)
 
 loginFormToJson : LoginForm -> Json.Value
-loginFormToJson { username, password } = 
+loginFormToJson { username, password, rememberMe } = 
   object 
     [ ( "username" , Json.Encode.string username )
     , ( "password" , Json.Encode.string password )
+    , ( "rememberMe" , Json.Encode.bool rememberMe )
     ]
 
 --
@@ -818,8 +820,9 @@ loginPageFormView { form, disabled } toMsg =
       usernameIcon = Just ( Small, [], i [ class "fa fa-user" ] [] )
       passwordIcon = Just ( Small, [], i [ class "fa fa-lock" ] [] )
 
-      username = form |> Form.getFieldAsString "username" |> info { controlInputModifiers | iconLeft = usernameIcon }
-      password = form |> Form.getFieldAsString "password" |> info { controlInputModifiers | iconLeft = passwordIcon }
+      username   = form |> Form.getFieldAsString "username"   |> info { controlInputModifiers | iconLeft = usernameIcon }
+      password   = form |> Form.getFieldAsString "password"   |> info { controlInputModifiers | iconLeft = passwordIcon }
+      rememberMe = form |> Form.getFieldAsBool   "rememberMe" |> info controlInputModifiers 
 
    in
 
@@ -845,6 +848,15 @@ loginPageFormView { form, disabled } toMsg =
             , value (Maybe.withDefault "" password.value)
             ] [] 
           , Bulma.Form.controlHelp Danger [] [ Html.text password.errorMessage ]
+          ]
+        , Bulma.Form.field [] 
+          [ Bulma.Form.controlCheckBox False [] [] 
+            [ onFocus (Form.Focus rememberMe.path)
+            , onBlur (Form.Blur rememberMe.path)
+            , onCheck (Bool >> Form.Input rememberMe.path Form.Checkbox)
+            , checked (Maybe.withDefault False rememberMe.value)
+            ] [ text "Remember me" ]
+          , Bulma.Form.controlHelp Danger [] [ Html.text rememberMe.errorMessage ]
           ]
         , Bulma.Form.field [] 
           [ div [ class "control" ] 
@@ -1411,15 +1423,17 @@ type alias User =
   , username : String
   , name : String
   , email : String 
+  , rememberMe : Bool
   }
 
 userDecoder : Json.Decoder User
 userDecoder = 
-  Json.map4 User
+  Json.map5 User
     (Json.field "id" Json.int)
     (Json.field "username" Json.string)
     (Json.field "name" Json.string)
     (Json.field "email" Json.string)
+    (Json.field "rememberMe" Json.bool)
 
 type alias Session =
   { user : User
@@ -1607,15 +1621,15 @@ view ({ page } as state) =
     [ myNavbar state.session state.page state.ui UiMsg
     , Bulma.Layout.section NotSpaced [] 
       [ pageView page PageMsg ] 
-    , div [] 
-      [ a [ href "/" ] [ text "Home" ]
-      , a [ href "/login" ] [ text "Login" ] 
-      , a [ href "/logout" ] [ text "Logout" ]
-      , a [ href "/register" ] [ text "Register" ]
-      , a [ href "/about" ] [ text "About" ]
-      , a [ href "/posts/new" ] [ text "New post" ]
+--    , div [] 
+--      [ a [ href "/" ] [ text "Home" ]
+--      , a [ href "/login" ] [ text "Login" ] 
+--      , a [ href "/logout" ] [ text "Logout" ]
+--      , a [ href "/register" ] [ text "Register" ]
+--      , a [ href "/about" ] [ text "About" ]
+--      , a [ href "/posts/new" ] [ text "New post" ]
 --      , Html.text (Debug.toString state)
-      ]
+--      ]
     ] 
   }
 

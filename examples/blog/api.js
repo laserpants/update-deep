@@ -7,7 +7,8 @@ var users =
     name: 'Mr. Test',
     password: 'test',
     username: 'test',
-    email: 'test@test.com'
+    email: 'test@test.com',
+    rememberMe: false
   }
 ];
 
@@ -54,8 +55,9 @@ xhook.before(function(request, callback) {
         return user.username === params.username && user.password === params.password;
       });
       if (filtered.length > 0) {
-        var user = filtered[0],
-            response = { session: { user: user } };
+        var user = filtered[0];
+        user.rememberMe = params.rememberMe;
+        var response = { session: { user: user } };
         callback({
           status: 200,
           data: JSON.stringify(response),
