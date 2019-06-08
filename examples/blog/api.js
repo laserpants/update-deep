@@ -57,7 +57,8 @@ xhook.before(function(request, callback) {
         name: params.name,
         username: params.username,
         email: params.email,
-        phoneNumber: params.phoneNumber
+        phoneNumber: params.phoneNumber,
+        rememberMe: false
       };
       callback({
         status: 200,
@@ -105,6 +106,14 @@ xhook.before(function(request, callback) {
         post.id = ++postId;
         post.comments = [];
         posts.push(post);
+
+        //// TEMP
+        //callback({
+        //  status: 500,
+        //  data: JSON.stringify({}),
+        //  headers: { 'Content-Type': 'application/json' }
+        //});
+
         callback({
           status: 200,
           data: JSON.stringify({ post: post }),

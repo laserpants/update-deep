@@ -27,6 +27,7 @@ import Bulma.Components exposing (..)
 import Bulma.Modifiers exposing (..)
 import Bulma.Form exposing (controlInputModifiers, controlTextAreaModifiers)
 import Css 
+import Css.Media
 import Html
 import Html.Styled 
 import Html.Styled.Attributes 
@@ -34,6 +35,9 @@ import Html.Styled.Events
 import Task
 import Process
 
+--
+
+-- TODO Make toast 100% width on smaller screens
 
 --
 
@@ -143,7 +147,10 @@ toastContainer html =
       , Css.displayFlex
       , Css.flexDirection (Css.column)
       , Css.padding (Css.px 15)
-      , Css.alignItems (Css.start)
+      , Css.Media.withMedia 
+        [ Css.Media.only Css.Media.screen 
+          [ Css.Media.minWidth (Css.px 768) ] 
+        ] [ Css.alignItems (Css.start) ]
       , Css.zIndex (Css.int 9000)
       ]
     ] [ Html.Styled.fromUnstyled html ]
@@ -630,10 +637,11 @@ newPostPageFormView { form, disabled } toMsg =
     |> Html.map toMsg
 
 newPostPageView : NewPostPageState -> (NewPostPageMsg -> msg) -> Html msg
-newPostPageView { formModel } toMsg = 
+newPostPageView { api, formModel } toMsg = 
   div [ class "columns is-centered", style "margin" "1.5em" ] 
     [ div [ class "column is-two-thirds" ] 
       [ h3 [ class "title is-3" ] [ text "New post" ] 
+      , resourceErrorView api.resource
       , newPostPageFormView formModel (toMsg << NewPostFormMsg) ]
     ]
 
@@ -777,7 +785,7 @@ showPostPageCommentsView comments toMsg =
             div [] (List.map commentItem comments)
 
 showPostPageView : ShowPostPageState -> (ShowPostPageMsg -> msg) -> Html msg
-showPostPageView { post, commentForm } toMsg = 
+showPostPageView { post, comment, commentForm } toMsg = 
  div [ class "columns is-centered", style "margin" "1.5em" ] 
    [ div [ class "column is-two-thirds" ] 
      [ if Requested == post.resource || commentForm.disabled
@@ -800,6 +808,7 @@ showPostPageView { post, commentForm } toMsg =
                      , h5 [ class "title is-5" ] [ text "Comments" ] 
                      , showPostPageCommentsView post_.comments toMsg
                      , h5 [ class "title is-5" ] [ text "Leave a comment" ] 
+                     , resourceErrorView comment.resource
                      , showPostPageCommentFormView commentForm (toMsg << ShowPostPageCommentFormMsg)
                      ]
      ]
@@ -939,6 +948,14 @@ loginPageFormView { form, disabled } toMsg =
     |> Html.form [ onSubmit Form.Submit ]
     |> Html.map toMsg
 
+resourceErrorView : ApiResource a -> Html msg
+resourceErrorView resource =
+  case resource of
+    Error error -> 
+      message { messageModifiers | color = Danger } [] 
+        [ messageBody [] [ text (error |> apiErrorToString) ] ]
+    _ -> text ""
+
 loginPageView : LoginPageState -> (LoginPageMsg -> msg) -> Html msg
 loginPageView { api, formModel } toMsg = 
   div [ class "columns is-centered is-mobile", style "margin" "6em 0" ] 
@@ -946,11 +963,12 @@ loginPageView { api, formModel } toMsg =
       [ card [] 
         [ cardContent []
           [ h3 [ class "title is-3" ] [ text "Log in" ] 
-          , case api.resource of
-              Error error -> 
-                message { messageModifiers | color = Danger } [] 
-                  [ messageBody [] [ text (error |> apiErrorToString) ] ]
-              _ -> text ""
+          , message { messageModifiers | color = Info } 
+            [ style "max-width" "400px" ] 
+            [ messageBody [] 
+              [ text "This is a demo. Log in with username 'test' and password 'test'." ] 
+            ]
+          , resourceErrorView api.resource
           , loginPageFormView formModel (toMsg << LoginFormMsg) 
           ]
         ]
@@ -1272,11 +1290,14 @@ registerPageView { api, formModel, usernameStatus } toMsg =
           [ h3 [ class "title is-3" ] [ text "Register" ] 
           , case api.resource of
               Available response ->
-                div [] [ text "Thanks!" ]
+                div [] 
+                  [ text "Thanks for registering! Now head over to the "
+                  , a [ href "/login" ] [ text "log in" ]
+                  , text " page and see how it goes." ]
               Error error ->
-                div [] [ text "error" ]
+                resourceErrorView api.resource
               _ ->
-                div [] [ registerPageFormView formModel usernameStatus (toMsg << RegisterFormMsg) ]
+                registerPageFormView formModel usernameStatus (toMsg << RegisterFormMsg)
           ]
         ]
       ]
@@ -1304,7 +1325,7 @@ parser =
     , Parser.map NewPost (Parser.s "posts" </> Parser.s "new")
     , Parser.map ShowPost (Parser.s "posts" </> Parser.int)
     ]
-    
+
 fromUrl : Url -> Maybe Route
 fromUrl = parse parser
 
@@ -1580,11 +1601,11 @@ loadPage setPage state =
         |> andThen (inUi closeBurgerMenu)
 
 handleRouteChange : Url -> Maybe Route -> State -> Update State Msg a
-handleRouteChange url maybeRoute state_ =
+handleRouteChange url maybeRoute =
 
   let 
-      ifAuthenticated gotoPage ({ session } as state) =
-        if Nothing == session 
+      ifAuthenticated gotoPage state =
+        if Nothing == state.session 
             then 
               state
                 |> setRestrictedUrl url.path  -- Redirect back here after successful login
@@ -1595,51 +1616,51 @@ handleRouteChange url maybeRoute state_ =
                 |> gotoPage
                 |> mapCmd PageMsg
 
-      unlessAuthenticated gotoPage ({ session } as state) =
-        state 
-          |> if Nothing /= session then redirect "/" else gotoPage >> mapCmd PageMsg
+      unlessAuthenticated gotoPage =
+        pluck .session (\session -> if Nothing /= session then redirect "/" else gotoPage >> mapCmd PageMsg)
 
    in 
       case maybeRoute of
 
         -- No route
         Nothing ->
-          state_
-            |> loadPage (save NotFoundPage)
-            |> mapCmd PageMsg
+          loadPage (save NotFoundPage) >> mapCmd PageMsg
 
         -- Authenticated only
         Just NewPost ->
-          ifAuthenticated (loadPage (Update.Deep.map NewPostPage (newPostPageInit NewPostPageMsg))) state_
+          ifAuthenticated (newPostPageInit NewPostPageMsg |> Update.Deep.map NewPostPage |> loadPage) 
 
         -- Redirect if already authenticated
         Just Login ->
-          unlessAuthenticated (loadPage (Update.Deep.map LoginPage (loginPageInit LoginPageMsg))) state_
+          unlessAuthenticated (loginPageInit LoginPageMsg |> Update.Deep.map LoginPage |> loadPage) 
 
         -- Redirect if already authenticated
         Just Register ->
-          unlessAuthenticated (loadPage (Update.Deep.map RegisterPage (registerPageInit RegisterPageMsg))) state_
+          unlessAuthenticated (registerPageInit RegisterPageMsg |> Update.Deep.map RegisterPage |> loadPage) 
 
         -- Other
         Just (ShowPost id) ->
-          loadPage (Update.Deep.map ShowPostPage (showPostPageInit id ShowPostPageMsg |> andThen (showPostPageUpdate { onCommentCreated = always save } FetchPost ShowPostPageMsg))) state_
-            |> mapCmd PageMsg
+          mapCmd PageMsg << (
+            showPostPageInit id ShowPostPageMsg 
+              |> andThen (showPostPageUpdate { onCommentCreated = always save } FetchPost ShowPostPageMsg) 
+              |> Update.Deep.map ShowPostPage
+              |> loadPage)  
 
         Just Home ->
-          loadPage (Update.Deep.map HomePage (homePageInit HomePageMsg |> andThen (homePageUpdate FetchPosts HomePageMsg))) state_
-            |> mapCmd PageMsg
+          mapCmd PageMsg << (
+            homePageInit HomePageMsg 
+              |> andThen (homePageUpdate FetchPosts HomePageMsg) 
+              |> Update.Deep.map HomePage
+              |> loadPage) 
 
         Just Logout ->
-          state_
-            |> setSession Nothing
-            |> andThen (updateSessionStorage Nothing)
-            |> andThen (redirect "/")
-            |> andThen (inUi (showInfoToast "You have been logged out" UiMsg))
- 
+          setSession Nothing
+            >> andThen (updateSessionStorage Nothing)
+            >> andThen (redirect "/")
+            >> andThen (inUi (showInfoToast "You have been logged out" UiMsg))
+
         Just About ->
-          state_
-            |> loadPage (save AboutPage)
-            |> mapCmd PageMsg
+          loadPage (save AboutPage) >> mapCmd PageMsg
 
 updateSessionStorage : Maybe Session -> State -> Update State msg a
 updateSessionStorage maybeSession =
