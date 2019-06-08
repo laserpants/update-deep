@@ -26,6 +26,14 @@ import Bulma.Elements as Bulma exposing (TitleSize(..), title)
 import Bulma.Components exposing (..)
 import Bulma.Modifiers exposing (..)
 import Bulma.Form exposing (controlInputModifiers, controlTextAreaModifiers)
+import Css 
+import Html
+import Html.Styled 
+import Html.Styled.Attributes 
+import Html.Styled.Events 
+import Task
+import Process
+
 
 --
 
@@ -63,11 +71,9 @@ fieldInfo toString modifiers { liveError, path, value } =
 
 --
 
--- TODO Toast timeout
-
 type UiMsg
   = ToggleBurgerMenu
-  | CloseToast
+  | CloseToast Int
 
 type alias Toast =
   { message : String
@@ -76,7 +82,12 @@ type alias Toast =
 
 type alias UiState =
   { menuOpen : Bool 
-  , toast : Maybe Toast }
+  , toast : Maybe ( Int, Toast )
+  , toastCounter : Int
+  }
+
+incrementToastCounter : UiState -> Update UiState msg a
+incrementToastCounter state = save { state | toastCounter = 1 + state.toastCounter }
 
 toggleMenuOpen : UiState -> Update UiState msg a
 toggleMenuOpen state = save { state | menuOpen = not state.menuOpen }
@@ -84,11 +95,19 @@ toggleMenuOpen state = save { state | menuOpen = not state.menuOpen }
 closeBurgerMenu : UiState -> Update UiState msg a
 closeBurgerMenu state = save { state | menuOpen = False }
 
-showToast : Toast -> UiState -> Update UiState msg a
-showToast toast state = save { state | toast = Just toast }
+setToast : Toast -> UiState -> Update UiState msg a
+setToast toast state = save { state | toast = Just ( state.toastCounter, toast ) }
 
-showInfoToast : String -> UiState -> Update UiState msg a
-showInfoToast message state = save { state | toast = Just { color = Info, message = message } }
+showToast : Toast -> (UiMsg -> msg) -> UiState -> Update UiState msg a
+showToast toast toMsg state = 
+  state 
+    |> setToast toast
+    |> andAddCmd (Task.perform (CloseToast state.toastCounter |> always) (Process.sleep 4000))
+    |> andThen incrementToastCounter
+    |> mapCmd toMsg 
+
+showInfoToast : String -> (UiMsg -> msg) -> UiState -> Update UiState msg a
+showInfoToast message = showToast { message = message, color = Info } 
 
 closeToast : UiState -> Update UiState msg a
 closeToast state = save { state | toast = Nothing }
@@ -98,36 +117,47 @@ uiInit =
   save UiState
     |> andMap (save False)
     |> andMap (save Nothing)
+    |> andMap (save 1)
 
 uiUpdate : UiMsg -> (UiMsg -> msg) -> UiState -> Update UiState msg a
 uiUpdate msg toMsg =
   case msg of
     ToggleBurgerMenu ->
       toggleMenuOpen
-    CloseToast ->
-      closeToast
+    CloseToast id ->
+      pluck .toast (\toast -> 
+        case toast of
+          Nothing ->
+            save 
+          Just ( toastId, _ ) ->
+            if id == toastId then closeToast else save) 
+
+toastContainer : Html msg -> Html msg
+toastContainer html =
+  Html.Styled.div 
+    [ Html.Styled.Attributes.css
+      [ Css.width (Css.pct 100)
+      , Css.position (Css.fixed)
+      , Css.bottom (Css.px 0)
+      , Css.pointerEvents (Css.none)
+      , Css.displayFlex
+      , Css.flexDirection (Css.column)
+      , Css.padding (Css.px 15)
+      , Css.alignItems (Css.start)
+      , Css.zIndex (Css.int 9000)
+      ]
+    ] [ Html.Styled.fromUnstyled html ]
+  |> Html.Styled.toUnstyled
 
 uiToastMessage : UiState -> (UiMsg -> msg) -> Html msg
 uiToastMessage { toast } toMsg =
   case toast of
     Nothing ->
       text ""
-    Just { message, color } ->
-      div 
-        -- TODO
-        [ style "width" "100%"
-        , style "position" "fixed"
-        , style "bottom" "0"
-        , style "pointer-events" "none"
-        , style "display" "flex"
-        , style "flex-direction" "column"
-        , style "padding" "15px"
-        , style "align-items" "center" 
-        , style "z-index" "1000" 
-        ] 
-        [ Bulma.notificationWithDelete color [] CloseToast [ text message ] ]
-
-      |> Html.map toMsg
+    Just ( id, { message, color } ) ->
+      Bulma.notificationWithDelete color [] (CloseToast id) [ text message ]
+        |> toastContainer 
+        |> Html.map toMsg
 
 uiNavbar : Maybe Session -> Page -> UiState -> (UiMsg -> msg) -> Html msg
 uiNavbar session page { menuOpen } toMsg = 
@@ -1549,8 +1579,8 @@ loadPage setPage state =
         |> andThenIf (not << isLoginRoute) resetRestrictedUrl
         |> andThen (inUi closeBurgerMenu)
 
-handleRouteChange : (PageMsg -> msg) -> Url -> Maybe Route -> State -> Update State msg a
-handleRouteChange toMsg url maybeRoute =
+handleRouteChange : Url -> Maybe Route -> State -> Update State Msg a
+handleRouteChange url maybeRoute state_ =
 
   let 
       ifAuthenticated gotoPage ({ session } as state) =
@@ -1559,63 +1589,57 @@ handleRouteChange toMsg url maybeRoute =
               state
                 |> setRestrictedUrl url.path  -- Redirect back here after successful login
                 |> andThen (redirect "/login")
-                |> andThen (inUi (showToast { message = "You must be logged in to access that page.", color = Warning }))
+                |> andThen (inUi (showToast { message = "You must be logged in to access that page.", color = Warning } UiMsg))
             else 
               state
                 |> gotoPage
+                |> mapCmd PageMsg
 
       unlessAuthenticated gotoPage ({ session } as state) =
         state 
-          |> if Nothing /= session then redirect "/" else gotoPage
+          |> if Nothing /= session then redirect "/" else gotoPage >> mapCmd PageMsg
 
    in 
-      mapCmd toMsg << case maybeRoute of
+      case maybeRoute of
 
         -- No route
         Nothing ->
-          loadPage (save NotFoundPage)
- 
+          state_
+            |> loadPage (save NotFoundPage)
+            |> mapCmd PageMsg
+
         -- Authenticated only
         Just NewPost ->
-          newPostPageInit NewPostPageMsg
-            |> Update.Deep.map NewPostPage
-            |> loadPage 
-            |> ifAuthenticated
- 
+          ifAuthenticated (loadPage (Update.Deep.map NewPostPage (newPostPageInit NewPostPageMsg))) state_
+
         -- Redirect if already authenticated
         Just Login ->
-          loginPageInit LoginPageMsg
-            |> Update.Deep.map LoginPage
-            |> loadPage 
-            |> unlessAuthenticated
- 
+          unlessAuthenticated (loadPage (Update.Deep.map LoginPage (loginPageInit LoginPageMsg))) state_
+
+        -- Redirect if already authenticated
         Just Register ->
-          registerPageInit RegisterPageMsg
-            |> Update.Deep.map RegisterPage
-            |> loadPage 
-            |> unlessAuthenticated
- 
+          unlessAuthenticated (loadPage (Update.Deep.map RegisterPage (registerPageInit RegisterPageMsg))) state_
+
         -- Other
         Just (ShowPost id) ->
-          showPostPageInit id ShowPostPageMsg
-            |> andThen (showPostPageUpdate { onCommentCreated = always save } FetchPost ShowPostPageMsg)
-            |> Update.Deep.map ShowPostPage 
-            |> loadPage 
- 
+          loadPage (Update.Deep.map ShowPostPage (showPostPageInit id ShowPostPageMsg |> andThen (showPostPageUpdate { onCommentCreated = always save } FetchPost ShowPostPageMsg))) state_
+            |> mapCmd PageMsg
+
         Just Home ->
-          homePageInit HomePageMsg
-            |> andThen (homePageUpdate FetchPosts HomePageMsg)
-            |> Update.Deep.map HomePage
-            |> loadPage 
- 
+          loadPage (Update.Deep.map HomePage (homePageInit HomePageMsg |> andThen (homePageUpdate FetchPosts HomePageMsg))) state_
+            |> mapCmd PageMsg
+
         Just Logout ->
-          setSession Nothing
-            >> andThen (updateSessionStorage Nothing)
-            >> andThen (redirect "/")
-            >> andThen (inUi (showInfoToast "You have been logged out"))
+          state_
+            |> setSession Nothing
+            |> andThen (updateSessionStorage Nothing)
+            |> andThen (redirect "/")
+            |> andThen (inUi (showInfoToast "You have been logged out" UiMsg))
  
         Just About ->
-          loadPage (save AboutPage)
+          state_
+            |> loadPage (save AboutPage)
+            |> mapCmd PageMsg
 
 updateSessionStorage : Maybe Session -> State -> Update State msg a
 updateSessionStorage maybeSession =
@@ -1642,12 +1666,12 @@ update : Msg -> State -> Update State Msg a
 update msg =
   case msg of
     RouterMsg routerMsg ->
-      inRouter (routerUpdate { onRouteChange = handleRouteChange PageMsg } routerMsg)
+      inRouter (routerUpdate { onRouteChange = handleRouteChange } routerMsg)
     PageMsg pageMsg ->
       inPage (pageUpdate 
         { onAuthResponse = handleAuthResponse
-        , onPostAdded = always (redirect "/" >> andThen (inUi (showInfoToast "Your post was published")))
-        , onCommentCreated = inUi (showInfoToast "Your comment was received") |> always 
+        , onPostAdded = always (redirect "/" >> andThen (inUi (showInfoToast "Your post was published" UiMsg)))
+        , onCommentCreated = inUi (showInfoToast "Your comment was received" UiMsg) |> always 
         } pageMsg PageMsg)
     UiMsg uiMsg ->
       inUi (uiUpdate uiMsg UiMsg)
