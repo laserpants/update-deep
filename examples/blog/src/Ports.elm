@@ -1,16 +1,6 @@
 port module Ports exposing (..)
 
-type alias User =
-  { id : Int
-  , username : String
-  , name : String
-  , email : String 
-  , rememberMe : Bool
-  }
-
-type alias Session =
-  { user : User
-  }
+import Data.Session exposing (Session)
 
 port setSession : Session -> Cmd msg
 
