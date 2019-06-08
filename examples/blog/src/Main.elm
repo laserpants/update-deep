@@ -432,7 +432,7 @@ homePagePostsList { resource } =
          NotRequested ->
            div [] []
          Requested ->
-           div [] [ text "Loading" ]
+           div [ class "spinner" ] [ div [ class "bounce1" ] [], div [ class "bounce2" ] [], div [ class "bounce3" ] [] ]
          Error error ->
            div [] [ text "error" ]
          Available posts ->
@@ -712,7 +712,7 @@ showPostPageView { post, commentForm } toMsg =
    [ div [ class "column is-two-thirds" ] 
      [ if Requested == post.resource || commentForm.disabled
            then
-             div [] [ text "Loading..." ]
+             div [ class "spinner" ] [ div [ class "bounce1" ] [], div [ class "bounce2" ] [], div [ class "bounce3" ] [] ]
            else
              case post.resource of
                NotRequested ->

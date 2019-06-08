@@ -24,7 +24,7 @@ var posts =
 var userId = 1;
 var postId = 1;
 var commentId = 0;
-var delay = 300;
+var delay = 400;
 
 xhook.before(function(request, callback) {
 
