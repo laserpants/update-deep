@@ -25,7 +25,41 @@ import Bulma.Layout exposing (SectionSpacing(..), hero,heroBody,container, fluid
 import Bulma.Elements as Bulma exposing (TitleSize(..), title)
 import Bulma.Components exposing (..)
 import Bulma.Modifiers exposing (..)
-import Bulma.Form exposing (controlInputModifiers)
+import Bulma.Form exposing (controlInputModifiers, controlTextAreaModifiers)
+
+-- 
+
+-- remember me
+-- flash message
+
+--
+
+fieldInfo 
+   : (a -> String) 
+  -> { b | color : Color } 
+  -> { e | liveError : Maybe (ErrorValue a), path : c, value : d }
+  -> { errorMessage : String
+     , hasError : Bool
+     , modifiers : { b | color : Color }
+     , path : c
+     , value : d
+     }
+fieldInfo toString modifiers { liveError, path, value } =
+  case liveError of
+    Nothing -> 
+      { path = path
+      , value = value
+      , hasError = False
+      , modifiers = modifiers
+      , errorMessage = "" 
+      }
+    Just error ->
+      { path = path
+      , value = value
+      , hasError = True
+      , modifiers = { modifiers | color = Danger }
+      , errorMessage = errorToString toString error 
+      }
 
 --
 
@@ -65,11 +99,11 @@ myNavbar session page { menuOpen } toMsg =
       currentPage = current page
 
    in
-        navbar { navbarModifiers | color = Info } []
+        fixedNavbar Top { navbarModifiers | color = Info } []
           [ navbarBrand [] burger
-            [ navbarItem False [] [ h5 [ class "title is-5" ] [ a [ class "has-text-white", href "/" ] [ text "Hello" ] ] ] ]
+            [ navbarItem False [] [ h5 [ class "title is-5" ] [ a [ class "has-text-white", href "/" ] [ text "Facepalm" ] ] ] ]
           , navbarMenu menuOpen []
-            [ navbarStart [ class "noselect" ] 
+            [ navbarStart [ class "is-unselectable" ] 
               [ navbarItemLink currentPage.isHomePage [ href "/" ] [ text "Home" ]
               , navbarItemLink currentPage.isAboutPage [ href "/about" ] [ text "About" ]
               , navbarItemLink currentPage.isNewPostPage [ href "/posts/new" ] [ text "New post" ]
@@ -78,6 +112,7 @@ myNavbar session page { menuOpen } toMsg =
                 [ navbarItem False [] [ div [ class "field is-grouped" ] buttons ] ]
             ]
           ]
+
         |> Html.map toMsg
 
 uiInit : Update UiState msg a
@@ -218,7 +253,7 @@ formUpdate { onSubmit } msg model =
     ( Form.Submit, Just form ) ->
       model
         |> formSetDisabled True
-        |> andThen (invokeHandler (onSubmit form))
+        |> andInvokeHandler (onSubmit form)
     _ ->
       model.form
         |> Form.update model.validation msg
@@ -296,6 +331,18 @@ apiUpdate { onSuccess, onError } msg toMsg =
     Reset ->
       apiResetResource
 
+apiErrorToString : Http.Error -> String
+apiErrorToString error =
+  case error of
+    Http.BadStatus 401 ->
+      "Authentication failed."
+    Http.BadStatus 500 ->
+      "Application error (500 Internal Server Error)"
+    Http.BadStatus 501 ->
+      "This feature is not implemented"
+    _ ->
+      "Something went wrong!"
+
 --
 
 errorToString : (a -> String) -> ErrorValue a -> String
@@ -359,14 +406,12 @@ homePageInit toMsg =
         |> mapCmd toMsg
 
 homePageUpdate : HomePageMsg -> (HomePageMsg -> msg) -> HomePageState -> Update HomePageState msg a
-homePageUpdate msg toMsg state = 
+homePageUpdate msg toMsg = 
   case msg of
     HomePageApiMsg apiMsg ->
-      state
-        |> homePageInPosts (apiUpdate { onSuccess = always save, onError = always save } apiMsg (toMsg << HomePageApiMsg))
+      homePageInPosts (apiUpdate { onSuccess = always save, onError = always save } apiMsg (toMsg << HomePageApiMsg))
     FetchPosts ->
-      state
-        |> homePageInPosts (apiSendRequest "" Nothing (toMsg << HomePageApiMsg))
+      homePageInPosts (apiSendRequest "" Nothing (toMsg << HomePageApiMsg))
 
 homePageSubscriptions : HomePageState -> (HomePageMsg -> msg) -> Sub msg
 homePageSubscriptions state toMsg = Sub.none
@@ -376,10 +421,10 @@ homePagePostsList { resource } =
 
   let listItem post =
         div [] 
-          [ h3 [] [ text post.title ] 
-          , p [] [ text post.body ] 
-          , p [] [ text (let count = List.length post.comments in if count > 0 then (String.fromInt count ++ " comment(s)") else "No comments") ] 
-          , a [ href ("/posts/" ++ String.fromInt post.id) ] [ text "Show post" ]
+          [ h4 [ class "title is-4" ] [ text post.title ] 
+          , p [ class "content" ] [ text post.body ] 
+          , p [ class "content" ] [ text (let count = List.length post.comments in if count > 0 then (String.fromInt count ++ " comment(s)") else "No comments") ] 
+          , p [ class "content" ] [ a [ href ("/posts/" ++ String.fromInt post.id) ] [ text "Show post" ] ]
           ]
 
    in 
@@ -395,9 +440,11 @@ homePagePostsList { resource } =
 
 homePageView : HomePageState -> (HomePageMsg -> msg) -> Html msg
 homePageView state toMsg = 
-  div [] 
-    [ h2 [] [ text "Posts" ]
-    , homePagePostsList state.posts
+  div [ class "columns is-centered", style "margin" "1.5em" ] 
+    [ div [ class "column is-two-thirds" ] 
+      [ h3 [ class "title is-3" ] [ text "Posts" ] 
+      , homePagePostsList state.posts
+      ]
     ]
 
 --
@@ -471,38 +518,41 @@ newPostPageSubscriptions state toMsg = Sub.none
 newPostPageFormView : FormModel Never NewPostForm -> (Form.Msg -> msg) -> Html msg
 newPostPageFormView { form, disabled } toMsg =
 
-  let title = form |> Form.getFieldAsString "title"
-      body  = form |> Form.getFieldAsString "body"
+  let 
+      info = fieldInfo (always "")
 
-      alwaysEmpty = always ""
-
-      errorMessage field = 
-        field.liveError 
-          |> Maybe.unpack alwaysEmpty (errorToString alwaysEmpty)
+      title = form |> Form.getFieldAsString "title" |> info controlInputModifiers
+      body  = form |> Form.getFieldAsString "body"  |> info controlTextAreaModifiers
 
    in
-
       [ fieldset [ Html.Attributes.disabled disabled ]
-        [ div [] 
-          [ input 
-            [ onFocus (Form.Focus title.path)
+        [ Bulma.Form.field [] 
+          [ Bulma.Form.controlLabel [] [ text "Title" ] 
+          , Bulma.Form.controlInput title.modifiers [] 
+            [ placeholder "Title"
+            , onFocus (Form.Focus title.path)
             , onBlur (Form.Blur title.path)
             , onInput (String >> Form.Input title.path Form.Text)
-            , value (Maybe.withDefault "" title.value)  
+            , value (Maybe.withDefault "" title.value)
             ] [] 
+          , Bulma.Form.controlHelp Danger [] [ Html.text title.errorMessage ]
           ]
-        , div [] [ Html.text (errorMessage title) ]
-        , div [] 
-          [ textarea 
-            [ onFocus (Form.Focus body.path)
+        , Bulma.Form.field [] 
+          [ Bulma.Form.controlLabel [] [ text "Body" ] 
+          , Bulma.Form.controlTextArea body.modifiers [] 
+            [ placeholder "Body"
+            , onFocus (Form.Focus body.path)
             , onBlur (Form.Blur body.path)
             , onInput (String >> Form.Input body.path Form.Text)
-            , value (Maybe.withDefault "" body.value) 
-            ] []
+            , value (Maybe.withDefault "" body.value)
+            ] [] 
+          , Bulma.Form.controlHelp Danger [] [ Html.text body.errorMessage ]
           ]
-        , div [] [ Html.text (errorMessage body) ]
-        , div []
-          [ button [ type_ "submit" ] [ text (if disabled then "Please wait" else "Publish") ] 
+        , Bulma.Form.field [] 
+          [ div [ class "control" ] 
+            [ button [ type_ "submit", class "button is-primary" ] 
+              [ text (if disabled then "Please wait" else "Publish") ] 
+            ]
           ]
         ]
       ]
@@ -512,7 +562,11 @@ newPostPageFormView { form, disabled } toMsg =
 
 newPostPageView : NewPostPageState -> (NewPostPageMsg -> msg) -> Html msg
 newPostPageView { formModel } toMsg = 
-  div [] [ newPostPageFormView formModel (toMsg << NewPostFormMsg) ]
+  div [ class "columns is-centered", style "margin" "1.5em" ] 
+    [ div [ class "column is-two-thirds" ] 
+      [ h3 [ class "title is-3" ] [ text "New post" ] 
+      , newPostPageFormView formModel (toMsg << NewPostFormMsg) ]
+    ]
 
 --
 
@@ -590,41 +644,44 @@ showPostPageUpdate msg toMsg =
 showPostPageSubscriptions : ShowPostPageState -> (ShowPostPageMsg -> msg) -> Sub msg
 showPostPageSubscriptions state toMsg = Sub.none
 
-newPostPageCommentFormView : FormModel Never CommentForm -> (Form.Msg -> msg) -> Html msg
-newPostPageCommentFormView { form, disabled } toMsg =
+showPostPageCommentFormView : FormModel Never CommentForm -> (Form.Msg -> msg) -> Html msg
+showPostPageCommentFormView { form, disabled } toMsg =
 
-  let email = form |> Form.getFieldAsString "email"
-      body  = form |> Form.getFieldAsString "body"
+  let 
+      info = fieldInfo (always "")
 
-      alwaysEmpty = always ""
-
-      errorMessage field = 
-        field.liveError 
-          |> Maybe.unpack alwaysEmpty (errorToString alwaysEmpty)
+      email = form |> Form.getFieldAsString "email" |> info controlInputModifiers
+      body  = form |> Form.getFieldAsString "body"  |> info controlTextAreaModifiers
 
    in
-
       [ fieldset [ Html.Attributes.disabled disabled ]
-        [ div [] 
-          [ input 
-            [ onFocus (Form.Focus email.path)
+        [ Bulma.Form.field [] 
+          [ Bulma.Form.controlLabel [] [ text "Email" ] 
+          , Bulma.Form.controlEmail email.modifiers [] 
+            [ placeholder "Email"
+            , onFocus (Form.Focus email.path)
             , onBlur (Form.Blur email.path)
             , onInput (String >> Form.Input email.path Form.Text)
-            , value (Maybe.withDefault "" email.value)  
+            , value (Maybe.withDefault "" email.value)
             ] [] 
+          , Bulma.Form.controlHelp Danger [] [ Html.text email.errorMessage ]
           ]
-        , div [] [ Html.text (errorMessage email) ]
-        , div [] 
-          [ textarea 
-            [ onFocus (Form.Focus body.path)
+        , Bulma.Form.field [] 
+          [ Bulma.Form.controlLabel [] [ text "Body" ] 
+          , Bulma.Form.controlTextArea body.modifiers [] 
+            [ placeholder "Body"
+            , onFocus (Form.Focus body.path)
             , onBlur (Form.Blur body.path)
             , onInput (String >> Form.Input body.path Form.Text)
-            , value (Maybe.withDefault "" body.value) 
-            ] []
+            , value (Maybe.withDefault "" body.value)
+            ] [] 
+          , Bulma.Form.controlHelp Danger [] [ Html.text body.errorMessage ]
           ]
-        , div [] [ Html.text (errorMessage body) ]
-        , div []
-          [ button [ type_ "submit" ] [ text (if disabled then "Please wait" else "Send comment") ] 
+        , Bulma.Form.field [] 
+          [ div [ class "control" ] 
+            [ button [ type_ "submit", class "button is-primary" ] 
+              [ text (if disabled then "Please wait" else "Send comment") ] 
+            ]
           ]
         ]
       ]
@@ -634,6 +691,7 @@ newPostPageCommentFormView { form, disabled } toMsg =
 
 showPostPageCommentsView : List Comment -> (ShowPostPageMsg -> msg) -> Html msg
 showPostPageCommentsView comments toMsg =
+
   let
       commentItem comment =
         div [] 
@@ -644,33 +702,38 @@ showPostPageCommentsView comments toMsg =
    in
       if List.isEmpty comments
           then 
-            p [] [ text "No comments" ]
+            p [ class "content" ] [ text "No comments" ]
           else
             div [] (List.map commentItem comments)
 
 showPostPageView : ShowPostPageState -> (ShowPostPageMsg -> msg) -> Html msg
 showPostPageView { post, commentForm } toMsg = 
-  if Requested == post.resource || commentForm.disabled
-      then
-        div [] [ text "Loading..." ]
-      else
-       case post.resource of
-         NotRequested ->
-           div [] []
-         Requested ->
-           div [] [ text "Loading" ]
-         Error error ->
-           div [] [ text "error" ]
-         Available post_ ->
-           div [] 
-             [ h2 [] [ text post_.title ]
-             , p [] [ text post_.body ]
-             , h4 [] [ text "Comments" ]
-             , showPostPageCommentsView post_.comments toMsg
-             , h4 [] [ text "Post a comment" ]
-             , newPostPageCommentFormView commentForm (toMsg << ShowPostPageCommentFormMsg)
-             ]
-
+ div [ class "columns is-centered", style "margin" "1.5em" ] 
+   [ div [ class "column is-two-thirds" ] 
+     [ if Requested == post.resource || commentForm.disabled
+           then
+             div [] [ text "Loading..." ]
+           else
+             case post.resource of
+               NotRequested ->
+                 div [] []
+               Requested ->
+                 div [] [ text "Loading" ]
+               Error error ->
+                 div [] [ text "error" ]
+               Available post_ -> 
+                 div []
+                   [ h3 
+                     [ class "title is-3" ] [ text post_.title ] 
+                     , p [ class "content" ] [ text post_.body ]
+                     , h5 [ class "title is-5" ] [ text "Comments" ] 
+                     , showPostPageCommentsView post_.comments toMsg
+                     , h5 [ class "title is-5" ] [ text "Leave a comment" ] 
+                     , showPostPageCommentFormView commentForm (toMsg << ShowPostPageCommentFormMsg)
+                     ]
+     ]
+   ]
+     
 --
 
 type alias LoginForm =
@@ -750,25 +813,13 @@ loginPageFormView : FormModel Never LoginForm -> (Form.Msg -> msg) -> Html msg
 loginPageFormView { form, disabled } toMsg =
 
   let 
-      fieldInfo { liveError, path, value } =
-        case liveError of
-          Nothing -> 
-            { path = path
-            , value = value
-            , hasError = False
-            , modifiers = controlInputModifiers
-            , errorMessage = "" 
-            }
-          Just error ->
-            { path = path
-            , value = value
-            , hasError = True
-            , modifiers = { controlInputModifiers | color = Danger }
-            , errorMessage = errorToString (always "") error 
-            }
+      info = fieldInfo (always "")
 
-      username = form |> Form.getFieldAsString "username" |> fieldInfo 
-      password = form |> Form.getFieldAsString "password" |> fieldInfo 
+      usernameIcon = Just ( Small, [], i [ class "fa fa-user" ] [] )
+      passwordIcon = Just ( Small, [], i [ class "fa fa-lock" ] [] )
+
+      username = form |> Form.getFieldAsString "username" |> info { controlInputModifiers | iconLeft = usernameIcon }
+      password = form |> Form.getFieldAsString "password" |> info { controlInputModifiers | iconLeft = passwordIcon }
 
    in
 
@@ -808,10 +859,21 @@ loginPageFormView { form, disabled } toMsg =
     |> Html.map toMsg
 
 loginPageView : LoginPageState -> (LoginPageMsg -> msg) -> Html msg
-loginPageView { formModel } toMsg = 
-  div [] 
-    [ h3 [ class "title is-3" ] [ text "Log in" ] 
-    , loginPageFormView formModel (toMsg << LoginFormMsg) 
+loginPageView { api, formModel } toMsg = 
+  div [ class "columns is-centered is-mobile", style "margin" "1.5em" ] 
+    [ div [ class "column is-narrow" ] 
+      [ card [] 
+        [ cardContent []
+          [ h3 [ class "title is-3" ] [ text "Log in" ] 
+          , case api.resource of
+              Error error -> 
+                message { messageModifiers | color = Danger } [] 
+                  [ messageBody [] [ text (error |> apiErrorToString) ] ]
+              _ -> text ""
+          , loginPageFormView formModel (toMsg << LoginFormMsg) 
+          ]
+        ]
+      ]
     ]
 
 --
@@ -1009,68 +1071,114 @@ registerPageFormView : FormModel RegisterFormError RegisterForm -> UsernameStatu
 registerPageFormView { form, disabled } usernameStatus toMsg =
 
   let 
-      name                 = form |> Form.getFieldAsString "name"
-      email                = form |> Form.getFieldAsString "email"
-      username             = form |> Form.getFieldAsString "username"
-      phoneNumber          = form |> Form.getFieldAsString "phoneNumber"
-      password             = form |> Form.getFieldAsString "password"
-      passwordConfirmation = form |> Form.getFieldAsString "passwordConfirmation"
-      agreeWithTerms       = form |> Form.getFieldAsBool   "agreeWithTerms"
+      info = fieldInfo registerFormErrorToString controlInputModifiers 
 
-      inputField attributes field = input 
-        ( [ onFocus (Form.Focus field.path)
-          , onBlur (Form.Blur field.path)
-          , onInput (String >> Form.Input field.path Form.Text)
-          , value (Maybe.withDefault "" field.value)
-          ] ++ attributes ) []
+      name                 = form |> Form.getFieldAsString "name"                 |> info
+      email                = form |> Form.getFieldAsString "email"                |> info
+      phoneNumber          = form |> Form.getFieldAsString "phoneNumber"          |> info
+      password             = form |> Form.getFieldAsString "password"             |> info
+      passwordConfirmation = form |> Form.getFieldAsString "passwordConfirmation" |> info
+      agreeWithTerms       = form |> Form.getFieldAsBool   "agreeWithTerms"       |> info
 
-      errorMessage field = 
-        field.liveError 
-          |> Maybe.unpack (always "") (errorToString registerFormErrorToString)
+      availableIcon = ( Small, [], i [ class "fa fa-check has-text-success" ] [] )
+      unavailableIcon = ( Small, [], i [ class "fa fa-times has-text-danger" ] [] )
 
-      usernameStatusText =
-        case usernameStatus of
-          UsernameBlank ->
-            text "[blank]"
-          UsernameAvailable isAvailable ->
-            text (if isAvailable then "Available" else "Not available")
-          Unknown ->
-            text "..."
+      username =
+        let 
+            info_ = form |> Form.getFieldAsString "username" |> info
+         in 
+            case usernameStatus of
+              UsernameAvailable True ->
+                { info_ | modifiers = { controlInputModifiers | color = Success, iconRight = Just availableIcon } }
+              UsernameAvailable False ->
+                { info_ | modifiers = { controlInputModifiers | color = Danger, iconRight = Just unavailableIcon }
+                        , errorMessage = "This username is not available" }
+              _ ->
+                info_
 
    in
-
       [ fieldset [ Html.Attributes.disabled disabled ]
-        [ div [] [ text "Name" ] 
-        , div [] [ inputField [] name ] 
-        , div [] [ Html.text (errorMessage name) ]
-        , div [] [ text "Email" ] 
-        , div [] [ inputField [] email ]
-        , div [] [ Html.text (errorMessage email) ]
-        , div [] [ text "Username" ] 
-        , div [] [ inputField [] username, usernameStatusText ]
-        , div [] [ Html.text (errorMessage username) ]
-        , div [] [ text "Phone number" ] 
-        , div [] [ inputField [] phoneNumber ]
-        , div [] [ Html.text (errorMessage phoneNumber) ]
-        , div [] [ text "Password" ] 
-        , div [] [ inputField [ type_ "password" ] password ]
-        , div [] [ Html.text (errorMessage password) ]
-        , div [] [ text "Password confirmation" ] 
-        , div [] [ inputField [ type_ "password" ] passwordConfirmation ]
-        , div [] [ Html.text (errorMessage passwordConfirmation) ]
-        , div [] 
-          [ input 
-            [ type_ "checkbox"
-            , onFocus (Form.Focus agreeWithTerms.path)
+        [ Bulma.Form.field [] 
+          [ Bulma.Form.controlLabel [] [ text "Name" ] 
+          , Bulma.Form.controlInput name.modifiers [] 
+            [ placeholder "Name"
+            , onFocus (Form.Focus name.path)
+            , onBlur (Form.Blur name.path)
+            , onInput (String >> Form.Input name.path Form.Text)
+            , value (Maybe.withDefault "" name.value)
+            ] [] 
+          , Bulma.Form.controlHelp Danger [] [ Html.text name.errorMessage ]
+          ]
+        , Bulma.Form.field [] 
+          [ Bulma.Form.controlLabel [] [ text "Email" ] 
+          , Bulma.Form.controlEmail email.modifiers [] 
+            [ placeholder "Email"
+            , onFocus (Form.Focus email.path)
+            , onBlur (Form.Blur email.path)
+            , onInput (String >> Form.Input email.path Form.Text)
+            , value (Maybe.withDefault "" email.value)
+            ] [] 
+          , Bulma.Form.controlHelp Danger [] [ Html.text email.errorMessage ]
+          ]
+        , Bulma.Form.field [] 
+          [ Bulma.Form.controlLabel [] [ text "Username" ] 
+          , Bulma.Form.controlInput username.modifiers
+              (if Unknown == usernameStatus then [ class "is-loading" ] else [])
+            [ placeholder "Username"
+            , onFocus (Form.Focus username.path)
+            , onBlur (Form.Blur username.path)
+            , onInput (String >> Form.Input username.path Form.Text)
+            , value (Maybe.withDefault "" username.value)
+            ] [] 
+          , Bulma.Form.controlHelp Danger [] [ Html.text username.errorMessage ]
+          ]
+        , Bulma.Form.field [] 
+          [ Bulma.Form.controlLabel [] [ text "Phone number" ] 
+          , Bulma.Form.controlPhone phoneNumber.modifiers [] 
+            [ placeholder "Phone number"
+            , onFocus (Form.Focus phoneNumber.path)
+            , onBlur (Form.Blur phoneNumber.path)
+            , onInput (String >> Form.Input phoneNumber.path Form.Text)
+            , value (Maybe.withDefault "" phoneNumber.value)
+            ] [] 
+          , Bulma.Form.controlHelp Danger [] [ Html.text phoneNumber.errorMessage ]
+          ]
+        , Bulma.Form.field [] 
+          [ Bulma.Form.controlLabel [] [ text "Password" ] 
+          , Bulma.Form.controlPassword password.modifiers [] 
+            [ placeholder "Password"
+            , onFocus (Form.Focus password.path)
+            , onBlur (Form.Blur password.path)
+            , onInput (String >> Form.Input password.path Form.Text)
+            , value (Maybe.withDefault "" password.value)
+            ] [] 
+          , Bulma.Form.controlHelp Danger [] [ Html.text password.errorMessage ]
+          ]
+        , Bulma.Form.field [] 
+          [ Bulma.Form.controlLabel [] [ text "Password confirmation" ] 
+          , Bulma.Form.controlPassword passwordConfirmation.modifiers [] 
+            [ placeholder "Password confirmation"
+            , onFocus (Form.Focus passwordConfirmation.path)
+            , onBlur (Form.Blur passwordConfirmation.path)
+            , onInput (String >> Form.Input passwordConfirmation.path Form.Text)
+            , value (Maybe.withDefault "" passwordConfirmation.value)
+            ] [] 
+          , Bulma.Form.controlHelp Danger [] [ Html.text passwordConfirmation.errorMessage ]
+          ]
+        , Bulma.Form.field [] 
+          [ Bulma.Form.controlCheckBox False [] [] 
+            [ onFocus (Form.Focus agreeWithTerms.path)
             , onBlur (Form.Blur agreeWithTerms.path)
             , onCheck (Bool >> Form.Input agreeWithTerms.path Form.Checkbox)
             , checked (Maybe.withDefault False agreeWithTerms.value)
-            ] 
-            []
+            ] [ text "I agree with terms and conditions" ]
+          , Bulma.Form.controlHelp Danger [] [ Html.text agreeWithTerms.errorMessage ]
           ]
-        , div [] [ Html.text (errorMessage agreeWithTerms) ]
-        , div []
-          [ button [ type_ "submit" ] [ text (if disabled then "Please wait" else "Submit") ] 
+        , Bulma.Form.field [] 
+          [ div [ class "control" ] 
+            [ button [ type_ "submit", class "button is-primary" ] 
+              [ text (if disabled then "Please wait" else "Send") ] 
+            ]
           ]
         ]
       ]
@@ -1080,15 +1188,21 @@ registerPageFormView { form, disabled } usernameStatus toMsg =
 
 registerPageView : RegisterPageState -> (RegisterPageMsg -> msg) -> Html msg
 registerPageView { api, formModel, usernameStatus } toMsg = 
-  div []
-    [ h3 [ class "title is-3" ] [ text "Register" ] 
-    , case api.resource of
-        Available response ->
-          div [] [ text "Thanks!" ]
-        Error error ->
-          div [] [ text "error" ]
-        _ ->
-          div [] [ registerPageFormView formModel usernameStatus (toMsg << RegisterFormMsg) ]
+  div [ class "columns is-centered", style "margin" "1.5em" ] 
+    [ div [ class "column is-half" ] 
+      [ card [] 
+        [ cardContent []
+          [ h3 [ class "title is-3" ] [ text "Register" ] 
+          , case api.resource of
+              Available response ->
+                div [] [ text "Thanks!" ]
+              Error error ->
+                div [] [ text "error" ]
+              _ ->
+                div [] [ registerPageFormView formModel usernameStatus (toMsg << RegisterFormMsg) ]
+          ]
+        ]
+      ]
     ]
 
 --
@@ -1282,7 +1396,11 @@ pageView page toMsg =
     RegisterPage registerPageState ->
       registerPageView registerPageState (toMsg << RegisterPageMsg)
     AboutPage ->
-      div [] [ text "about" ]
+      div [ class "columns is-centered", style "margin" "1.5em" ] 
+        [ div [ class "column is-two-thirds" ] 
+          [ h3 [ class "title is-3" ] [ text "About" ] 
+          , p [ class "content" ] [ text "about" ] ]
+        ]
     NotFoundPage ->
       div [] [ text "not found" ]
 
@@ -1329,8 +1447,11 @@ type alias State =
   , page : Page
   }
 
-setRestrictedUrl : Maybe String -> State -> Update State msg a
-setRestrictedUrl url state = save { state | restrictedUrl = url }
+setRestrictedUrl : String -> State -> Update State msg a
+setRestrictedUrl url state = save { state | restrictedUrl = Just url }
+
+resetRestrictedUrl : State -> Update State msg a
+resetRestrictedUrl state = save { state | restrictedUrl = Nothing }
 
 setSession : Maybe Session -> State -> Update State msg a
 setSession session state = save { state | session = session }
@@ -1369,13 +1490,13 @@ redirect : String -> State -> Update State msg a
 redirect = inRouter << routerRedirect
 
 loadPage : Update Page msg (State -> Update State msg a) -> State -> Update State msg a
-loadPage update_ state = 
+loadPage setPage state = 
   let 
       isLoginRoute = always (Just Login == state.router.route)
    in 
       state
-        |> inPage (always update_)
-        |> andThenIf (not << isLoginRoute) (setRestrictedUrl Nothing)
+        |> inPage (always setPage)
+        |> andThenIf (not << isLoginRoute) resetRestrictedUrl
         |> andThen (inUi closeBurgerMenu)
 
 handleRouteChange : (PageMsg -> msg) -> Url -> Maybe Route -> State -> Update State msg a
@@ -1386,7 +1507,7 @@ handleRouteChange toMsg url maybeRoute =
         if Nothing == session 
             then 
               state
-                |> setRestrictedUrl (Just url.path)  -- Redirect back here after successful login
+                |> setRestrictedUrl url.path  -- Redirect back here after successful login
                 |> andThen (redirect "/login")
             else 
               state
@@ -1485,7 +1606,7 @@ view ({ page } as state) =
   , body =
     [ myNavbar state.session state.page state.ui UiMsg
     , Bulma.Layout.section NotSpaced [] 
-      [ container [] [ pageView page PageMsg ] ]
+      [ pageView page PageMsg ] 
     , div [] 
       [ a [ href "/" ] [ text "Home" ]
       , a [ href "/login" ] [ text "Login" ] 

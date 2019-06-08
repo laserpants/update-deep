@@ -31,7 +31,7 @@ if (app.ports && app.ports.clearSession) {
   });
 }
 
-var usernamesTaken = ['bob', 'laserpants', 'neo', 'admin', 'speedo'];
+var usernamesTaken = ['bob', 'laserpants', 'neo', 'neonpants', 'admin', 'speedo'];
 
 var delay = 300;
 
