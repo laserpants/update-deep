@@ -37,14 +37,39 @@ import Process
 
 --
 
--- TODO Make toast 100% width on smaller screens
-
---
-
-pluck : (a -> b) -> (b -> a -> c) -> a -> c
-pluck getter what state = what (getter state) state
-
---
+errorToString : (a -> String) -> ErrorValue a -> String
+errorToString customErrorToString error =
+  case error of
+    Empty ->
+      "This field is required"
+    InvalidString ->
+      "Not a valid string"
+    InvalidEmail ->
+      "Please enter a valid email address"
+    InvalidFormat ->
+      "Invalid format"
+    InvalidInt ->
+      "This value must be an integer"
+    InvalidFloat ->
+      "This value must be a real number"
+    InvalidBool ->
+      "Error"
+    SmallerIntThan int ->
+      "Error"
+    GreaterIntThan int ->
+      "Error"
+    SmallerFloatThan float ->
+      "Error"
+    GreaterFloatThan float ->
+      "Error"
+    ShorterStringThan int ->
+      "Must be at least " ++ String.fromInt int ++ " characters"
+    LongerStringThan int ->
+      "Must be no more than " ++ String.fromInt int ++ " characters"
+    NotIncludedIn ->
+      "Error"
+    CustomError e ->
+      customErrorToString e
 
 fieldInfo 
    : (a -> String) 
@@ -56,7 +81,7 @@ fieldInfo
      , path : c
      , value : d
      }
-fieldInfo toString modifiers { liveError, path, value } =
+fieldInfo custom modifiers { liveError, path, value } =
   case liveError of
     Nothing -> 
       { path = path
@@ -70,7 +95,7 @@ fieldInfo toString modifiers { liveError, path, value } =
       , value = value
       , hasError = True
       , modifiers = { modifiers | color = Danger }
-      , errorMessage = errorToString toString error 
+      , errorMessage = errorToString custom error 
       }
 
 --
@@ -425,40 +450,6 @@ apiErrorToString error =
       "Something went wrong!"
 
 --
-
-errorToString : (a -> String) -> ErrorValue a -> String
-errorToString customErrorToString error =
-  case error of
-    Empty ->
-      "This field is required"
-    InvalidString ->
-      "Not a valid string"
-    InvalidEmail ->
-      "Please enter a valid email address"
-    InvalidFormat ->
-      "Invalid format"
-    InvalidInt ->
-      "This value must be an integer"
-    InvalidFloat ->
-      "This value must be a real number"
-    InvalidBool ->
-      "Error"
-    SmallerIntThan int ->
-      "Error"
-    GreaterIntThan int ->
-      "Error"
-    SmallerFloatThan float ->
-      "Error"
-    GreaterFloatThan float ->
-      "Error"
-    ShorterStringThan int ->
-      "Must be at least " ++ String.fromInt int ++ " characters"
-    LongerStringThan int ->
-      "Must be no more than " ++ String.fromInt int ++ " characters"
-    NotIncludedIn ->
-      "Error"
-    CustomError e ->
-      customErrorToString e
 
 --
 
@@ -964,7 +955,7 @@ loginPageView { api, formModel } toMsg =
         [ cardContent []
           [ h3 [ class "title is-3" ] [ text "Log in" ] 
           , message { messageModifiers | color = Info } 
-            [ style "max-width" "400px" ] 
+            [ style "max-width" "360px" ] 
             [ messageBody [] 
               [ text "This is a demo. Log in with username 'test' and password 'test'." ] 
             ]

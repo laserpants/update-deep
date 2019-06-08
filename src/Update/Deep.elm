@@ -1,4 +1,4 @@
-module Update.Deep exposing (In, Update, addCmd, andAddCmd, andInvokeHandler, andMap, andThen, andThenIf, ap, applicationInit, documentInit, foldEvents, foldEventsAndThen, invokeHandler, join, kleisli, map, map2, map3, map4, map5, map6, map7, mapCmd, runUpdate, save, inState)
+module Update.Deep exposing (..)
 
 
 type alias Update m c e =
@@ -116,6 +116,11 @@ foldEvents ( m, cmd, events ) =
 foldEventsAndThen : (m -> Update a c (a -> Update a c e)) -> Update m c (a -> Update a c e) -> Update a c e
 foldEventsAndThen fun =
     foldEvents << andThen fun
+
+
+pluck : (a -> b) -> (b -> a -> c) -> a -> c
+pluck get that state = 
+    that (get state) state
 
 
 type alias In state slice msg a =
