@@ -27,9 +27,10 @@ import Bulma.Components exposing (..)
 import Bulma.Modifiers exposing (..)
 import Bulma.Form exposing (controlInputModifiers, controlTextAreaModifiers)
 
--- 
+--
 
--- flash message
+pluck : (a -> b) -> (b -> a -> c) -> a -> c
+pluck getter what state = what (getter state) state
 
 --
 
@@ -62,11 +63,20 @@ fieldInfo toString modifiers { liveError, path, value } =
 
 --
 
+-- TODO Toast timeout
+
 type UiMsg
   = ToggleBurgerMenu
+  | CloseToast
+
+type alias Toast =
+  { message : String
+  , color : Color 
+  }
 
 type alias UiState =
-  { menuOpen : Bool }
+  { menuOpen : Bool 
+  , toast : Maybe Toast }
 
 toggleMenuOpen : UiState -> Update UiState msg a
 toggleMenuOpen state = save { state | menuOpen = not state.menuOpen }
@@ -74,8 +84,55 @@ toggleMenuOpen state = save { state | menuOpen = not state.menuOpen }
 closeBurgerMenu : UiState -> Update UiState msg a
 closeBurgerMenu state = save { state | menuOpen = False }
 
-myNavbar : Maybe Session -> Page -> UiState -> (UiMsg -> msg) -> Html msg
-myNavbar session page { menuOpen } toMsg = 
+showToast : Toast -> UiState -> Update UiState msg a
+showToast toast state = save { state | toast = Just toast }
+
+showInfoToast : String -> UiState -> Update UiState msg a
+showInfoToast message state = save { state | toast = Just { color = Info, message = message } }
+
+closeToast : UiState -> Update UiState msg a
+closeToast state = save { state | toast = Nothing }
+
+uiInit : Update UiState msg a
+uiInit = 
+  save UiState
+    |> andMap (save False)
+    |> andMap (save Nothing)
+
+uiUpdate : UiMsg -> (UiMsg -> msg) -> UiState -> Update UiState msg a
+uiUpdate msg toMsg state =
+  case msg of
+    ToggleBurgerMenu ->
+      state
+        |> toggleMenuOpen
+    CloseToast ->
+      state
+        |> closeToast
+
+uiToastMessage : UiState -> (UiMsg -> msg) -> Html msg
+uiToastMessage { toast } toMsg =
+  case toast of
+    Nothing ->
+      text ""
+    Just { message, color } ->
+      div 
+        -- TODO
+        [ style "width" "100%"
+        , style "position" "fixed"
+        , style "bottom" "0"
+        , style "pointer-events" "none"
+        , style "display" "flex"
+        , style "flex-direction" "column"
+        , style "padding" "15px"
+        , style "align-items" "center" 
+        , style "z-index" "1000" 
+        ] 
+        [ Bulma.notificationWithDelete color [] CloseToast [ text message ] ]
+
+      |> Html.map toMsg
+
+uiNavbar : Maybe Session -> Page -> UiState -> (UiMsg -> msg) -> Html msg
+uiNavbar session page { menuOpen } toMsg = 
 
   let 
       burger = 
@@ -96,7 +153,6 @@ myNavbar session page { menuOpen } toMsg =
               ] 
 
       currentPage = current page
-
    in
         fixedNavbar Top { navbarModifiers | color = Info } []
           [ navbarBrand [] burger
@@ -113,18 +169,6 @@ myNavbar session page { menuOpen } toMsg =
           ]
 
         |> Html.map toMsg
-
-uiInit : Update UiState msg a
-uiInit = 
-  save UiState
-    |> andMap (save False)
-
-uiUpdate : UiMsg -> (UiMsg -> msg) -> UiState -> Update UiState msg a
-uiUpdate msg toMsg state =
-  case msg of
-    ToggleBurgerMenu ->
-      state
-        |> toggleMenuOpen
 
 --
 
@@ -313,6 +357,9 @@ apiSendRequest url maybeBody toMsg model =
     |> andAddCmd (model.request url maybeBody)
     |> mapCmd toMsg
 
+apiSendSimpleRequest : (ApiMsg a -> msg) -> ApiModel a -> Update (ApiModel a) msg b
+apiSendSimpleRequest = apiSendRequest "" Nothing
+
 apiResetResource : ApiModel a -> Update (ApiModel a) msg b
 apiResetResource = setResource NotRequested
 
@@ -398,7 +445,6 @@ homePageInit toMsg =
       api = apiInit { endpoint = "/posts"
                     , method   = HttpGet
                     , decoder  = Json.field "posts" (Json.list postDecoder) }
-
    in 
       save HomePageState
         |> andMap api
@@ -410,7 +456,7 @@ homePageUpdate msg toMsg =
     HomePageApiMsg apiMsg ->
       homePageInPosts (apiUpdate { onSuccess = always save, onError = always save } apiMsg (toMsg << HomePageApiMsg))
     FetchPosts ->
-      homePageInPosts (apiSendRequest "" Nothing (toMsg << HomePageApiMsg))
+      homePageInPosts (apiSendSimpleRequest (toMsg << HomePageApiMsg))
 
 homePageSubscriptions : HomePageState -> (HomePageMsg -> msg) -> Sub msg
 homePageSubscriptions state toMsg = Sub.none
@@ -419,13 +465,12 @@ homePagePostsList : ApiModel (List Post) -> Html msg
 homePagePostsList { resource } = 
 
   let listItem post =
-        div [] 
+        div [ class "content" ] 
           [ h4 [ class "title is-4" ] [ text post.title ] 
           , p [ class "content" ] [ text post.body ] 
           , p [ class "content" ] [ text (let count = List.length post.comments in if count > 0 then (String.fromInt count ++ " comment(s)") else "No comments") ] 
           , p [ class "content" ] [ a [ href ("/posts/" ++ String.fromInt post.id) ] [ text "Show post" ] ]
           ]
-
    in 
        case resource of
          NotRequested ->
@@ -490,12 +535,10 @@ newPostPageInit toMsg =
       api = apiInit { endpoint = "/posts"
                     , method   = HttpPost
                     , decoder  = Json.field "post" postDecoder }
-
-      form = formInit [] newPostFormValidate
    in 
       save NewPostPageState
         |> andMap api
-        |> andMap form
+        |> andMap (formInit [] newPostFormValidate)
         |> mapCmd toMsg
 
 newPostPageHandleSubmit : (NewPostPageMsg -> msg) -> NewPostForm -> NewPostPageState -> Update NewPostPageState msg a
@@ -522,7 +565,6 @@ newPostPageFormView { form, disabled } toMsg =
 
       title = form |> Form.getFieldAsString "title" |> info controlInputModifiers
       body  = form |> Form.getFieldAsString "body"  |> info controlTextAreaModifiers
-
    in
       [ fieldset [ Html.Attributes.disabled disabled ]
         [ Bulma.Form.field [] 
@@ -604,37 +646,39 @@ showPostPageInit id toMsg =
       comment = apiInit { endpoint = "/posts/" ++ String.fromInt id ++ "/comments"
                         , method   = HttpPost
                         , decoder  = Json.field "comment" commentDecoder }
-
-      form = formInit [] commentFormValidate
    in 
       save ShowPostPageState
         |> andMap (save id)
         |> andMap post
         |> andMap comment
-        |> andMap form
+        |> andMap (formInit [] commentFormValidate)
         |> mapCmd toMsg
 
 showPostPageHandleSubmit : (ShowPostPageMsg -> msg) -> CommentForm -> ShowPostPageState -> Update ShowPostPageState msg a
 showPostPageHandleSubmit toMsg form state = 
+
   let 
       json = form |> commentFormToJson state.id |> Http.jsonBody 
    in 
       state 
         |> showPostPageInCommentApi (apiSendRequest "" (Just json) (toMsg << ShowPostPageCommentApiMsg))
 
-showPostPageUpdate : ShowPostPageMsg -> (ShowPostPageMsg -> msg) -> ShowPostPageState -> Update ShowPostPageState msg a
-showPostPageUpdate msg toMsg = 
+showPostPageUpdate : { onCommentCreated : Comment -> a } -> ShowPostPageMsg -> (ShowPostPageMsg -> msg) -> ShowPostPageState -> Update ShowPostPageState msg a
+showPostPageUpdate { onCommentCreated } msg toMsg = 
 
   let 
+      toApiMsg = toMsg << ShowPostPageApiMsg
+
       commentCreated comment = 
         showPostPageInCommentForm (formReset [])
-          >> andThen (showPostPageUpdate FetchPost toMsg)
+          >> andThen (showPostPageInApi (apiSendSimpleRequest toApiMsg))
+          >> andInvokeHandler (onCommentCreated comment)
    in 
       case msg of
         ShowPostPageApiMsg apiMsg ->
-          showPostPageInApi (apiUpdate { onSuccess = always save, onError = always save } apiMsg (toMsg << ShowPostPageApiMsg))
+          showPostPageInApi (apiUpdate { onSuccess = always save, onError = always save } apiMsg toApiMsg)
         FetchPost ->
-          showPostPageInApi (apiSendRequest "" Nothing (toMsg << ShowPostPageApiMsg))
+          showPostPageInApi (apiSendSimpleRequest toApiMsg)
         ShowPostPageCommentFormMsg formMsg ->
           showPostPageInCommentForm (formUpdate { onSubmit = showPostPageHandleSubmit toMsg } formMsg)
         ShowPostPageCommentApiMsg apiMsg ->
@@ -651,7 +695,6 @@ showPostPageCommentFormView { form, disabled } toMsg =
 
       email = form |> Form.getFieldAsString "email" |> info controlInputModifiers
       body  = form |> Form.getFieldAsString "body"  |> info controlTextAreaModifiers
-
    in
       [ fieldset [ Html.Attributes.disabled disabled ]
         [ Bulma.Form.field [] 
@@ -694,7 +737,7 @@ showPostPageCommentsView comments toMsg =
   let
       commentItem comment =
         div [] 
-          [ div [] [ text comment.email ]
+          [ div [ style "margin-bottom" ".5em" ] [ b [] [ text "From: " ], text comment.email ]
           , div [] [ p [] [ text comment.body ] ]
           , hr [] [] 
           ]
@@ -725,6 +768,7 @@ showPostPageView { post, commentForm } toMsg =
                    [ h3 
                      [ class "title is-3" ] [ text post_.title ] 
                      , p [ class "content" ] [ text post_.body ]
+                     , hr [] []
                      , h5 [ class "title is-5" ] [ text "Comments" ] 
                      , showPostPageCommentsView post_.comments toMsg
                      , h5 [ class "title is-5" ] [ text "Leave a comment" ] 
@@ -777,16 +821,15 @@ loginPageInForm =
 
 loginPageInit : (LoginPageMsg -> msg) -> Update LoginPageState msg a
 loginPageInit toMsg = 
+
   let 
       api = apiInit { endpoint = "/auth/login"
                     , method   = HttpPost
                     , decoder  = Json.field "session" sessionDecoder }
-
-      form = formInit [] loginFormValidate
    in 
       save LoginPageState
         |> andMap api
-        |> andMap form
+        |> andMap (formInit [] loginFormValidate)
         |> mapCmd toMsg
 
 loginPageHandleSubmit : (LoginPageMsg -> msg) -> LoginForm -> LoginPageState -> Update LoginPageState msg a
@@ -801,12 +844,12 @@ loginPageUpdate { onAuthResponse } msg toMsg =
       handleApiResponse maybeSession = 
         loginPageInForm (formReset []) 
           >> andInvokeHandler (onAuthResponse maybeSession)
-
-   in case msg of
-     LoginPageApiMsg apiMsg -> 
-       loginPageInApi (apiUpdate { onSuccess = handleApiResponse << Just, onError = handleApiResponse Nothing |> always } apiMsg (toMsg << LoginPageApiMsg))
-     LoginFormMsg formMsg ->
-       loginPageInForm (formUpdate { onSubmit = loginPageHandleSubmit toMsg } formMsg)
+   in 
+      case msg of
+        LoginPageApiMsg apiMsg -> 
+          loginPageInApi (apiUpdate { onSuccess = handleApiResponse << Just, onError = handleApiResponse Nothing |> always } apiMsg (toMsg << LoginPageApiMsg))
+        LoginFormMsg formMsg ->
+          loginPageInForm (formUpdate { onSubmit = loginPageHandleSubmit toMsg } formMsg)
 
 loginPageSubscriptions : LoginPageState -> (LoginPageMsg -> msg) -> Sub msg
 loginPageSubscriptions state toMsg = Sub.none
@@ -823,9 +866,7 @@ loginPageFormView { form, disabled } toMsg =
       username   = form |> Form.getFieldAsString "username"   |> info { controlInputModifiers | iconLeft = usernameIcon }
       password   = form |> Form.getFieldAsString "password"   |> info { controlInputModifiers | iconLeft = passwordIcon }
       rememberMe = form |> Form.getFieldAsBool   "rememberMe" |> info controlInputModifiers 
-
    in
-
       [ fieldset [ Html.Attributes.disabled disabled ]
         [ Bulma.Form.field [] 
           [ Bulma.Form.controlLabel [] [ text "Username" ] 
@@ -872,7 +913,7 @@ loginPageFormView { form, disabled } toMsg =
 
 loginPageView : LoginPageState -> (LoginPageMsg -> msg) -> Html msg
 loginPageView { api, formModel } toMsg = 
-  div [ class "columns is-centered is-mobile", style "margin" "1.5em" ] 
+  div [ class "columns is-centered is-mobile", style "margin" "6em 0" ] 
     [ div [ class "column is-narrow" ] 
       [ card [] 
         [ cardContent []
@@ -920,11 +961,11 @@ validatePassword =
 validatePasswordConfirmation : Field -> Result (Error RegisterFormError) String
 validatePasswordConfirmation = 
 
-  let match password confirmation = 
+  let 
+      match password confirmation = 
         if password == confirmation
             then Validate.succeed confirmation
             else Validate.fail (Validate.customError PasswordConfirmationMismatch)
-
    in 
        [ Validate.string, Validate.emptyString ]
          |> Validate.oneOf
@@ -1008,12 +1049,10 @@ registerPageInit toMsg =
       api = apiInit { endpoint = "/auth/register"
                     , method   = HttpPost
                     , decoder  = Json.field "user" userDecoder }
-
-      form = formInit [] registerFormValidate
    in 
       save RegisterPageState
         |> andMap api
-        |> andMap form
+        |> andMap (formInit [] registerFormValidate)
         |> andMap (save Dict.empty)
         |> andMap (save UsernameBlank)
         |> mapCmd toMsg
@@ -1055,26 +1094,24 @@ registerPageHandleSubmit toMsg form =
    in registerPageInApi (apiSendRequest "" (Just json) (toMsg << RegisterPageApiMsg))
 
 registerPageUpdate : RegisterPageMsg -> (RegisterPageMsg -> msg) -> RegisterPageState -> Update RegisterPageState msg a
-registerPageUpdate msg toMsg state = 
+registerPageUpdate msg toMsg = 
   case msg of
     RegisterPageApiMsg apiMsg ->
-      state
-        |> registerPageInApi (apiUpdate { onSuccess = always save, onError = always save } apiMsg (toMsg << RegisterPageApiMsg))
+      registerPageInApi (apiUpdate { onSuccess = always save, onError = always save } apiMsg (toMsg << RegisterPageApiMsg))
     RegisterFormMsg formMsg ->
-      state
-        |> registerPageInForm (formUpdate { onSubmit = registerPageHandleSubmit toMsg } formMsg)
-        |> andThen (usernameFieldSpy formMsg)
-    RegisterPageWebsocketMsg wsMsg ->
-      case Json.decodeString websocketMessageDecoder wsMsg of
+      registerPageInForm (formUpdate { onSubmit = registerPageHandleSubmit toMsg } formMsg)
+        >> andThen (usernameFieldSpy formMsg)
+    RegisterPageWebsocketMsg websocketMsg ->
+      case Json.decodeString websocketMessageDecoder websocketMsg of
         Ok (WebSocketUsernameAvailableResponse { username, available }) ->
-          let 
-              usernameField = Form.getFieldAsString "username" state.formModel.form
-           in 
-              state
-                |> saveUsernameStatus username available
-                |> andThen (checkIfUsernameAvailable <| Maybe.withDefault "" usernameField.value)
+          pluck .formModel (\model -> 
+            let 
+                usernameField = Form.getFieldAsString "username" model.form
+             in 
+                saveUsernameStatus username available
+                  >> andThen (checkIfUsernameAvailable <| Maybe.withDefault "" usernameField.value))
         _ ->
-          save state
+          save 
 
 registerPageSubscriptions : RegisterPageState -> (RegisterPageMsg -> msg) -> Sub msg
 registerPageSubscriptions state toMsg = Ports.websocketIn (toMsg << RegisterPageWebsocketMsg)
@@ -1096,6 +1133,7 @@ registerPageFormView { form, disabled } usernameStatus toMsg =
       unavailableIcon = ( Small, [], i [ class "fa fa-times has-text-danger" ] [] )
 
       username =
+
         let 
             info_ = form |> Form.getFieldAsString "username" |> info
          in 
@@ -1107,7 +1145,6 @@ registerPageFormView { form, disabled } usernameStatus toMsg =
                         , errorMessage = "This username is not available" }
               _ ->
                 info_
-
    in
       [ fieldset [ Html.Attributes.disabled disabled ]
         [ Bulma.Form.field [] 
@@ -1328,8 +1365,8 @@ current page =
         NotFoundPage ->
           { default | isNotFoundPage = True }
 
-pageUpdate : { onAuthResponse : Maybe Session -> a, onPostAdded : Post -> a } -> PageMsg -> (PageMsg -> msg) -> Page -> Update Page msg a
-pageUpdate { onAuthResponse, onPostAdded } msg toMsg page = 
+pageUpdate : { onAuthResponse : Maybe Session -> a, onPostAdded : Post -> a, onCommentCreated : Comment -> a } -> PageMsg -> (PageMsg -> msg) -> Page -> Update Page msg a
+pageUpdate { onAuthResponse, onPostAdded, onCommentCreated } msg toMsg page = 
   case page of
     HomePage homePageState ->
       case msg of
@@ -1351,7 +1388,7 @@ pageUpdate { onAuthResponse, onPostAdded } msg toMsg page =
       case msg of
         ShowPostPageMsg showPostPageMsg ->
           showPostPageState
-            |> showPostPageUpdate showPostPageMsg (toMsg << ShowPostPageMsg)
+            |> showPostPageUpdate { onCommentCreated = onCommentCreated } showPostPageMsg (toMsg << ShowPostPageMsg)
             |> Update.Deep.map ShowPostPage 
         _ ->
           save page
@@ -1411,7 +1448,7 @@ pageView page toMsg =
       div [ class "columns is-centered", style "margin" "1.5em" ] 
         [ div [ class "column is-two-thirds" ] 
           [ h3 [ class "title is-3" ] [ text "About" ] 
-          , p [ class "content" ] [ text "about" ] ]
+          , p [ class "content" ] [ text "Welcome to Facepalm. A place to meet weird people while keeping all your personal data safe." ] ]
         ]
     NotFoundPage ->
       div [] [ text "not found" ]
@@ -1505,6 +1542,7 @@ redirect = inRouter << routerRedirect
 
 loadPage : Update Page msg (State -> Update State msg a) -> State -> Update State msg a
 loadPage setPage state = 
+
   let 
       isLoginRoute = always (Just Login == state.router.route)
    in 
@@ -1561,7 +1599,7 @@ handleRouteChange toMsg url maybeRoute =
         -- Other
         Just (ShowPost id) ->
           showPostPageInit id ShowPostPageMsg
-            |> andThen (showPostPageUpdate FetchPost ShowPostPageMsg)
+            |> andThen (showPostPageUpdate { onCommentCreated = always save } FetchPost ShowPostPageMsg)
             |> Update.Deep.map ShowPostPage 
             |> loadPage 
  
@@ -1575,6 +1613,7 @@ handleRouteChange toMsg url maybeRoute =
           setSession Nothing
             >> andThen (updateSessionStorage Nothing)
             >> andThen (redirect "/")
+            >> andThen (inUi (showInfoToast "You have been logged out"))
  
         Just About ->
           loadPage (save AboutPage)
@@ -1588,12 +1627,11 @@ updateSessionStorage maybeSession =
       addCmd (Ports.setSession session)
 
 returnToRestrictedUrl : State -> Update State Msg a
-returnToRestrictedUrl state =
-  state
-    |> redirect (Maybe.withDefault "/" state.restrictedUrl) 
+returnToRestrictedUrl = pluck .restrictedUrl (redirect << Maybe.withDefault "/") 
 
 handleAuthResponse : Maybe Session -> State -> Update State Msg a
 handleAuthResponse maybeSession = 
+
   let 
       authenticated = always (Maybe.isJust maybeSession)
    in 
@@ -1607,7 +1645,11 @@ update msg =
     RouterMsg routerMsg ->
       inRouter (routerUpdate { onRouteChange = handleRouteChange PageMsg } routerMsg)
     PageMsg pageMsg ->
-      inPage (pageUpdate { onAuthResponse = handleAuthResponse, onPostAdded = always (redirect "/") } pageMsg PageMsg)
+      inPage (pageUpdate 
+        { onAuthResponse = handleAuthResponse
+        , onPostAdded = always (redirect "/" >> andThen (inUi (showInfoToast "Your post was published")))
+        , onCommentCreated = inUi (showInfoToast "Your comment was received") |> always 
+        } pageMsg PageMsg)
     UiMsg uiMsg ->
       inUi (uiUpdate uiMsg UiMsg)
 
@@ -1615,21 +1657,13 @@ subscriptions : State -> Sub Msg
 subscriptions { page } = pageSubscriptions page PageMsg
 
 view : State -> Document Msg
-view ({ page } as state) = 
-  { title = ""
+view ({ page, session, ui } as state) = 
+  { title = "Welcome to Facepalm"
   , body =
-    [ myNavbar state.session state.page state.ui UiMsg
+    [ uiNavbar session page ui UiMsg
+    , uiToastMessage ui UiMsg
     , Bulma.Layout.section NotSpaced [] 
       [ pageView page PageMsg ] 
---    , div [] 
---      [ a [ href "/" ] [ text "Home" ]
---      , a [ href "/login" ] [ text "Login" ] 
---      , a [ href "/logout" ] [ text "Logout" ]
---      , a [ href "/register" ] [ text "Register" ]
---      , a [ href "/about" ] [ text "About" ]
---      , a [ href "/posts/new" ] [ text "New post" ]
---      , Html.text (Debug.toString state)
---      ]
     ] 
   }
 
