@@ -100,14 +100,12 @@ uiInit =
     |> andMap (save Nothing)
 
 uiUpdate : UiMsg -> (UiMsg -> msg) -> UiState -> Update UiState msg a
-uiUpdate msg toMsg state =
+uiUpdate msg toMsg =
   case msg of
     ToggleBurgerMenu ->
-      state
-        |> toggleMenuOpen
+      toggleMenuOpen
     CloseToast ->
-      state
-        |> closeToast
+      closeToast
 
 uiToastMessage : UiState -> (UiMsg -> msg) -> Html msg
 uiToastMessage { toast } toMsg =
@@ -1561,6 +1559,7 @@ handleRouteChange toMsg url maybeRoute =
               state
                 |> setRestrictedUrl url.path  -- Redirect back here after successful login
                 |> andThen (redirect "/login")
+                |> andThen (inUi (showToast { message = "You must be logged in to access that page.", color = Warning }))
             else 
               state
                 |> gotoPage
