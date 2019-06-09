@@ -118,9 +118,9 @@ foldEventsAndThen fun =
     foldEvents << andThen fun
 
 
-pluck : (a -> b) -> (b -> a -> c) -> a -> c
-pluck get that state = 
-    that (get state) state
+unwrap : (a -> b) -> (b -> a -> c) -> a -> c
+unwrap get some state = 
+    some (get state) state
 
 
 type alias In state slice msg a =
