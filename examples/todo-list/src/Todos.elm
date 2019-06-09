@@ -88,9 +88,7 @@ view { items, form } toMsg =
 
         row ( ix, todo ) =
             tr []
-                [ td []
-                    [ text todo.text ]
-                , td []
+                [ td [ style "width" "180px" ]
                     [ span [ class "icon has-text-success" ]
                         [ i [ class "fa fa-check-square" ] [] ]
                     , a [ onClick (toMsg <| MarkDone ix), href "#" ]
@@ -103,6 +101,8 @@ view { items, form } toMsg =
                     , a [ onClick (toMsg <| Delete ix), href "#" ]
                         [ text "Delete" ]
                     ]
+                , td []
+                    [ text todo.text ]
                 ]
     in
     div [ style "margin" "1em" ]
@@ -112,5 +112,5 @@ view { items, form } toMsg =
             p [] [ text "You have no tasks" ]
 
           else
-            table [ class "table is-bordered is-fullwidth" ] (List.map row (indexed items))
+            table [ class "table is-narrow is-bordered is-fullwidth" ] (List.map row (indexed items))
         ]

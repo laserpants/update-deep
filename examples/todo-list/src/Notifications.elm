@@ -89,11 +89,11 @@ view { queue } toMsg =
                 , Html.text text
                 ]
     in
-    div [ style "float" "right" ]
+    div [ style "margin" "1em" ]
         [ div [] (List.map item queue)
         , if List.isEmpty queue then
             text ""
 
           else
-            div [ style "margin-top" ".5em" ] [ a [ href "#", onClick (toMsg DismissAll) ] [ text "Dismiss all notifications" ] ]
+            div [ class "has-text-centered", style "margin-top" ".5em" ] [ a [ href "#", onClick (toMsg DismissAll) ] [ text "Dismiss all notifications" ] ]
         ]

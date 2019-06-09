@@ -72,14 +72,14 @@ view { notifications, todos } =
         [ nav [ class "navbar is-primary" ]
             [ div [ class "navbar-brand" ]
                 [ a [ href "#", class "title is-5 navbar-item" ]
-                    [ text "Todo app" ]
+                    [ text "trollo" ]
                 ]
             ]
-        , div [ class "columns" ]
-            [ div [ class "column" ]
-                [ Todos.view todos TodosMsg ]
-            , div [ class "column", style "margin" "1em" ]
-                [ Notifications.view notifications NotificationsMsg ]
+        , div [ class "columns is-centered" ]
+            [ div [ class "column is-two-thirds" ]
+                [ Notifications.view notifications NotificationsMsg
+                , Todos.view todos TodosMsg
+                ]
             ]
         ]
     }
