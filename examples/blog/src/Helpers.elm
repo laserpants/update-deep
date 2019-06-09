@@ -5,7 +5,7 @@ import Bulma.Modifiers exposing (..)
 import Bulma.Components exposing (..)
 import Form.Error exposing (ErrorValue(..), Error)
 import Form.Field as Field exposing (Field, FieldValue(..))
-import Form.Validate as Validate exposing (Validation, succeed, field)
+import Form.Validate as Validate exposing (Validation, oneOf, andThen, succeed, field)
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (..)
@@ -15,13 +15,13 @@ import Update.Deep.Api as Api
 validateStringNonEmpty : Field -> Result (Error e) String
 validateStringNonEmpty = 
   [ Validate.string, Validate.emptyString ]
-    |> Validate.oneOf  
-    |> Validate.andThen Validate.nonEmpty
+    |> oneOf  
+    |> andThen Validate.nonEmpty
 
 validateEmail : Field -> Result (Error e) String
 validateEmail = 
   validateStringNonEmpty 
-    |> Validate.andThen (always Validate.email) 
+    |> andThen (always Validate.email) 
 
 validationErrorToString : (a -> String) -> ErrorValue a -> String
 validationErrorToString customErrorToString error =
@@ -96,10 +96,13 @@ httpErrorToString error =
     _ ->
       "Something went wrong!"
 
-resourceErrorView : Api.Resource a -> Html msg
-resourceErrorView resource =
+apiResourceErrorMessage : Api.Resource a -> Html msg
+apiResourceErrorMessage resource =
   case resource of
     Api.Error error -> 
       message { messageModifiers | color = Danger } [] 
         [ messageBody [] [ text (error |> httpErrorToString) ] ]
     _ -> text ""
+
+spinner : Html msg
+spinner = div [ class "spinner" ] [ div [ class "bounce1" ] [], div [ class "bounce2" ] [], div [ class "bounce3" ] [] ]

@@ -1,4 +1,4 @@
-module Update.Deep.Form exposing (Model, init, insertAsFormIn, reset, setDisabled, update)
+module Update.Deep.Form exposing (Model, init, reset, setDisabled, update)
 
 import Form exposing (Form)
 import Form.Field as Field exposing (Field)

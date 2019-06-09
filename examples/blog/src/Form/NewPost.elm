@@ -1,6 +1,6 @@
 module Form.NewPost exposing (Fields, toJson, validate, view)
 
-import Bulma.Form exposing (controlEmail, controlHelp, controlInputModifiers, controlLabel, controlTextArea, controlTextAreaModifiers)
+import Bulma.Form exposing (controlInput, controlEmail, controlHelp, controlInputModifiers, controlLabel, controlTextArea, controlTextAreaModifiers)
 import Bulma.Modifiers exposing (..)
 import Form exposing (Form)
 import Form.Field as Field exposing (Field, FieldValue(..))
@@ -48,8 +48,8 @@ view form disabled toMsg =
     in
     [ fieldset [ Html.Attributes.disabled disabled ]
         [ Bulma.Form.field []
-            [ Bulma.Form.controlLabel [] [ text "Title" ]
-            , Bulma.Form.controlInput title.modifiers
+            [ controlLabel [] [ text "Title" ]
+            , controlInput title.modifiers
                 []
                 [ placeholder "Title"
                 , onFocus (Form.Focus title.path)
@@ -58,11 +58,11 @@ view form disabled toMsg =
                 , value (Maybe.withDefault "" title.value)
                 ]
                 []
-            , Bulma.Form.controlHelp Danger [] [ Html.text title.errorMessage ]
+            , controlHelp Danger [] [ Html.text title.errorMessage ]
             ]
         , Bulma.Form.field []
-            [ Bulma.Form.controlLabel [] [ text "Body" ]
-            , Bulma.Form.controlTextArea body.modifiers
+            [ controlLabel [] [ text "Body" ]
+            , controlTextArea body.modifiers
                 []
                 [ placeholder "Body"
                 , onFocus (Form.Focus body.path)
@@ -71,7 +71,7 @@ view form disabled toMsg =
                 , value (Maybe.withDefault "" body.value)
                 ]
                 []
-            , Bulma.Form.controlHelp Danger [] [ Html.text body.errorMessage ]
+            , controlHelp Danger [] [ Html.text body.errorMessage ]
             ]
         , Bulma.Form.field []
             [ div [ class "control" ]

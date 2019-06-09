@@ -162,7 +162,7 @@ view { api, formModel, usernameStatus } toMsg =
                   , a [ href "/login" ] [ text "log in" ]
                   , text " page and see how it goes." ]
               Api.Error error ->
-                resourceErrorView api.resource
+                apiResourceErrorMessage api.resource
               _ ->
                 Form.Register.view formModel.form formModel.disabled usernameStatus (toMsg << FormMsg)
           ]

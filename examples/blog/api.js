@@ -35,13 +35,13 @@ var posts =
   {
     id: 2,
     title: 'Online use of the facepalm',
-    body: 'Use of the gesture is not limited to a visual representations, often just the word, facepalm, is used to show someone’s disapproval or embarrassment.',
+    body: 'Use of the gesture is not limited to visual representations. Often just the word, facepalm, is used to show someone’s disapproval or embarrassment.',
     comments: []
   }
 ];
 
 var userId = 1;
-var postId = 1;
+var postId = 2;
 var commentId = 0;
 var delay = 400;
 

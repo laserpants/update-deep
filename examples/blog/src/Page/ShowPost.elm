@@ -114,11 +114,11 @@ view { post, comment, commentForm } toMsg =
    [ div [ class "column is-two-thirds" ] 
      [ if Api.Requested == post.resource || commentForm.disabled
            then
-             div [ class "spinner" ] [ div [ class "bounce1" ] [], div [ class "bounce2" ] [], div [ class "bounce3" ] [] ]
+             spinner
            else
              case post.resource of
                Api.Error error ->
-                 resourceErrorView post.resource
+                 apiResourceErrorMessage post.resource
                Api.Available post_ -> 
                  div []
                    [ h3 
@@ -128,7 +128,7 @@ view { post, comment, commentForm } toMsg =
                      , h5 [ class "title is-5" ] [ text "Comments" ] 
                      , commentsView post_.comments toMsg
                      , h5 [ class "title is-5" ] [ text "Leave a comment" ] 
-                     , resourceErrorView comment.resource
+                     , apiResourceErrorMessage comment.resource
                      , Form.Comment.view commentForm.form commentForm.disabled (toMsg << CommentFormMsg)
                      ]
                _ ->

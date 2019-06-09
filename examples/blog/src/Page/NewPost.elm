@@ -65,4 +65,4 @@ subscriptions state toMsg = Sub.none
 view : State -> (Msg -> msg) -> Html msg
 view { api, formModel } toMsg = 
   Ui.Page.container "New post" 
-    [ resourceErrorView api.resource, Form.NewPost.view formModel.form formModel.disabled (toMsg << FormMsg) ]
+    [ apiResourceErrorMessage api.resource, Form.NewPost.view formModel.form formModel.disabled (toMsg << FormMsg) ]

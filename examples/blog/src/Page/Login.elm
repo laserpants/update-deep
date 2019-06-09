@@ -81,7 +81,7 @@ view { api, formModel } toMsg =
             [ messageBody [] 
               [ text "This is a demo. Log in with username 'test' and password 'test'." ] 
             ]
-          , resourceErrorView api.resource
+          , apiResourceErrorMessage api.resource
           , Form.Login.view formModel.form formModel.disabled (toMsg << FormMsg) 
           ]
         ]
