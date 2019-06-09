@@ -3,7 +3,7 @@ module Page.NewPost exposing (Msg(..), State, init, subscriptions, update, view)
 import Bulma.Form exposing (controlInputModifiers, controlTextAreaModifiers)
 import Bulma.Modifiers exposing (..)
 import Data.Post as Post exposing (Post)
-import Form.Field as Field exposing (Field, FieldValue(..))
+import Form.Field exposing (FieldValue(..))
 import Form.NewPost
 import Helpers.Api exposing (resourceErrorMessage)
 import Html exposing (..)

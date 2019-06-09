@@ -3,7 +3,7 @@ module Ui exposing (Msg(..), State, Toast, closeBurgerMenu, closeToast, incremen
 import Bulma.Components exposing (..)
 import Bulma.Elements exposing (..)
 import Bulma.Modifiers exposing (..)
-import Data.Session as Session exposing (Session)
+import Data.Session exposing (Session)
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (..)

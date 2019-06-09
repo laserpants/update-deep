@@ -93,7 +93,9 @@ resetResource =
 
 
 type alias ApiEventHandlers a b =
-    { onSuccess : a -> b, onError : Http.Error -> b }
+    { onSuccess : a -> b
+    , onError : Http.Error -> b 
+    }
 
 
 update : ApiEventHandlers a b -> Msg a -> (Msg a -> msg) -> Model a -> Update (Model a) msg b

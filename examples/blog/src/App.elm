@@ -1,13 +1,12 @@
 module App exposing (Flags, Msg(..), State, handleAuthResponse, handleCommentCreated, handlePostAdded, handleRouteChange, inPage, inRouter, inUi, init, initSession, loadPage, redirect, resetRestrictedUrl, returnToRestrictedUrl, setRestrictedUrl, setSession, subscriptions, update, updateSessionStorage, view)
 
-import Browser exposing (Document, UrlRequest)
+import Browser exposing (Document)
 import Browser.Navigation as Navigation
-import Bulma.Layout exposing (SectionSpacing(..), container, fluidContainer, hero, heroBody)
+import Bulma.Layout exposing (SectionSpacing(..))
 import Bulma.Modifiers exposing (..)
-import Data.Comment as Comment exposing (Comment)
-import Data.Post as Post exposing (Post)
+import Data.Comment exposing (Comment)
+import Data.Post exposing (Post)
 import Data.Session as Session exposing (Session)
-import Data.User as User exposing (User)
 import Json.Decode as Json
 import Maybe.Extra as Maybe
 import Page exposing (Page, current)

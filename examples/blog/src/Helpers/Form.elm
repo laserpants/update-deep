@@ -3,8 +3,8 @@ module Helpers.Form exposing (fieldInfo, validateEmail, validateStringNonEmpty, 
 import Bulma.Components exposing (..)
 import Bulma.Modifiers exposing (..)
 import Form.Error exposing (Error, ErrorValue(..))
-import Form.Field as Field exposing (Field, FieldValue(..))
-import Form.Validate as Validate exposing (Validation, andThen, field, oneOf, succeed)
+import Form.Field exposing (Field, FieldValue(..))
+import Form.Validate as Validate exposing (andThen, oneOf)
 
 
 validateStringNonEmpty : Field -> Result (Error e) String

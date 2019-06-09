@@ -7,7 +7,7 @@ import Bulma.Modifiers exposing (..)
 import Data.User as User exposing (User)
 import Dict exposing (Dict)
 import Form as F
-import Form.Field as Field exposing (Field, FieldValue(..))
+import Form.Field exposing (FieldValue(..))
 import Form.Register exposing (UsernameStatus(..))
 import Form.Register.Custom
 import Helpers.Api exposing (resourceErrorMessage)

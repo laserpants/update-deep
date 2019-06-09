@@ -1,8 +1,8 @@
 module Update.Deep.Form exposing (Model, Msg, init, reset, setDisabled, update)
 
 import Form exposing (Form)
-import Form.Field as Field exposing (Field)
-import Form.Validate as Validate exposing (Validation)
+import Form.Field exposing (Field)
+import Form.Validate exposing (Validation)
 import Update.Deep exposing (..)
 
 

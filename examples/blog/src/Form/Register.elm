@@ -4,7 +4,7 @@ import Bulma.Form exposing (controlCheckBox, controlEmail, controlHelp, controlI
 import Bulma.Modifiers exposing (..)
 import Form exposing (Form)
 import Form.Error exposing (Error, ErrorValue(..))
-import Form.Field as Field exposing (Field, FieldValue(..))
+import Form.Field exposing (Field, FieldValue(..))
 import Form.Register.Custom as Custom
 import Form.Validate as Validate exposing (Validation, andMap, andThen, customError, fail, field, minLength, oneOf, succeed)
 import Helpers.Form exposing (..)
