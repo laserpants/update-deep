@@ -3,11 +3,10 @@ module Main exposing (Flags, Msg(..), State, handleItemAdded, handleTaskDone, in
 import Browser exposing (Document)
 import Data.TodoItem exposing (TodoItem)
 import Html exposing (..)
-import Html.Attributes exposing (attribute, class, disabled, href, placeholder, src, style)
+import Html.Attributes exposing (class, href, style)
 import Html.Events exposing (..)
 import Notifications
 import Todos
-import Todos.Form
 import Update.Deep exposing (..)
 import Update.Deep.Browser as Deep
 
