@@ -32,9 +32,6 @@
     },
     "test-dependencies": {
         "direct": {},
-        "indirect": {
-            "avh4/elm-color": "1.0.0",
-            "elm-community/list-extra": "8.2.0"
-        }
+        "indirect": {}
     }
 }
