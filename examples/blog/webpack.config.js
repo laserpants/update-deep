@@ -8,6 +8,10 @@ module.exports = function() {
   return {
     mode: 'development',
     entry: './index.js',
+    output: {
+      path: __dirname + '/dist',
+      filename: 'main.js'
+    },
     module: {
       rules: [
         {
