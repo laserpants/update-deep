@@ -1,7 +1,7 @@
 module Main exposing (main)
 
 import App exposing (..)
-import Router
+import Update.Deep.Router as Router
 import Update.Deep.Browser exposing (application)
 
 

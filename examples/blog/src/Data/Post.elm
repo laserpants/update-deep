@@ -1,7 +1,7 @@
 module Data.Post exposing (Post, decoder)
 
 import Data.Comment as Comment exposing (Comment)
-import Json.Decode as Json exposing (field, int, string)
+import Json.Decode as Json exposing (field, int, string, list)
 
 
 type alias Post =
@@ -18,4 +18,4 @@ decoder =
         (field "id" int)
         (field "title" string)
         (field "body" string)
-        (field "comments" (Json.list Comment.decoder))
+        (field "comments" (list Comment.decoder))

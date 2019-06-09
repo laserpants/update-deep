@@ -21,7 +21,7 @@ import Ports
 import Browser exposing (Document, UrlRequest)
 import Bulma.Layout exposing (SectionSpacing(..), hero,heroBody,container, fluidContainer)
 import Route exposing (Route(..), fromUrl)
-import Router
+import Update.Deep.Router as Router
 
 type alias Flags =
   { api     : String
@@ -182,7 +182,7 @@ handlePostAdded post =
 
 handleCommentCreated : Comment -> State -> Update State Msg a
 handleCommentCreated comment = 
-  inUi (showInfoToast "Your comment was received" UiMsg) 
+  inUi (showInfoToast "Your comment was successfully received" UiMsg) 
 
 update : Msg -> State -> Update State Msg a
 update msg =
