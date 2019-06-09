@@ -80,7 +80,7 @@ state
     |> andThen doSomething
 ```
 
-How is this `Update` type useful then? Well, messages move down in the update tree. To pass information in the opposite direction, this library introduces a simple, callback-based event handling mechanism. That is what the third element of the `Update` tuple is for.
+How is this `Update` type useful then? Well, messages move down in the update tree. To pass information in the opposite direction, this library introduces a callback-based event handling mechanism. That is what the third element of the `Update` tuple is for.
 
 In this example, there are three event handlers involved:
 
