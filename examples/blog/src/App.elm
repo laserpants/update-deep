@@ -7,7 +7,7 @@ import Data.Session as Session exposing (Session)
 import Data.User as User exposing (User)
 import Data.Comment as Comment exposing (Comment)
 import Ui exposing (showToast, showInfoToast)
-import Page exposing (Page)
+import Page exposing (Page, current)
 import Page.Home
 import Page.ShowPost
 import Page.NewPost
@@ -121,15 +121,24 @@ handleRouteChange url maybeRoute =
 
         -- Authenticated only
         Just NewPost ->
-          ifAuthenticated (Page.NewPost.init Page.NewPostPageMsg |> Update.Deep.map Page.NewPostPage |> loadPage) 
+          ifAuthenticated 
+            (Page.NewPost.init Page.NewPostPageMsg 
+              |> Update.Deep.map Page.NewPostPage 
+              |> loadPage) 
 
         -- Redirect if already authenticated
         Just Login ->
-          unlessAuthenticated (Page.Login.init Page.LoginPageMsg |> Update.Deep.map Page.LoginPage |> loadPage) 
+          unlessAuthenticated 
+            (Page.Login.init Page.LoginPageMsg 
+              |> Update.Deep.map Page.LoginPage 
+              |> loadPage) 
 
         -- Redirect if already authenticated
         Just Register ->
-          unlessAuthenticated (Page.Register.init Page.RegisterPageMsg |> Update.Deep.map Page.RegisterPage |> loadPage) 
+          unlessAuthenticated 
+            (Page.Register.init Page.RegisterPageMsg 
+              |> Update.Deep.map Page.RegisterPage 
+              |> loadPage) 
 
         -- Other
         Just (ShowPost id) ->
@@ -205,7 +214,7 @@ view : State -> Document Msg
 view { page, session, ui } = 
   { title = "Welcome to Facepalm"
   , body =
-    [ Ui.navbar session page ui UiMsg
+    [ Ui.navbar session (current page) ui UiMsg
     , Ui.toastMessage ui UiMsg
     , Bulma.Layout.section NotSpaced [] [ Page.view page PageMsg ] 
     ] 

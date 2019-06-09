@@ -1,16 +1,10 @@
-module Helpers exposing (..)
+module Helpers.Form exposing (..)
 
-import Http exposing (emptyBody)
 import Bulma.Modifiers exposing (..)
 import Bulma.Components exposing (..)
 import Form.Error exposing (ErrorValue(..), Error)
 import Form.Field as Field exposing (Field, FieldValue(..))
 import Form.Validate as Validate exposing (Validation, oneOf, andThen, succeed, field)
-import Html exposing (..)
-import Html.Attributes exposing (..)
-import Html.Events exposing (..)
-import Http
-import Update.Deep.Api as Api
 
 validateStringNonEmpty : Field -> Result (Error e) String
 validateStringNonEmpty = 
@@ -83,26 +77,3 @@ fieldInfo custom modifiers { liveError, path, value } =
       , modifiers = { modifiers | color = Danger }
       , errorMessage = validationErrorToString custom error 
       }
-
-httpErrorToString : Http.Error -> String
-httpErrorToString error =
-  case error of
-    Http.BadStatus 401 ->
-      "Authentication failed."
-    Http.BadStatus 500 ->
-      "Application error (500 Internal Server Error)"
-    Http.BadStatus 501 ->
-      "This feature is not implemented"
-    _ ->
-      "Something went wrong!"
-
-apiResourceErrorMessage : Api.Resource a -> Html msg
-apiResourceErrorMessage resource =
-  case resource of
-    Api.Error error -> 
-      message { messageModifiers | color = Danger } [] 
-        [ messageBody [] [ text (error |> httpErrorToString) ] ]
-    _ -> text ""
-
-spinner : Html msg
-spinner = div [ class "spinner" ] [ div [ class "bounce1" ] [], div [ class "bounce2" ] [], div [ class "bounce3" ] [] ]

@@ -5,7 +5,8 @@ import Bulma.Form exposing (controlInputModifiers)
 import Bulma.Modifiers exposing (..)
 import Data.Session as Session exposing (Session)
 import Form.Login
-import Helpers exposing (..)
+import Helpers.Api exposing (resourceErrorMessage)
+import Helpers.Form exposing (..)
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (..)
@@ -84,6 +85,10 @@ subscriptions state toMsg =
 
 view : State -> (Msg -> msg) -> Html msg
 view { api, formModel } toMsg =
+    let
+        { form, disabled } =
+            formModel
+    in
     div [ class "columns is-centered is-mobile", style "margin" "6em 0" ]
         [ div [ class "column is-narrow" ]
             [ card []
@@ -94,8 +99,8 @@ view { api, formModel } toMsg =
                         [ messageBody []
                             [ text "This is a demo. Log in with username 'test' and password 'test'." ]
                         ]
-                    , apiResourceErrorMessage api.resource
-                    , Form.Login.view formModel.form formModel.disabled (toMsg << FormMsg)
+                    , resourceErrorMessage api.resource
+                    , Form.Login.view form disabled (toMsg << FormMsg)
                     ]
                 ]
             ]

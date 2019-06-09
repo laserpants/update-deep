@@ -1,7 +1,6 @@
 module Ui exposing (..)
 
 import Data.Session as Session exposing (Session)
-import Page as Page exposing (Page, current)
 import Bulma.Modifiers exposing (Color(..))
 import Update.Deep exposing (..)
 import Task
@@ -86,7 +85,7 @@ toastMessage { toast } toMsg =
         |> Ui.Toast.container 
         |> Html.map toMsg
 
-navbar : Maybe Session -> Page -> State -> (Msg -> msg) -> Html msg
+navbar : Maybe Session -> { a | isHomePage : Bool, isNewPostPage : Bool, isAboutPage : Bool } -> State -> (Msg -> msg) -> Html msg
 navbar session page { menuOpen } toMsg = 
 
   let 
@@ -107,16 +106,15 @@ navbar session page { menuOpen } toMsg =
                 [ a [ class "button is-primary", href "/logout" ] [ text "Log out" ] ] 
               ] 
 
-      currentPage = current page
    in
         fixedNavbar Top { navbarModifiers | color = Info } []
           [ navbarBrand [] burger
             [ navbarItem False [] [ h5 [ class "title is-5" ] [ a [ class "has-text-white", href "/" ] [ text "Facepalm" ] ] ] ]
           , navbarMenu menuOpen []
             [ navbarStart [ class "is-unselectable" ] 
-              [ navbarItemLink currentPage.isHomePage [ href "/" ] [ text "Home" ]
-              , navbarItemLink currentPage.isAboutPage [ href "/about" ] [ text "About" ]
-              , navbarItemLink currentPage.isNewPostPage [ href "/posts/new" ] [ text "New post" ]
+              [ navbarItemLink page.isHomePage [ href "/" ] [ text "Home" ]
+              , navbarItemLink page.isAboutPage [ href "/about" ] [ text "About" ]
+              , navbarItemLink page.isNewPostPage [ href "/posts/new" ] [ text "New post" ]
               ]
               , navbarEnd [] 
                 [ navbarItem False [] [ div [ class "field is-grouped" ] buttons ] ]
@@ -124,3 +122,6 @@ navbar session page { menuOpen } toMsg =
           ]
 
         |> Html.map toMsg
+
+spinner : Html msg
+spinner = div [ class "spinner" ] [ div [ class "bounce1" ] [], div [ class "bounce2" ] [], div [ class "bounce3" ] [] ]

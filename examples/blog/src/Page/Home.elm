@@ -1,12 +1,15 @@
 module Page.Home exposing (Msg(..), State, init, subscriptions, update, view)
 
+import Bulma.Elements exposing (..)
+import Bulma.Modifiers exposing (..)
 import Data.Post as Post exposing (Post)
-import Helpers exposing (apiResourceErrorMessage, spinner)
+import Helpers.Api exposing (resourceErrorMessage)
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (..)
 import Json.Decode as Json
 import Ui.Page
+import Ui exposing (spinner)
 import Update.Deep exposing (..)
 import Update.Deep.Api as Api
 
@@ -79,7 +82,8 @@ view { posts } toMsg =
                                     )
                                 ]
             in
-            div [ class "content" ]
+            content Standard
+                []
                 [ h4 [ class "title is-4" ] [ a [ href postUrl ] [ text title ] ]
                 , p [] [ text body ]
                 , p []
@@ -97,7 +101,7 @@ view { posts } toMsg =
                     [ spinner ]
 
                 Api.Error error ->
-                    [ apiResourceErrorMessage posts.resource ]
+                    [ resourceErrorMessage posts.resource ]
 
                 Api.Available items ->
                     List.map listItem items

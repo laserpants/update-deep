@@ -7,7 +7,7 @@ import Form.Error exposing (Error, ErrorValue(..))
 import Form.Field as Field exposing (Field, FieldValue(..))
 import Form.Register.Custom as Custom
 import Form.Validate as Validate exposing (Validation, andMap, andThen, customError, fail, field, minLength, oneOf, succeed)
-import Helpers exposing (..)
+import Helpers.Form exposing (..)
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (..)
