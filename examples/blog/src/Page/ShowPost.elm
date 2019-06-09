@@ -168,5 +168,5 @@ view { post, comment, commentForm } toMsg =
             spinner
 
           else
-            content Standard [] postView
+            div [] postView
         ]

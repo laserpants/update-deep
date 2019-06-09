@@ -3,6 +3,7 @@
   "scripts": {
     "dev": "npx webpack-dev-server"
   },
+  "dependencies": {},
   "devDependencies": {
     "elm-webpack-loader": "^5.0.0",
     "file-loader": "^3.0.1",
