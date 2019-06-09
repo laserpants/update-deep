@@ -5,7 +5,7 @@ import Bulma.Modifiers exposing (..)
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (..)
-import Http 
+import Http
 import Update.Deep.Api as Api
 
 
