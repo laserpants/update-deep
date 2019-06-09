@@ -74,7 +74,7 @@ view { text } toMsg =
             ]
         , div []
             [ button
-                [ class "button"
+                [ class "button is-fullwidth"
                 , disabled (String.isEmpty text)
                 , onClick (toMsg Submit)
                 ]
