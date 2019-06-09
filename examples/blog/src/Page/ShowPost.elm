@@ -2,7 +2,6 @@ module Page.ShowPost exposing (..)
 
 import Data.Comment as Comment exposing (Comment)
 import Data.Post as Post exposing (Post)
-import Form exposing (Form)
 import Form.Comment
 import Helpers exposing (..)
 import Html exposing (..)
@@ -12,7 +11,6 @@ import Http
 import Json.Decode as Json
 import Update.Deep exposing (..)
 import Update.Deep.Api as Api
-import Update.Deep.Form
 import Update.Deep.Form as Form
 
 type Msg 
@@ -84,7 +82,7 @@ update { onCommentCreated } msg toMsg =
         FetchPost ->
           inPostApi (Api.sendSimpleRequest toApiMsg)
         CommentFormMsg formMsg ->
-          inCommentForm (Update.Deep.Form.update { onSubmit = handleSubmit toMsg } formMsg)
+          inCommentForm (Form.update { onSubmit = handleSubmit toMsg } formMsg)
         CommentApiMsg apiMsg ->
           inCommentApi (Api.update { onSuccess = commentCreated, onError = always save } apiMsg (toMsg << CommentApiMsg))
 

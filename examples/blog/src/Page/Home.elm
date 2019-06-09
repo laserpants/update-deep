@@ -1,4 +1,4 @@
-module Page.Home exposing (Msg(..), State, inPosts, init, subscriptions, update, view)
+module Page.Home exposing (Msg(..), State, init, subscriptions, update, view)
 
 import Data.Post as Post exposing (Post)
 import Helpers exposing (apiResourceErrorMessage, spinner)

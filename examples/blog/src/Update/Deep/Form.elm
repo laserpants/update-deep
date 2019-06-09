@@ -1,9 +1,12 @@
-module Update.Deep.Form exposing (Model, init, reset, setDisabled, update)
+module Update.Deep.Form exposing (Model, Msg, init, reset, setDisabled, update)
 
 import Form exposing (Form)
 import Form.Field as Field exposing (Field)
 import Form.Validate as Validate exposing (Validation)
 import Update.Deep exposing (..)
+
+
+type alias Msg = Form.Msg
 
 
 type alias Model a b =

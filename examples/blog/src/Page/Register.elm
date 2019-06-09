@@ -1,26 +1,25 @@
 module Page.Register exposing (..)
 
+import Bulma.Components exposing (..)
+import Bulma.Form exposing (controlInputModifiers)
 import Bulma.Modifiers exposing (..)
+import Data.User as User exposing (User)
 import Dict exposing (Dict)
-import Form exposing (Form)
-import Update.Deep.Form 
-import Update.Deep.Api as Api
+import Form as F
+import Form.Field as Field exposing (Field, FieldValue(..))
 import Form.Register exposing (UsernameStatus(..))
 import Form.Register.Custom
-import Http 
-import Form.Field as Field exposing (Field, FieldValue(..))
-import Data.User as User exposing (User)
-import Json.Decode as Json
-import Update.Deep.Api as Api exposing (Resource(..))
-import Update.Deep exposing (..)
-import Bulma.Components exposing (..)
-import Json.Encode as Encode
-import Ports
+import Helpers exposing (..)
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (..)
-import Bulma.Form exposing (controlInputModifiers)
-import Helpers exposing (..)
+import Http 
+import Json.Decode as Json
+import Json.Encode as Encode
+import Ports
+import Update.Deep exposing (..)
+import Update.Deep.Api as Api exposing (Resource(..))
+import Update.Deep.Form as Form
 
 type alias WebSocketIsAvailableResponsePayload =
   { username : String
@@ -55,7 +54,7 @@ type Msg
 
 type alias State =
   { api : Api.Model User 
-  , formModel : Update.Deep.Form.Model Form.Register.Custom.Error Form.Register.Fields
+  , formModel : Form.Model Form.Register.Custom.Error Form.Register.Fields
   , usernames : Dict String Bool 
   , usernameStatus : UsernameStatus
   }
@@ -67,7 +66,7 @@ inApi : In State (Api.Model User) msg a
 inApi =
     inState { get = .api, set = \state api -> { state | api = api } }
 
-inForm : In State (Update.Deep.Form.Model Form.Register.Custom.Error Form.Register.Fields) msg a
+inForm : In State (Form.Model Form.Register.Custom.Error Form.Register.Fields) msg a
 inForm =
     inState { get = .formModel, set = \state form -> { state | formModel = form } }
 
@@ -84,7 +83,7 @@ init toMsg =
    in 
       save State
         |> andMap api
-        |> andMap (Update.Deep.Form.init [] Form.Register.validate)
+        |> andMap (Form.init [] Form.Register.validate)
         |> andMap (save Dict.empty)
         |> andMap (save Blank)
         |> mapCmd toMsg
@@ -112,10 +111,10 @@ checkIfIsAvailable username ({ usernames } as state) =
               |> setUsernameStatus Unknown
               |> andAddCmd (Ports.websocketOut (Encode.encode 0 (websocketIsAvailableQuery username)))
 
-usernameFieldSpy : Form.Msg -> State -> Update State msg a
+usernameFieldSpy : F.Msg -> State -> Update State msg a
 usernameFieldSpy formMsg =
   case formMsg of
-    Form.Input "username" Form.Text (String username) ->
+    F.Input "username" F.Text (String username) ->
       checkIfIsAvailable username 
     _ ->
       save 
@@ -131,14 +130,14 @@ update msg toMsg =
     ApiMsg apiMsg ->
       inApi (Api.update { onSuccess = always save, onError = always save } apiMsg (toMsg << ApiMsg))
     FormMsg formMsg ->
-      inForm (Update.Deep.Form.update { onSubmit = handleSubmit toMsg } formMsg)
+      inForm (Form.update { onSubmit = handleSubmit toMsg } formMsg)
         >> andThen (usernameFieldSpy formMsg)
     WebsocketMsg websocketMsg ->
       case Json.decodeString websocketMessageDecoder websocketMsg of
         Ok (WebSocketIsAvailableResponse { username, available }) ->
           unwrap .formModel (\model -> 
             let 
-                usernameField = Form.getFieldAsString "username" model.form
+                usernameField = F.getFieldAsString "username" model.form
              in 
                 saveUsernameStatus username available
                   >> andThen (checkIfIsAvailable <| Maybe.withDefault "" usernameField.value))

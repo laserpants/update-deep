@@ -3,7 +3,6 @@ module Page.NewPost exposing (..)
 import Bulma.Form exposing (controlInputModifiers, controlTextAreaModifiers)
 import Bulma.Modifiers exposing (..)
 import Data.Post as Post exposing (Post)
-import Form exposing (Form)
 import Form.Field as Field exposing (Field, FieldValue(..))
 import Form.NewPost
 import Helpers exposing (..)
@@ -15,7 +14,6 @@ import Json.Decode as Json
 import Ui.Page
 import Update.Deep exposing (..)
 import Update.Deep.Api as Api
-import Update.Deep.Form 
 import Update.Deep.Form as Form
 
 type Msg 
@@ -57,7 +55,7 @@ update { onPostAdded } msg toMsg =
     ApiMsg apiMsg ->
       inApi (Api.update { onSuccess = invokeHandler << onPostAdded, onError = always save } apiMsg (toMsg << ApiMsg))
     FormMsg formMsg ->
-      inForm (Update.Deep.Form.update { onSubmit = handleSubmit toMsg } formMsg)
+      inForm (Form.update { onSubmit = handleSubmit toMsg } formMsg)
 
 subscriptions : State -> (Msg -> msg) -> Sub msg
 subscriptions state toMsg = Sub.none
