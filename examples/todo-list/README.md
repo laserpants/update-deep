@@ -23,7 +23,7 @@ The `Data.TodoItem` module defines the `TodoItem` type
 type alias TodoItem = { text : String }
 ```
 
-which holds a description of the anticipated task. `Data.Notification` is similar. It represents a “toast” notification shown on the screen.
+which is just a description of the anticipated task. `Data.Notification` is similar. It represents a “toast” notification shown on the screen.
 Let's concentrate instead on the four modules on the left side of the diagram; `Main`, `Notifications`, `Todos`, and `Todos.Form`.
 Each one of these specifies its own `Msg` and `State` type, as well as `update` and `init` functions. (Subscriptions are not used in this example.)
 
