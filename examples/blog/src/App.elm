@@ -1,4 +1,4 @@
-module App exposing (Flags, Msg(..), State, handleAuthResponse, handleCommentCreated, handlePostAdded, handleRouteChange, inPage, inRouter, inUi, init, initSession, loadPage, redirect, resetRestrictedUrl, returnToRestrictedUrl, setRestrictedUrl, setSession, subscriptions, update, updateSessionStorage, view)
+module App exposing (Flags, Msg(..), State, init, subscriptions, update, view)
 
 import Browser exposing (Document)
 import Browser.Navigation as Navigation
