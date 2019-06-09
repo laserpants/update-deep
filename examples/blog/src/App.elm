@@ -24,8 +24,7 @@ import Url exposing (Url)
 
 
 type alias Flags =
-    { api : String
-    , session : String
+    { session : String
     }
 
 
@@ -115,18 +114,18 @@ loadPage setPage state =
 handleRouteChange : Url -> Maybe Route -> State -> Update State Msg a
 handleRouteChange url maybeRoute =
     let
-        ifAuthenticated gotoPage state =
-            if Nothing == state.session then
-                state
-                    |> setRestrictedUrl url.path
-                    -- Redirect back here after successful login
-                    |> andThen (redirect "/login")
-                    |> andThen (inUi (showToast { message = "You must be logged in to access that page.", color = Warning } UiMsg))
+        ifAuthenticated gotoPage =
+            unwrap .session
+                (\session ->
+                    if Nothing == session then
+                        -- Redirect and return to this url after successful login
+                        setRestrictedUrl url.path
+                            >> andThen (redirect "/login")
+                            >> andThen (inUi (showToast { message = "You must be logged in to access that page.", color = Warning } UiMsg))
 
-            else
-                state
-                    |> gotoPage
-                    |> mapCmd PageMsg
+                    else
+                        gotoPage >> mapCmd PageMsg
+                )
 
         unlessAuthenticated gotoPage =
             unwrap .session

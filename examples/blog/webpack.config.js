@@ -1,15 +1,9 @@
-var dotenv = require('dotenv');
 var path = require('path');
 var webpack = require('webpack');
 
 module.exports = function() {
 
-  var env = dotenv.config({ path: '.env' }).parsed;
-
-  var keys = env ? Object.keys(env).reduce(function(acc, val) {
-    acc['process.env.' + val] = JSON.stringify(env[val]);
-    return acc;
-  }, {}) : {};
+  var keys = {};
 
   return {
     mode: 'development',
@@ -26,7 +20,7 @@ module.exports = function() {
           exclude: [ /elm-stuff/, /node_modules/ ],
           loader: 'elm-webpack-loader?verbose=true&warn=true',
           options: {
-            debug: false //true
+            debug: false
           }
         }
       ]

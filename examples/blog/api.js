@@ -106,14 +106,6 @@ xhook.before(function(request, callback) {
         post.id = ++postId;
         post.comments = [];
         posts.push(post);
-
-        //// TEMP
-        //callback({
-        //  status: 500,
-        //  data: JSON.stringify({}),
-        //  headers: { 'Content-Type': 'application/json' }
-        //});
-
         callback({
           status: 200,
           data: JSON.stringify({ post: post }),
