@@ -13,6 +13,7 @@ import Bulma.Elements exposing (..)
 import Bulma.Components exposing (..)
 import Bulma.Modifiers exposing (..)
 import Maybe.Extra as Maybe
+import Ui.Toast
 
 type Msg
   = ToggleBurgerMenu
@@ -68,35 +69,12 @@ update msg toMsg =
     ToggleBurgerMenu ->
       toggleMenuOpen
     CloseToast id ->
-      pluck .toast (\toast -> 
+      unwrap .toast (\toast -> 
         case toast of
           Nothing ->
             save 
           Just ( toastId, _ ) ->
             if id == toastId then closeToast else save) 
-
-toastContainer : Html msg -> Html msg
-toastContainer html = div [] [ html ]
-
---toastContainer : Html msg -> Html msg
---toastContainer html =
---  Html.Styled.div 
---    [ Html.Styled.Attributes.css
---      [ Css.width (Css.pct 100)
---      , Css.position (Css.fixed)
---      , Css.bottom (Css.px 0)
---      , Css.pointerEvents (Css.none)
---      , Css.displayFlex
---      , Css.flexDirection (Css.column)
---      , Css.padding (Css.px 15)
---      , Css.Media.withMedia 
---        [ Css.Media.only Css.Media.screen 
---          [ Css.Media.minWidth (Css.px 768) ] 
---        ] [ Css.alignItems (Css.start) ]
---      , Css.zIndex (Css.int 9000)
---      ]
---    ] [ Html.Styled.fromUnstyled html ]
---  |> Html.Styled.toUnstyled
 
 toastMessage : State -> (Msg -> msg) -> Html msg
 toastMessage { toast } toMsg =
@@ -105,7 +83,7 @@ toastMessage { toast } toMsg =
       text ""
     Just ( id, { message, color } ) ->
       notificationWithDelete color [] (CloseToast id) [ text message ]
-        |> toastContainer 
+        |> Ui.Toast.container 
         |> Html.map toMsg
 
 navbar : Maybe Session -> Page -> State -> (Msg -> msg) -> Html msg

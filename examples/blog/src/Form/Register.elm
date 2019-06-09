@@ -1,23 +1,12 @@
 module Form.Register exposing (..)
 
 import Form.Field as Field exposing (Field, FieldValue(..))
+import Form.Register.Custom as Custom exposing (Error(..)) 
 import Form.Error exposing (ErrorValue(..), Error)
 import Form.Validate as Validate exposing (Validation, succeed, field)
 import Helpers exposing (..)
 import Json.Decode as Json
 import Json.Encode as Encode
-
-type RegisterFormError
-  = PasswordConfirmationMismatch
-  | MustAgreeWithTerms
-
-errorToString : RegisterFormError -> String
-errorToString error =
-  case error of
-    PasswordConfirmationMismatch ->
-      "Password confirmation doesn’t match password"
-    MustAgreeWithTerms ->
-      "You must agree with the terms of this service to complete the registration"
 
 type alias Fields =
   { name : String
@@ -34,7 +23,7 @@ validatePassword =
   validateStringNonEmpty
     |> Validate.andThen (Validate.minLength 8)
 
-validatePasswordConfirmation : Field -> Result (Error RegisterFormError) String
+validatePasswordConfirmation : Field -> Result (Error Custom.Error) String
 validatePasswordConfirmation = 
 
   let 
@@ -51,7 +40,7 @@ validatePasswordConfirmation =
                 |> Validate.andThen (match value)
                 |> field "passwordConfirmation")
 
-validateChecked : Field -> Result (Error RegisterFormError) Bool
+validateChecked : Field -> Result (Error Custom.Error) Bool
 validateChecked = 
 
   let 
@@ -63,7 +52,7 @@ validateChecked =
       Validate.bool 
         |> Validate.andThen mustBeChecked
 
-validate : Validation RegisterFormError Fields
+validate : Validation Custom.Error Fields
 validate =
   succeed Fields
     |> Validate.andMap (field "name" validateStringNonEmpty)

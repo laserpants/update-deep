@@ -6,6 +6,7 @@ import Form exposing (Form)
 import Update.Deep.Form 
 import Update.Deep.Api as Api
 import Form.Register
+import Form.Register.Custom
 import Http 
 import Form.Field as Field exposing (Field, FieldValue(..))
 import Data.User as User exposing (User)
@@ -61,7 +62,7 @@ type UsernameStatus
 
 type alias State =
   { api : Api.Model User 
-  , formModel : Update.Deep.Form.Model Form.Register.RegisterFormError Form.Register.Fields
+  , formModel : Update.Deep.Form.Model Form.Register.Custom.Error Form.Register.Fields
   , usernames : Dict String Bool 
   , usernameStatus : UsernameStatus
   }
@@ -73,7 +74,7 @@ inApi : In State (Api.Model User) msg a
 inApi =
     inState { get = .api, set = \state api -> { state | api = api } }
 
-inForm : In State (Update.Deep.Form.Model Form.Register.RegisterFormError Form.Register.Fields) msg a
+inForm : In State (Update.Deep.Form.Model Form.Register.Custom.Error Form.Register.Fields) msg a
 inForm =
     inState { get = .formModel, set = \state form -> { state | formModel = form } }
 
@@ -142,7 +143,7 @@ update msg toMsg =
     RegisterPageWebsocketMsg websocketMsg ->
       case Json.decodeString websocketMessageDecoder websocketMsg of
         Ok (WebSocketUsernameAvailableResponse { username, available }) ->
-          pluck .formModel (\model -> 
+          unwrap .formModel (\model -> 
             let 
                 usernameField = Form.getFieldAsString "username" model.form
              in 
@@ -154,11 +155,11 @@ update msg toMsg =
 subscriptions : State -> (Msg -> msg) -> Sub msg
 subscriptions state toMsg = Ports.websocketIn (toMsg << RegisterPageWebsocketMsg)
 
-formView : Update.Deep.Form.Model Form.Register.RegisterFormError Form.Register.Fields -> UsernameStatus -> (Form.Msg -> msg) -> Html msg
+formView : Update.Deep.Form.Model Form.Register.Custom.Error Form.Register.Fields -> UsernameStatus -> (Form.Msg -> msg) -> Html msg
 formView { form, disabled } usernameStatus toMsg =
 
   let 
-      info = fieldInfo Form.Register.errorToString controlInputModifiers 
+      info = fieldInfo Form.Register.Custom.errorToString controlInputModifiers 
 
       name                 = form |> Form.getFieldAsString "name"                 |> info
       email                = form |> Form.getFieldAsString "email"                |> info
