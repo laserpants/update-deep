@@ -1,78 +1,116 @@
-module Todos exposing (..)
+module Todos exposing (Index, Msg(..), State, addItem, inForm, init, setItems, update, view)
 
-import Data.TodoItem exposing (..)
+import Data.TodoItem exposing (TodoItem)
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (..)
 import Todos.Form as Form
 import Update.Deep exposing (..)
-import Util exposing (const, uncurry)
 
-type alias Index = Int
+
+type alias Index =
+    Int
+
 
 type Msg
-  = FormMsg Form.Msg
-  | AddItem TodoItem
-  | DeleteItem Index
-  | TaskDone Index
+    = TodosFormMsg Form.Msg
+    | MarkDone Index
+    | Delete Index
+
 
 type alias State =
-  { list : List TodoItem
-  , form : Form.State }
+    { items : List TodoItem
+    , form : Form.State
+    }
 
-pushItem : TodoItem -> State -> Update State Msg a
-pushItem item state = save { state | list = item :: state.list }
 
-removeItem : { t | onDelete : TodoItem -> a } -> Index -> State -> Update State Msg a
-removeItem { onDelete } ix ({ list } as state) =
-  case List.drop ix list of
-    [] ->
-      save state
-    (item :: rest) ->
-      { state | list = List.take ix list ++ rest }
-        |> save
-        |> andInvoke (onDelete item)
+setItems : List TodoItem -> State -> Update State msg a
+setItems items state =
+    save { state | items = items }
 
-type alias EventHandlers t a c e =
-  { t | onItemAdded : a -> Update a c e
-      , onTaskDone  : TodoItem -> a -> Update a c e }
 
-update : EventHandlers t a c e  -> Msg -> State -> Update State Msg (a -> Update a c e)
-update events msg state =
-  case msg of
-    FormMsg formMsg ->
-      state.form
-        |> Form.update { onSubmit = \todo -> update events (AddItem todo) } formMsg
-        |> mapCmd FormMsg
-        |> andThen (\form -> save { state | form = form})
-        |> consumeEvents
-    AddItem item ->
-      state
-        |> pushItem item
-        |> andInvoke events.onItemAdded
-    TaskDone ix ->
-      state
-        |> removeItem { onDelete = events.onTaskDone } ix
-    DeleteItem ix ->
-      state
-        |> removeItem { onDelete = const save } ix
+addItem : TodoItem -> State -> Update State msg a
+addItem item state =
+    save { state | items = item :: state.items }
 
-init : Init State Msg
-init =
-  let form = Form.init
-   in { list = [], form = form.state }
-        |> initial
-        |> initCmd FormMsg form
 
-view : State -> Html Msg
-view { list } =
-  let indexed = List.indexedMap Tuple.pair
-      item ix todo =
-        li [] [ a [ href "#", onClick (TaskDone ix) ] [ text "Done" ]
-              , text " | "
-              , a [ href "#", onClick (DeleteItem ix) ] [ text "Delete" ]
-              , text " | "
-              , text todo.text ]
-   in div []
-        [ if not (List.isEmpty list) then h3 [] [ text "Todos" ] else text ""
-        , ul [] (List.map (uncurry item) (indexed list)) ]
+inForm : In State Form.State msg a
+inForm =
+    inState { get = .form, set = \state form -> { state | form = form } }
+
+
+init : (Msg -> msg) -> Update State msg a
+init toMsg =
+    save State
+        |> andMap (save [])
+        |> andMap (Form.init TodosFormMsg)
+        |> mapCmd toMsg
+
+
+update : { onTaskAdded : TodoItem -> a, onTaskDone : TodoItem -> a } -> Msg -> State -> Update State msg a
+update { onTaskAdded, onTaskDone } msg =
+    let
+        handleSubmit data =
+            let
+                item =
+                    { text = data.text }
+            in
+            addItem item
+                >> andInvokeHandler (onTaskAdded item)
+
+        removeItem ix flags state =
+            state
+                |> (case List.drop ix state.items of
+                        [] ->
+                            save
+
+                        item :: rest ->
+                            setItems (List.take ix state.items ++ rest)
+                                >> andThenIf (always flags.notify) (invokeHandler <| onTaskDone item)
+                   )
+    in
+    case msg of
+        TodosFormMsg formMsg ->
+            inForm (Form.update { onSubmit = handleSubmit } formMsg)
+
+        MarkDone ix ->
+            removeItem ix { notify = True }
+
+        Delete ix ->
+            removeItem ix { notify = False }
+
+
+view : State -> (Msg -> msg) -> Html msg
+view { items, form } toMsg =
+    let
+        indexed =
+            List.indexedMap Tuple.pair
+
+        row ( ix, todo ) =
+            tr []
+                [ td []
+                    [ text todo.text ]
+                , td []
+                    [ span [ class "icon has-text-success" ]
+                        [ i [ class "fa fa-check-square" ] [] ]
+                    , a [ onClick (toMsg <| MarkDone ix), href "#" ]
+                        [ text "Done" ]
+                    , span
+                        [ style "margin-left" ".5em"
+                        , class "icon has-text-danger"
+                        ]
+                        [ i [ class "fa fa-trash" ] [] ]
+                    , a [ onClick (toMsg <| Delete ix), href "#" ]
+                        [ text "Delete" ]
+                    ]
+                ]
+    in
+    div [ style "margin" "1em" ]
+        [ Form.view form (toMsg << TodosFormMsg)
+        , h3 [ class "title is-3" ] [ text "Tasks" ]
+        , if List.isEmpty items then
+            p [] [ text "You have no tasks" ]
+
+          else
+            table [ class "table is-bordered is-fullwidth" ] (List.map row (indexed items))
+        ]

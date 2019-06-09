@@ -1,45 +1,96 @@
-# To Do-List Tutorial
+# To Do-List App Example
+
+#### Run this example in the browser [here](https://laserpants.github.io/update-deep/examples/todo-list).
 
 The application consists of the following modules:
 
 ```
                ┌────────────┐               |
-          ┌────│    Main    │────┐          |   
-          │    └────────────┘    │          |   ┌─────────────────┐
- ┌─────── ▼ ───────┐       ┌──── ▼ ────┐    |   │  Data.TodoItem  │
- │  Notifications  │       │   Todos   │    |   └─────────────────┘
- └─────────────────┘       └─────┬─────┘    |   ┌────────┐     
-                                 │          |   │  Util  │
-                         ┌────── ▼ ─────┐   |   └────────┘
-                         │  Todos.Form  │   | 
-                         └──────────────┘   |  
+          ┌────│    Main    │────┐          |
+          │    └────────────┘    │          |   ┌───────────────────┐
+ ┌─────── ▼ ───────┐       ┌──── ▼ ────┐    |   │   Data.TodoItem   │
+ │  Notifications  │       │   Todos   │    |   └───────────────────┘
+ └─────────────────┘       └─────┬─────┘    |   ┌───────────────────┐         
+                                 │          |   │ Data.Notification │         
+                         ┌────── ▼ ─────┐   |   └───────────────────┘         
+                         │  Todos.Form  │   |
+                         └──────────────┘   |
 ```
 
-In `Data.TodoItem`, we just define the `TodoItem` type; and `Util` contains a few helper functions, like `flip` and `const`. 
-In the following, we are mostly concerned with the four modules on the left side of the diagram; `Main`, `Notifications`, `Todos`, and `Todos.Form`. 
-Each one of these specifies its own `Msg` and `State` type, as well as `update` and `init` functions. 
-Most of this is implemented as usual, but the return types of `update` and `init` are a bit different, and `update` takes an extra `EventHandlers` argument:
+The `Data.TodoItem` module defines the `TodoItem` type
 
 ```elm
-update : EventHandlers t a c e  -> Msg -> State -> Update State Msg (a -> Update a c e)
+type alias TodoItem = { text : String }
 ```
 
-```elm
-init : Flags -> Init State Msg
-```
+which is just a description of the anticipated task. `Data.Notification` is similar. It represents a “toast” notification shown on the screen.
+Let's concentrate instead on the four modules on the left side of the diagram; `Main`, `Notifications`, `Todos`, and `Todos.Form`.
+Each one of these specifies its own `Msg` and `State` type, as well as `update` and `init` functions. (Subscriptions are not used in this example.)
 
 > Note that *state* is used here to refer to (what the Elm architecture calls) a *model*, and that these two terms are used more or less interchangeably in the following.
 
-As usual, messages move down in the update tree. To pass information in the opposite direction, this library introduces a simple, callback-based event handling mechanism. 
+It is useful to imagine these as instances of the following base template:
+
+```elm
+module Template exposing (..)
+
+type Msg
+    = SomeMsg
+    | SomeOtherMsg
+    | -- etc.
+
+type alias State =
+    { 
+        -- ...
+    }
+
+init : Update State msg a
+init = 
+    save {}
+
+update : Msg -> State -> Update State msg a
+update msg state =
+    case msg of
+        -- etc.
+
+view = ...
+```
+
+The only thing that makes this different is the return types of `update` and `init`.
+Here is the definition of the `Update` type alias:
+
+```elm
+type alias Update m c e =
+    ( m, Cmd c, List e )
+```
+
+This is just the usual model-`Cmd` pair with an extra, third element.
+As you may have guessed already, writing `save {}` in the above code, is the same as returning `( {}, Cmd.none, [] )`.
+We typically manipulate these values by composing functions of the form `something -> State -> Update State msg a` in the familiar style using pipes:
+
+```elm
+save state
+    |> andThen doSomething
+    |> andThen doSomethingElse
+```
+
+```elm
+state
+    |> addCmd (Ports.clearSession ())
+    |> andThen doSomething
+```
+
+How is this useful then? Well, messages move down in the update tree. To pass information in the opposite direction, this library introduces a simple, callback-based event handling mechanism. That is what the third element of the `Update` tuple is for.
+
 In this example, there are three event handlers involved:
 
 ```
                ┌────────────┐
-               │    Main    │      
-               └── ▲ ─ ▲ ───┘      
-                   │   │                   
-                   │   │--- onItemAdded
-     onTaskDone ---│   │               
+               │    Main    │
+               └── ▲ ─ ▲ ───┘
+                   │   │
+                   │   │--- onTaskAdded
+     onTaskDone ---│   │
                    │   │   ┌───────────┐
                    └───┴───│   Todos   │
                            └──── ▲ ────┘
@@ -51,73 +102,71 @@ In this example, there are three event handlers involved:
                          └──────────────┘
 ```
 
-When a task is added or completed, `Main` gets a chance to update itself, so that we can show a notification.
-Similarly, `Todos` is interested to know when the form is submitted, so that it can add the new `TodoItem` to the list. Let's look at `update` in `Todos.Form`:
+When a task is added or completed, `Main` gets a chance to update itself, in this case so that we can show a notification (toast).
+Similarly, `Todos` is told when the form is submitted, so that it can add the new `TodoItem` to its list. Let's look at `update` in `Todos.Form`:
 
 ```elm
--- src/Todos/Form.elm (line 24)
+-- src/Todos/Form.elm (line 30)
 
-update : EventHandlers t a c e -> Msg -> State -> Update State Msg (a -> Update a c e)
+update : { onSubmit : FormData -> a } -> Msg -> State -> Update State msg a
 update { onSubmit } msg state =
-  case msg of
-    OnSubmit ->
-      state
-        |> setText ""
-        |> andInvoke (onSubmit { text = state.text })
-    OnFocus ->
-      -- etc.
+    case msg of
+        Submit ->
+            state
+                |> invokeHandler (onSubmit { text = state.text })
+                |> andThen (setText "")
+        
+        Focus ->
+            -- etc.
 ```
 
-in `Todos`, the `onSubmit` handler receives the `TodoItem` and wraps it in an `AddItem` message&hellip;
+An `onSubmit` callback is 
+
+Now,
 
 ```elm
--- src/Todos.elm (line 40)
+-- src/Todos.elm (line 52)
 
-update : EventHandlers t a c e  -> Msg -> State -> Update State Msg (a -> Update a c e)
-update events msg state =
-  case msg of
-    FormMsg formMsg ->
-      state.form
-        |> Form.update { onSubmit = \todo -> update events (AddItem todo) } formMsg
+    let
+        handleSubmit data =
+            let
+                item =
+                    { text = data.text }
+            in
+            addItem item
+                >> andInvokeHandler (onTaskAdded item)
+
+-- src/Todos.elm (line 71)
+
+    in
+    case msg of
+        TodosFormMsg formMsg ->
+            inForm (Form.update { onSubmit = handleSubmit } formMsg)
+
         -- etc.
 ```
 
-&hellip; and then calls `update` again.
+`addItem` (lo and behold) adds the `TodoItem` to the list of tasks.
 
-```
-             ┌──────────┐
-             │          │ 
-          AddTodo       │ 
-             │          │ 
-       ┌──── ▼ ────┐    │
-       │   Todos   │────┘
-       └──── ▲ ────┘
-             │--- onSubmit
-     ┌───────┴──────┐
-     │  Todos.Form  │
-     └──────────────┘
-```
-
-The subsequent lines are mostly boilerplate to insert the updated `Todos.Form` state back into the `Todo` model again, and to map the `FormMsg` constructor over the command value (so that it becomes a `Cmd Todos.Msg`).
-Calling the event handlers from within `Todos.Form` produces a list of monadic functions, which is what the third type parameter in `Update` is for. 
-We then use `consumeEvents` to apply these actions in the context of `State.update`.
+Finally, in `Main.elm`
 
 ```elm
--- src/Todos.elm (line 46)
-        |> mapCmd FormMsg
-        |> andThen (\form -> save { state | form = form})
-        |> consumeEvents
-    AddItem item ->
-      -- etc.
+-- src/Main.elm (line 59)
+
+update : Msg -> State -> Update State Msg a
+update msg =
+    case msg of
+        TodosMsg todosMsg ->
+            inTodos (Todos.update { onTaskAdded = handleItemAdded, onTaskDone = handleTaskDone } todosMsg)
+
+        -- etc.
 ```
 
-Then, when the item is added, `onItemAdded` is invoked to pass the word to `Main`.
-
 ```elm
--- src/Todos.elm (line 49)
-    AddItem item ->
-      state
-        |> pushItem item
-        |> andInvoke events.onItemAdded
-     -- etc.
+-- src/Main.elm (line 47)
+
+handleItemAdded : TodoItem -> State -> Update State Msg a
+handleItemAdded _ =
+    Notifications.addNotification "A new task was added to your list." NotificationsMsg
+        |> inNotifications
 ```

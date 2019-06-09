@@ -1,59 +1,99 @@
-module Notifications exposing (..)
+module Notifications exposing (Msg(..), State, addNotification, dismissAfterSeconds, enqueuNotification, incrementCounter, init, removeWithId, resetQueue, update, view)
 
+import Data.Notification exposing (Notification, NotificationId(..))
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (..)
 import Process
 import Task
-import List exposing (isEmpty, length, reverse, take)
 import Update.Deep exposing (..)
-import Util exposing (const)
+
 
 type Msg
-  = Add String
-  | DismissOne
-  | DismissAll
+    = DismissOne NotificationId
+    | DismissAll
+
 
 type alias State =
-  { list : List String }
+    { queue : List Notification
+    , counter : Int
+    }
 
-addNotification : String -> State -> Update State Msg a
-addNotification text state = save { state | list = text :: state.list }
 
-dismissOne : State -> Update State Msg a
-dismissOne state = save { state | list = List.take (List.length state.list - 1) state.list }
+enqueuNotification : Notification -> State -> Update State msg a
+enqueuNotification notification state =
+    save { state | queue = notification :: state.queue }
 
-dismissAll : State -> Update State Msg a
-dismissAll state = save { state | list = [] }
 
-dismissAfterSeconds : Int -> State -> Update State Msg a
-dismissAfterSeconds n =
-  let secs = toFloat n
-   in runCmd (Task.perform (const DismissOne) (Process.sleep (secs * 1000)))
+removeWithId : NotificationId -> State -> Update State msg a
+removeWithId id_ state =
+    save { state | queue = List.filter (\{ id } -> id /= id_) state.queue }
 
-update : Msg -> State -> Update State Msg a
-update msg state =
-  let setTimeoutIf cond = if cond then dismissAfterSeconds 6 else save
-   in case msg of
-    Add text ->
-      state
-        |> addNotification text
-        |> andThen (setTimeoutIf (isEmpty state.list))
-    DismissOne ->
-      state
-        |> dismissOne
-        |> andThen (setTimeoutIf (length state.list > 1))
-    DismissAll ->
-      state
-        |> dismissAll
 
-init : Init State Msg
-init = initial { list = [] }
+resetQueue : State -> Update State msg a
+resetQueue state =
+    save { state | queue = [] }
 
-view : State -> Html Msg
-view { list } =
-  let len = length list
-      item text = Html.text text
-   in div []
-       ([ text (if len > 1 then "(" ++ String.fromInt len ++ ")" else "")
-        , text " " ] ++ List.map item (list |> reverse |> take 1))
+
+incrementCounter : State -> Update State msg a
+incrementCounter state =
+    save { state | counter = 1 + state.counter }
+
+
+init : (Msg -> msg) -> Update State msg a
+init toMsg =
+    save State
+        |> andMap (save [])
+        |> andMap (save 1)
+        |> mapCmd toMsg
+
+
+dismissAfterSeconds : Int -> Notification -> State -> Update State Msg a
+dismissAfterSeconds n { id } =
+    let
+        secs =
+            toFloat n
+    in
+    addCmd (Task.perform (always <| DismissOne id) (Process.sleep (secs * 1000)))
+
+
+addNotification : String -> (Msg -> msg) -> State -> Update State msg a
+addNotification text toMsg state =
+    let
+        notification =
+            { id = Id state.counter, text = text }
+    in
+    state
+        |> enqueuNotification notification
+        |> andThen (notification |> dismissAfterSeconds 10)
+        |> andThen incrementCounter
+        |> mapCmd toMsg
+
+
+update : Msg -> (Msg -> msg) -> State -> Update State msg a
+update msg toMsg =
+    case msg of
+        DismissOne notificationId ->
+            removeWithId notificationId >> mapCmd toMsg
+
+        DismissAll ->
+            resetQueue >> mapCmd toMsg
+
+
+view : State -> (Msg -> msg) -> Html msg
+view { queue } toMsg =
+    let
+        item { id, text } =
+            div [ class "notification" ]
+                [ button [ onClick (toMsg <| DismissOne id), class "delete" ] []
+                , Html.text text
+                ]
+    in
+    div [ style "float" "right" ]
+        [ div [] (List.map item queue)
+        , if List.isEmpty queue then
+            text ""
+
+          else
+            div [ style "margin-top" ".5em" ] [ a [ href "#", onClick (toMsg DismissAll) ] [ text "Dismiss all notifications" ] ]
+        ]
