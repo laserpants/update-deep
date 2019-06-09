@@ -1,5 +1,6 @@
 module Helpers exposing (..)
 
+import Http exposing (emptyBody)
 import Bulma.Modifiers exposing (..)
 import Bulma.Components exposing (..)
 import Form.Error exposing (ErrorValue(..), Error)
@@ -8,6 +9,7 @@ import Form.Validate as Validate exposing (Validation, succeed, field)
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (..)
+import Http
 import Update.Deep.Api as Api
 
 validateStringNonEmpty : Field -> Result (Error e) String
@@ -21,8 +23,8 @@ validateEmail =
   validateStringNonEmpty 
     |> Validate.andThen (always Validate.email) 
 
-errorToString : (a -> String) -> ErrorValue a -> String
-errorToString customErrorToString error =
+validationErrorToString : (a -> String) -> ErrorValue a -> String
+validationErrorToString customErrorToString error =
   case error of
     Empty ->
       "This field is required"
@@ -79,13 +81,25 @@ fieldInfo custom modifiers { liveError, path, value } =
       , value = value
       , hasError = True
       , modifiers = { modifiers | color = Danger }
-      , errorMessage = errorToString custom error 
+      , errorMessage = validationErrorToString custom error 
       }
+
+httpErrorToString : Http.Error -> String
+httpErrorToString error =
+  case error of
+    Http.BadStatus 401 ->
+      "Authentication failed."
+    Http.BadStatus 500 ->
+      "Application error (500 Internal Server Error)"
+    Http.BadStatus 501 ->
+      "This feature is not implemented"
+    _ ->
+      "Something went wrong!"
 
 resourceErrorView : Api.Resource a -> Html msg
 resourceErrorView resource =
   case resource of
     Api.Error error -> 
       message { messageModifiers | color = Danger } [] 
-        [ messageBody [] [ text (error |> Api.errorToString) ] ]
+        [ messageBody [] [ text (error |> httpErrorToString) ] ]
     _ -> text ""

@@ -1,4 +1,4 @@
-module Update.Deep exposing (..)
+module Update.Deep exposing (In, Update, addCmd, andAddCmd, andInvokeHandler, andMap, andThen, andThenIf, ap, applicationInit, documentInit, foldEvents, foldEventsAndThen, inState, invokeHandler, join, kleisli, map, map2, map3, map4, map5, map6, map7, mapCmd, runUpdate, save, unwrap)
 
 
 type alias Update m c e =
@@ -119,7 +119,7 @@ foldEventsAndThen fun =
 
 
 unwrap : (a -> b) -> (b -> a -> c) -> a -> c
-unwrap get some state = 
+unwrap get some state =
     some (get state) state
 
 
