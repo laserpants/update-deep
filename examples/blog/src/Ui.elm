@@ -1,4 +1,4 @@
-module Ui exposing (Msg(..), State, Toast, closeBurgerMenu, closeToast, incrementToastCounter, init, navbar, setToast, showInfoToast, showToast, spinner, toastMessage, toggleMenuOpen, update)
+module Ui exposing (Msg(..), State, Toast, closeBurgerMenu, closeToast, init, navbar, showInfoToast, showToast, spinner, toastMessage, toggleMenuOpen, update)
 
 import Bulma.Components exposing (..)
 import Bulma.Elements exposing (..)
