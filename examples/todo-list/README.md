@@ -1,6 +1,6 @@
 # To Do-List App Example
 
-#### Run this example in the browser [here](https://laserpants.github.io/update-deep/examples/todo-list).
+#### Run this example in the browser [here](https://laserpants.github.io/update-deep/examples/todo-list/dist).
 
 The application consists of the following modules:
 
@@ -24,7 +24,7 @@ type alias TodoItem = { text : String }
 ```
 
 which is just a description of the anticipated task. `Data.Notification` is similar. It represents a “toast” notification shown on the screen.
-Let's concentrate instead on the four modules on the left side of the diagram; `Main`, `Notifications`, `Todos`, and `Todos.Form`.
+These modules are not so important for this example, so let's concentrate instead on the four modules on the left side of the diagram; `Main`, `Notifications`, `Todos`, and `Todos.Form`.
 Each one of these specifies its own `Msg` and `State` type, as well as `update` and `init` functions. (Subscriptions are not used in this example.)
 
 > Note that *state* is used here to refer to (what the Elm architecture calls) a *model*, and that these two terms are used more or less interchangeably in the following.
@@ -66,7 +66,7 @@ type alias Update m c e =
 
 This is just the usual model-`Cmd` pair with an extra, third element.
 As you may have guessed already, writing `save {}` in the above code, is the same as returning `( {}, Cmd.none, [] )`.
-We typically manipulate these values by composing functions of the form `something -> State -> Update State msg a` in the familiar style using pipes:
+We typically manipulate these values by composing functions of the form `something -> State -> Update State msg a` in the familiar pipe-driven style:
 
 ```elm
 save state
@@ -80,7 +80,7 @@ state
     |> andThen doSomething
 ```
 
-How is this useful then? Well, messages move down in the update tree. To pass information in the opposite direction, this library introduces a simple, callback-based event handling mechanism. That is what the third element of the `Update` tuple is for.
+How is this `Update` type useful then? Well, messages move down in the update tree. To pass information in the opposite direction, this library introduces a simple, callback-based event handling mechanism. That is what the third element of the `Update` tuple is for.
 
 In this example, there are three event handlers involved:
 
