@@ -156,4 +156,4 @@ navbar session page { menuOpen } toMsg =
 
 spinner : Html msg
 spinner =
-    div [ class "spinner" ] [ div [ class "bounce1" ] [], div [ class "bounce2" ] [], div [ class "bounce3" ] [] ]
+    div [ class "sk-three-bounce" ] [ div [ class "sk-child sk-bounce1" ] [], div [ class "sk-child sk-bounce2" ] [], div [ class "sk-child sk-bounce3" ] [] ]
