@@ -1,12 +1,13 @@
 module Page.Home exposing (..)
 
 import Data.Post as Post exposing (Post)
-import Update.Deep.Api as Api
-import Json.Decode as Json
-import Update.Deep exposing (..)
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (..)
+import Json.Decode as Json
+import Ui.Page
+import Update.Deep exposing (..)
+import Update.Deep.Api as Api
 
 type Msg 
   = ApiMsg (Api.Msg (List Post))
@@ -68,18 +69,13 @@ view { posts } toMsg =
       listView =
         case posts.resource of
           Api.NotRequested ->
-            div [] []
+            []
           Api.Requested ->
-            div [ class "spinner" ] [ div [ class "bounce1" ] [], div [ class "bounce2" ] [], div [ class "bounce3" ] [] ]
+            [ div [ class "spinner" ] [ div [ class "bounce1" ] [], div [ class "bounce2" ] [], div [ class "bounce3" ] [] ] ]
           Api.Error error ->
-            div [] [ text "error" ]
+            [ text "error" ]
           Api.Available items ->
-            div [] (List.map listItem items)
+            List.map listItem items
 
    in
-      div [ class "columns is-centered", style "margin" "1.5em" ] 
-        [ div [ class "column is-two-thirds" ] 
-          [ h3 [ class "title is-3" ] [ text "Posts" ] 
-          , listView
-          ] 
-        ]
+       Ui.Page.container "Posts" listView

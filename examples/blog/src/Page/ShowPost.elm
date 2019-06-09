@@ -1,6 +1,5 @@
 module Page.ShowPost exposing (..)
 
-import Bulma.Form exposing (controlInputModifiers, controlTextAreaModifiers)
 import Data.Comment as Comment exposing (Comment)
 import Data.Post as Post exposing (Post)
 import Form exposing (Form)
@@ -15,14 +14,12 @@ import Update.Deep exposing (..)
 import Update.Deep.Api as Api
 import Update.Deep.Form
 import Update.Deep.Form as Form
-import Form.Field as Field exposing (Field, FieldValue(..))
-import Bulma.Modifiers exposing (..)
 
 type Msg 
-  = ShowPostPageApiMsg (Api.Msg Post)
-  | ShowPostPageCommentApiMsg (Api.Msg Comment)
+  = PostApiMsg (Api.Msg Post)
+  | CommentApiMsg (Api.Msg Comment)
   | FetchPost
-  | ShowPostPageCommentFormMsg Form.Msg
+  | CommentFormMsg Form.Msg
 
 type alias State =
   { id : Int
@@ -30,8 +27,8 @@ type alias State =
   , comment : Api.Model Comment
   , commentForm : Form.Model Never Form.Comment.Fields }
 
-inApi : In State (Api.Model Post) msg a
-inApi =
+inPostApi : In State (Api.Model Post) msg a
+inPostApi =
     inState { get = .post, set = \state post -> { state | post = post } }
 
 inCommentApi : In State (Api.Model Comment) msg a
@@ -68,75 +65,31 @@ handleSubmit toMsg form state =
       json = form |> Form.Comment.toJson state.id |> Http.jsonBody 
    in 
       state 
-        |> inCommentApi (Api.sendRequest "" (Just json) (toMsg << ShowPostPageCommentApiMsg))
+        |> inCommentApi (Api.sendRequest "" (Just json) (toMsg << CommentApiMsg))
 
 update : { onCommentCreated : Comment -> a } -> Msg -> (Msg -> msg) -> State -> Update State msg a
 update { onCommentCreated } msg toMsg = 
 
   let 
-      toApiMsg = toMsg << ShowPostPageApiMsg
+      toApiMsg = toMsg << PostApiMsg
 
       commentCreated comment = 
         inCommentForm (Form.reset [])
-          >> andThen (inApi (Api.sendSimpleRequest toApiMsg))
+          >> andThen (inPostApi (Api.sendSimpleRequest toApiMsg))
           >> andInvokeHandler (onCommentCreated comment)
    in 
       case msg of
-        ShowPostPageApiMsg apiMsg ->
-          inApi (Api.update { onSuccess = always save, onError = always save } apiMsg toApiMsg)
+        PostApiMsg apiMsg ->
+          inPostApi (Api.update { onSuccess = always save, onError = always save } apiMsg toApiMsg)
         FetchPost ->
-          inApi (Api.sendSimpleRequest toApiMsg)
-        ShowPostPageCommentFormMsg formMsg ->
+          inPostApi (Api.sendSimpleRequest toApiMsg)
+        CommentFormMsg formMsg ->
           inCommentForm (Update.Deep.Form.update { onSubmit = handleSubmit toMsg } formMsg)
-        ShowPostPageCommentApiMsg apiMsg ->
-          inCommentApi (Api.update { onSuccess = commentCreated, onError = always save } apiMsg (toMsg << ShowPostPageCommentApiMsg))
+        CommentApiMsg apiMsg ->
+          inCommentApi (Api.update { onSuccess = commentCreated, onError = always save } apiMsg (toMsg << CommentApiMsg))
 
 subscriptions : State -> (Msg -> msg) -> Sub msg
 subscriptions state toMsg = Sub.none
-
-commentFormView : Form.Model Never Form.Comment.Fields -> (Form.Msg -> msg) -> Html msg
-commentFormView { form, disabled } toMsg =
-
-  let 
-      info = fieldInfo (always "")
-
-      email = form |> Form.getFieldAsString "email" |> info controlInputModifiers
-      body  = form |> Form.getFieldAsString "body"  |> info controlTextAreaModifiers
-   in
-      [ fieldset [ Html.Attributes.disabled disabled ]
-        [ Bulma.Form.field [] 
-          [ Bulma.Form.controlLabel [] [ text "Email" ] 
-          , Bulma.Form.controlEmail email.modifiers [] 
-            [ placeholder "Email"
-            , onFocus (Form.Focus email.path)
-            , onBlur (Form.Blur email.path)
-            , onInput (String >> Form.Input email.path Form.Text)
-            , value (Maybe.withDefault "" email.value)
-            ] [] 
-          , Bulma.Form.controlHelp Danger [] [ Html.text email.errorMessage ]
-          ]
-        , Bulma.Form.field [] 
-          [ Bulma.Form.controlLabel [] [ text "Body" ] 
-          , Bulma.Form.controlTextArea body.modifiers [] 
-            [ placeholder "Body"
-            , onFocus (Form.Focus body.path)
-            , onBlur (Form.Blur body.path)
-            , onInput (String >> Form.Input body.path Form.Text)
-            , value (Maybe.withDefault "" body.value)
-            ] [] 
-          , Bulma.Form.controlHelp Danger [] [ Html.text body.errorMessage ]
-          ]
-        , Bulma.Form.field [] 
-          [ div [ class "control" ] 
-            [ button [ type_ "submit", class "button is-primary" ] 
-              [ text (if disabled then "Please wait" else "Send comment") ] 
-            ]
-          ]
-        ]
-      ]
-
-    |> Html.form [ onSubmit Form.Submit ]
-    |> Html.map toMsg
 
 commentsView : List Comment -> (Msg -> msg) -> Html msg
 commentsView comments toMsg =
@@ -164,12 +117,8 @@ view { post, comment, commentForm } toMsg =
              div [ class "spinner" ] [ div [ class "bounce1" ] [], div [ class "bounce2" ] [], div [ class "bounce3" ] [] ]
            else
              case post.resource of
-               Api.NotRequested ->
-                 div [] []
-               Api.Requested ->
-                 div [] [ text "Loading" ]
                Api.Error error ->
-                 div [] [ text "error" ]
+                 resourceErrorView post.resource
                Api.Available post_ -> 
                  div []
                    [ h3 
@@ -180,7 +129,9 @@ view { post, comment, commentForm } toMsg =
                      , commentsView post_.comments toMsg
                      , h5 [ class "title is-5" ] [ text "Leave a comment" ] 
                      , resourceErrorView comment.resource
-                     , commentFormView commentForm (toMsg << ShowPostPageCommentFormMsg)
+                     , Form.Comment.view commentForm.form commentForm.disabled (toMsg << CommentFormMsg)
                      ]
+               _ ->
+                 text ""
      ]
    ]

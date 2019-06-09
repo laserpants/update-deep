@@ -5,7 +5,7 @@ import Dict exposing (Dict)
 import Form exposing (Form)
 import Update.Deep.Form 
 import Update.Deep.Api as Api
-import Form.Register
+import Form.Register exposing (UsernameStatus(..))
 import Form.Register.Custom
 import Http 
 import Form.Field as Field exposing (Field, FieldValue(..))
@@ -22,28 +22,26 @@ import Html.Events exposing (..)
 import Bulma.Form exposing (controlInputModifiers)
 import Helpers exposing (..)
 
---
-
-type alias WebSocketUsernameAvailableResponsePayload =
+type alias WebSocketIsAvailableResponsePayload =
   { username : String
   , available : Bool 
   }
 
-webSocketUsernameAvailableResponseDecoder : Json.Decoder WebSocketUsernameAvailableResponsePayload
-webSocketUsernameAvailableResponseDecoder =
-  Json.map2 WebSocketUsernameAvailableResponsePayload
+webSocketIsAvailableResponseDecoder : Json.Decoder WebSocketIsAvailableResponsePayload
+webSocketIsAvailableResponseDecoder =
+  Json.map2 WebSocketIsAvailableResponsePayload
     (Json.field "username" Json.string)
     (Json.field "available" Json.bool)
 
 type WebSocketMessage
-  = WebSocketUsernameAvailableResponse WebSocketUsernameAvailableResponsePayload
+  = WebSocketIsAvailableResponse WebSocketIsAvailableResponsePayload
 
 websocketMessageDecoder : Json.Decoder WebSocketMessage
 websocketMessageDecoder =
   let payloadDecoder type_ =
         case type_ of
           "username_available_response" ->
-            Json.map WebSocketUsernameAvailableResponse webSocketUsernameAvailableResponseDecoder
+            Json.map WebSocketIsAvailableResponse webSocketIsAvailableResponseDecoder
           _ ->
             Json.fail "Unrecognized message type"
    in Json.field "type" Json.string |> Json.andThen payloadDecoder
@@ -51,14 +49,9 @@ websocketMessageDecoder =
 --
 
 type Msg 
-  = RegisterPageApiMsg (Api.Msg User)
-  | RegisterFormMsg Form.Msg
-  | RegisterPageWebsocketMsg String
-
-type UsernameStatus
-  = UsernameBlank
-  | UsernameAvailable Bool
-  | Unknown
+  = ApiMsg (Api.Msg User)
+  | FormMsg Form.Msg
+  | WebsocketMsg String
 
 type alias State =
   { api : Api.Model User 
@@ -93,186 +86,67 @@ init toMsg =
         |> andMap api
         |> andMap (Update.Deep.Form.init [] Form.Register.validate)
         |> andMap (save Dict.empty)
-        |> andMap (save UsernameBlank)
+        |> andMap (save Blank)
         |> mapCmd toMsg
 
-websocketUsernameAvailableQuery : String -> Json.Value
-websocketUsernameAvailableQuery username =
+websocketIsAvailableQuery : String -> Json.Value
+websocketIsAvailableQuery username =
   Encode.object
     [ ( "type"  , Encode.string "username_available_query" )
     , ( "username" , Encode.string username ) 
     ]
 
-checkIfUsernameAvailable : String -> State -> Update State msg a
-checkIfUsernameAvailable username ({ usernames } as state) = 
+checkIfIsAvailable : String -> State -> Update State msg a
+checkIfIsAvailable username ({ usernames } as state) = 
   if String.isEmpty username
       then 
         state
-          |> setUsernameStatus UsernameBlank
+          |> setUsernameStatus Blank
       else 
         case Dict.get username usernames of
           Just isAvailable ->
             state
-              |> setUsernameStatus (UsernameAvailable isAvailable)
+              |> setUsernameStatus (IsAvailable isAvailable)
           Nothing ->
             state
               |> setUsernameStatus Unknown
-              |> andAddCmd (Ports.websocketOut (Encode.encode 0 (websocketUsernameAvailableQuery username)))
+              |> andAddCmd (Ports.websocketOut (Encode.encode 0 (websocketIsAvailableQuery username)))
 
 usernameFieldSpy : Form.Msg -> State -> Update State msg a
 usernameFieldSpy formMsg =
   case formMsg of
     Form.Input "username" Form.Text (String username) ->
-      checkIfUsernameAvailable username 
+      checkIfIsAvailable username 
     _ ->
       save 
 
 handleSubmit : (Msg -> msg) -> Form.Register.Fields -> State -> Update State msg a
 handleSubmit toMsg form =
   let json = form |> Form.Register.toJson |> Http.jsonBody 
-   in inApi (Api.sendRequest "" (Just json) (toMsg << RegisterPageApiMsg))
+   in inApi (Api.sendRequest "" (Just json) (toMsg << ApiMsg))
 
 update : Msg -> (Msg -> msg) -> State -> Update State msg a
 update msg toMsg = 
   case msg of
-    RegisterPageApiMsg apiMsg ->
-      inApi (Api.update { onSuccess = always save, onError = always save } apiMsg (toMsg << RegisterPageApiMsg))
-    RegisterFormMsg formMsg ->
+    ApiMsg apiMsg ->
+      inApi (Api.update { onSuccess = always save, onError = always save } apiMsg (toMsg << ApiMsg))
+    FormMsg formMsg ->
       inForm (Update.Deep.Form.update { onSubmit = handleSubmit toMsg } formMsg)
         >> andThen (usernameFieldSpy formMsg)
-    RegisterPageWebsocketMsg websocketMsg ->
+    WebsocketMsg websocketMsg ->
       case Json.decodeString websocketMessageDecoder websocketMsg of
-        Ok (WebSocketUsernameAvailableResponse { username, available }) ->
+        Ok (WebSocketIsAvailableResponse { username, available }) ->
           unwrap .formModel (\model -> 
             let 
                 usernameField = Form.getFieldAsString "username" model.form
              in 
                 saveUsernameStatus username available
-                  >> andThen (checkIfUsernameAvailable <| Maybe.withDefault "" usernameField.value))
+                  >> andThen (checkIfIsAvailable <| Maybe.withDefault "" usernameField.value))
         _ ->
           save 
 
 subscriptions : State -> (Msg -> msg) -> Sub msg
-subscriptions state toMsg = Ports.websocketIn (toMsg << RegisterPageWebsocketMsg)
-
-formView : Update.Deep.Form.Model Form.Register.Custom.Error Form.Register.Fields -> UsernameStatus -> (Form.Msg -> msg) -> Html msg
-formView { form, disabled } usernameStatus toMsg =
-
-  let 
-      info = fieldInfo Form.Register.Custom.errorToString controlInputModifiers 
-
-      name                 = form |> Form.getFieldAsString "name"                 |> info
-      email                = form |> Form.getFieldAsString "email"                |> info
-      phoneNumber          = form |> Form.getFieldAsString "phoneNumber"          |> info
-      password             = form |> Form.getFieldAsString "password"             |> info
-      passwordConfirmation = form |> Form.getFieldAsString "passwordConfirmation" |> info
-      agreeWithTerms       = form |> Form.getFieldAsBool   "agreeWithTerms"       |> info
-
-      availableIcon = ( Small, [], i [ class "fa fa-check has-text-success" ] [] )
-      unavailableIcon = ( Small, [], i [ class "fa fa-times has-text-danger" ] [] )
-
-      username =
-
-        let 
-            info_ = form |> Form.getFieldAsString "username" |> info
-         in 
-            case usernameStatus of
-              UsernameAvailable True ->
-                { info_ | modifiers = { controlInputModifiers | color = Success, iconRight = Just availableIcon } }
-              UsernameAvailable False ->
-                { info_ | modifiers = { controlInputModifiers | color = Danger, iconRight = Just unavailableIcon }
-                        , errorMessage = "This username is not available" }
-              _ ->
-                info_
-   in
-      [ fieldset [ Html.Attributes.disabled disabled ]
-        [ Bulma.Form.field [] 
-          [ Bulma.Form.controlLabel [] [ text "Name" ] 
-          , Bulma.Form.controlInput name.modifiers [] 
-            [ placeholder "Name"
-            , onFocus (Form.Focus name.path)
-            , onBlur (Form.Blur name.path)
-            , onInput (String >> Form.Input name.path Form.Text)
-            , value (Maybe.withDefault "" name.value)
-            ] [] 
-          , Bulma.Form.controlHelp Danger [] [ Html.text name.errorMessage ]
-          ]
-        , Bulma.Form.field [] 
-          [ Bulma.Form.controlLabel [] [ text "Email" ] 
-          , Bulma.Form.controlEmail email.modifiers [] 
-            [ placeholder "Email"
-            , onFocus (Form.Focus email.path)
-            , onBlur (Form.Blur email.path)
-            , onInput (String >> Form.Input email.path Form.Text)
-            , value (Maybe.withDefault "" email.value)
-            ] [] 
-          , Bulma.Form.controlHelp Danger [] [ Html.text email.errorMessage ]
-          ]
-        , Bulma.Form.field [] 
-          [ Bulma.Form.controlLabel [] [ text "Username" ] 
-          , Bulma.Form.controlInput username.modifiers
-              (if Unknown == usernameStatus then [ class "is-loading" ] else [])
-            [ placeholder "Username"
-            , onFocus (Form.Focus username.path)
-            , onBlur (Form.Blur username.path)
-            , onInput (String >> Form.Input username.path Form.Text)
-            , value (Maybe.withDefault "" username.value)
-            ] [] 
-          , Bulma.Form.controlHelp Danger [] [ Html.text username.errorMessage ]
-          ]
-        , Bulma.Form.field [] 
-          [ Bulma.Form.controlLabel [] [ text "Phone number" ] 
-          , Bulma.Form.controlPhone phoneNumber.modifiers [] 
-            [ placeholder "Phone number"
-            , onFocus (Form.Focus phoneNumber.path)
-            , onBlur (Form.Blur phoneNumber.path)
-            , onInput (String >> Form.Input phoneNumber.path Form.Text)
-            , value (Maybe.withDefault "" phoneNumber.value)
-            ] [] 
-          , Bulma.Form.controlHelp Danger [] [ Html.text phoneNumber.errorMessage ]
-          ]
-        , Bulma.Form.field [] 
-          [ Bulma.Form.controlLabel [] [ text "Password" ] 
-          , Bulma.Form.controlPassword password.modifiers [] 
-            [ placeholder "Password"
-            , onFocus (Form.Focus password.path)
-            , onBlur (Form.Blur password.path)
-            , onInput (String >> Form.Input password.path Form.Text)
-            , value (Maybe.withDefault "" password.value)
-            ] [] 
-          , Bulma.Form.controlHelp Danger [] [ Html.text password.errorMessage ]
-          ]
-        , Bulma.Form.field [] 
-          [ Bulma.Form.controlLabel [] [ text "Password confirmation" ] 
-          , Bulma.Form.controlPassword passwordConfirmation.modifiers [] 
-            [ placeholder "Password confirmation"
-            , onFocus (Form.Focus passwordConfirmation.path)
-            , onBlur (Form.Blur passwordConfirmation.path)
-            , onInput (String >> Form.Input passwordConfirmation.path Form.Text)
-            , value (Maybe.withDefault "" passwordConfirmation.value)
-            ] [] 
-          , Bulma.Form.controlHelp Danger [] [ Html.text passwordConfirmation.errorMessage ]
-          ]
-        , Bulma.Form.field [] 
-          [ Bulma.Form.controlCheckBox False [] [] 
-            [ onFocus (Form.Focus agreeWithTerms.path)
-            , onBlur (Form.Blur agreeWithTerms.path)
-            , onCheck (Bool >> Form.Input agreeWithTerms.path Form.Checkbox)
-            , checked (Maybe.withDefault False agreeWithTerms.value)
-            ] [ text "I agree with terms and conditions" ]
-          , Bulma.Form.controlHelp Danger [] [ Html.text agreeWithTerms.errorMessage ]
-          ]
-        , Bulma.Form.field [] 
-          [ div [ class "control" ] 
-            [ button [ type_ "submit", class "button is-primary" ] 
-              [ text (if disabled then "Please wait" else "Send") ] 
-            ]
-          ]
-        ]
-      ]
-
-    |> Html.form [ onSubmit Form.Submit ]
-    |> Html.map toMsg
+subscriptions state toMsg = Ports.websocketIn (toMsg << WebsocketMsg)
 
 view : State -> (Msg -> msg) -> Html msg
 view { api, formModel, usernameStatus } toMsg = 
@@ -290,7 +164,7 @@ view { api, formModel, usernameStatus } toMsg =
               Api.Error error ->
                 resourceErrorView api.resource
               _ ->
-                formView formModel usernameStatus (toMsg << RegisterFormMsg)
+                Form.Register.view formModel.form formModel.disabled usernameStatus (toMsg << FormMsg)
           ]
         ]
       ]

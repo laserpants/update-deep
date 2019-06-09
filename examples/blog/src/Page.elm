@@ -1,17 +1,18 @@
 module Page exposing (..)
 
+import Data.Comment exposing (Comment)
+import Data.Post exposing (Post)
+import Data.Session exposing (Session)
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (..)
-import Data.Post exposing (Post)
-import Data.Comment exposing (Comment)
-import Data.Session exposing (Session)
-import Update.Deep exposing (..)
 import Page.Home
-import Page.NewPost
-import Page.ShowPost
 import Page.Login
+import Page.NewPost
 import Page.Register
+import Page.ShowPost
+import Ui.Page
+import Update.Deep exposing (..)
 
 type Msg
   = HomePageMsg Page.Home.Msg
@@ -131,14 +132,6 @@ view page toMsg =
     RegisterPage registerPageState ->
       Page.Register.view registerPageState (toMsg << RegisterPageMsg)
     AboutPage ->
-      div [ class "columns is-centered", style "margin" "1.5em" ] 
-        [ div [ class "column is-two-thirds" ] 
-          [ h3 [ class "title is-3" ] [ text "About" ] 
-          , p [ class "content" ] [ text "Welcome to Facepalm. A place to meet weird people while keeping all your personal data safe." ] ]
-        ]
+      Ui.Page.container "About" [ text "Welcome to Facepalm. A place to meet weird people while keeping all your personal data safe." ]
     NotFoundPage ->
-      div [ class "columns is-centered", style "margin" "1.5em" ] 
-        [ div [ class "column is-two-thirds" ] 
-          [ h3 [ class "title is-3" ] [ text "Error 404" ] 
-          , p [ class "content" ] [ text "That means we couldn’t find that page." ] ]
-        ]
+      Ui.Page.container "Error 404" [ text "That means we couldn’t find that page." ]

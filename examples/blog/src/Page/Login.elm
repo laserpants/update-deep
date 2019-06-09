@@ -1,7 +1,6 @@
 module Page.Login exposing (..)
 
 import Http 
-import Form.Field as Field exposing (Field, FieldValue(..))
 import Update.Deep.Form as Form
 import Update.Deep.Form 
 import Update.Deep.Api as Api
@@ -19,8 +18,8 @@ import Bulma.Modifiers exposing (..)
 import Bulma.Form exposing (controlInputModifiers)
 
 type Msg 
-  = LoginFormMsg Form.Msg
-  | LoginPageApiMsg (Api.Msg Session)
+  = FormMsg Form.Msg
+  | ApiMsg (Api.Msg Session)
 
 type alias State =
   { api : Api.Model Session
@@ -51,7 +50,7 @@ init toMsg =
 handleSubmit : (Msg -> msg) -> Form.Login.Fields -> State -> Update State msg a
 handleSubmit toMsg form = 
   let json = form |> Form.Login.toJson |> Http.jsonBody 
-   in inApi (Api.sendRequest "" (Just json) (toMsg << LoginPageApiMsg))
+   in inApi (Api.sendRequest "" (Just json) (toMsg << ApiMsg))
 
 update : { onAuthResponse : Maybe Session -> a } -> Msg -> (Msg -> msg) -> State -> Update State msg a
 update { onAuthResponse } msg toMsg =
@@ -62,70 +61,13 @@ update { onAuthResponse } msg toMsg =
           >> andInvokeHandler (onAuthResponse maybeSession)
    in 
       case msg of
-        LoginPageApiMsg apiMsg -> 
-          inApi (Api.update { onSuccess = handleApiResponse << Just, onError = handleApiResponse Nothing |> always } apiMsg (toMsg << LoginPageApiMsg))
-        LoginFormMsg formMsg ->
+        ApiMsg apiMsg -> 
+          inApi (Api.update { onSuccess = handleApiResponse << Just, onError = handleApiResponse Nothing |> always } apiMsg (toMsg << ApiMsg))
+        FormMsg formMsg ->
           inForm (Update.Deep.Form.update { onSubmit = handleSubmit toMsg } formMsg)
 
 subscriptions : State -> (Msg -> msg) -> Sub msg
 subscriptions state toMsg = Sub.none
-
-loginPageFormView : Form.Model Never Form.Login.Fields -> (Form.Msg -> msg) -> Html msg
-loginPageFormView { form, disabled } toMsg =
-
-  let 
-      info = fieldInfo (always "")
-
-      usernameIcon = Just ( Small, [], i [ class "fa fa-user" ] [] )
-      passwordIcon = Just ( Small, [], i [ class "fa fa-lock" ] [] )
-
-      username   = form |> Form.getFieldAsString "username"   |> info { controlInputModifiers | iconLeft = usernameIcon }
-      password   = form |> Form.getFieldAsString "password"   |> info { controlInputModifiers | iconLeft = passwordIcon }
-      rememberMe = form |> Form.getFieldAsBool   "rememberMe" |> info controlInputModifiers 
-   in
-      [ fieldset [ Html.Attributes.disabled disabled ]
-        [ Bulma.Form.field [] 
-          [ Bulma.Form.controlLabel [] [ text "Username" ] 
-          , Bulma.Form.controlInput username.modifiers [] 
-            [ placeholder "Username"
-            , onFocus (Form.Focus username.path)
-            , onBlur (Form.Blur username.path)
-            , onInput (String >> Form.Input username.path Form.Text)
-            , value (Maybe.withDefault "" username.value)
-            ] [] 
-          , Bulma.Form.controlHelp Danger [] [ Html.text username.errorMessage ]
-          ]
-        , Bulma.Form.field [] 
-          [ Bulma.Form.controlLabel [] [ text "Password" ] 
-          , Bulma.Form.controlPassword password.modifiers [] 
-            [ placeholder "Password"
-            , onFocus (Form.Focus password.path)
-            , onBlur (Form.Blur password.path)
-            , onInput (String >> Form.Input password.path Form.Text)
-            , value (Maybe.withDefault "" password.value)
-            ] [] 
-          , Bulma.Form.controlHelp Danger [] [ Html.text password.errorMessage ]
-          ]
-        , Bulma.Form.field [] 
-          [ Bulma.Form.controlCheckBox False [] [] 
-            [ onFocus (Form.Focus rememberMe.path)
-            , onBlur (Form.Blur rememberMe.path)
-            , onCheck (Bool >> Form.Input rememberMe.path Form.Checkbox)
-            , checked (Maybe.withDefault False rememberMe.value)
-            ] [ text "Remember me" ]
-          , Bulma.Form.controlHelp Danger [] [ Html.text rememberMe.errorMessage ]
-          ]
-        , Bulma.Form.field [] 
-          [ div [ class "control" ] 
-            [ button [ type_ "submit", class "button is-primary" ] 
-              [ text (if disabled then "Please wait" else "Log in") ] 
-            ]
-          ]
-        ]
-      ]
-
-    |> Html.form [ onSubmit Form.Submit ]
-    |> Html.map toMsg
 
 view : State -> (Msg -> msg) -> Html msg
 view { api, formModel } toMsg = 
@@ -140,7 +82,7 @@ view { api, formModel } toMsg =
               [ text "This is a demo. Log in with username 'test' and password 'test'." ] 
             ]
           , resourceErrorView api.resource
-          , loginPageFormView formModel (toMsg << LoginFormMsg) 
+          , Form.Login.view formModel.form formModel.disabled (toMsg << FormMsg) 
           ]
         ]
       ]
