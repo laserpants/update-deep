@@ -13,7 +13,7 @@ layout html =
 
 container : String -> List (Html msg) -> Html msg
 container title html =
-    layout 
+    layout
         [ h3 [ class "title is-3" ] [ text title ]
         , p [ class "content" ] html
         ]

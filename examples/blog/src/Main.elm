@@ -1,8 +1,8 @@
 module Main exposing (main)
 
 import App exposing (..)
-import Update.Deep.Router as Router
 import Update.Deep.Browser exposing (application)
+import Update.Deep.Router as Router
 
 
 main : Program Flags State Msg

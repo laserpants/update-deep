@@ -1,6 +1,6 @@
 module Form.NewPost exposing (Fields, toJson, validate, view)
 
-import Bulma.Form exposing (controlInput, controlEmail, controlHelp, controlInputModifiers, controlLabel, controlTextArea, controlTextAreaModifiers)
+import Bulma.Form exposing (controlEmail, controlHelp, controlInput, controlInputModifiers, controlLabel, controlTextArea, controlTextAreaModifiers)
 import Bulma.Modifiers exposing (..)
 import Form exposing (Form)
 import Form.Field as Field exposing (Field, FieldValue(..))

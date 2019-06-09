@@ -6,7 +6,8 @@ import Form.Validate as Validate exposing (Validation)
 import Update.Deep exposing (..)
 
 
-type alias Msg = Form.Msg
+type alias Msg =
+    Form.Msg
 
 
 type alias Model a b =

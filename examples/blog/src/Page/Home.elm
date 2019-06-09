@@ -8,8 +8,8 @@ import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (..)
 import Json.Decode as Json
-import Ui.Page
 import Ui exposing (spinner)
+import Ui.Page
 import Update.Deep exposing (..)
 import Update.Deep.Api as Api
 
