@@ -41,33 +41,31 @@ redirect href state =
 
 update : { onRouteChange : Url -> Maybe route -> a } -> Msg -> State route -> Update (State route) msg a
 update { onRouteChange } msg state =
+    let
+        stripPathPrefix url =
+            { url | path = String.dropLeft (String.length state.basePath) url.path }
 
-  let 
-      stripPathPrefix url =
-        { url | path = String.dropLeft (String.length state.basePath) url.path }
+        insertPathPrefix url =
+            { url | path = state.basePath ++ url.path }
+    in
+    case msg of
+        UrlChange url ->
+            let
+                route =
+                    state.fromUrl (stripPathPrefix url)
+            in
+            state
+                |> setRoute route
+                |> andInvokeHandler (onRouteChange url route)
 
-      insertPathPrefix url =
-        { url | path = state.basePath ++ url.path }
+        UrlRequest (Browser.Internal url) ->
+            state
+                |> addCmd (Navigation.pushUrl state.key (Url.toString (insertPathPrefix url)))
 
-  in
-  case msg of
-      UrlChange url ->
-          let
-              route =
-                  state.fromUrl (stripPathPrefix url)
-          in
-          state
-              |> setRoute route
-              |> andInvokeHandler (onRouteChange url route)
+        UrlRequest (Browser.External "") ->
+            state
+                |> save
 
-      UrlRequest (Browser.Internal url) ->
-          state
-              |> addCmd (Navigation.pushUrl state.key (Url.toString (insertPathPrefix url)))
-
-      UrlRequest (Browser.External "") ->
-          state
-              |> save
-
-      UrlRequest (Browser.External href) ->
-          state
-              |> addCmd (Navigation.load href)
+        UrlRequest (Browser.External href) ->
+            state
+                |> addCmd (Navigation.load href)
