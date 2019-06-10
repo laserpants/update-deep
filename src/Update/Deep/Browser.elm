@@ -1,11 +1,20 @@
 module Update.Deep.Browser exposing (application, document)
 
+{-|
+
+@docs application, document
+
+-}
+
 import Browser exposing (Document, UrlRequest)
 import Browser.Navigation as Navigation
 import Update.Deep exposing (Update, applicationInit, documentInit, runUpdate)
 import Url exposing (Url)
 
 
+{-| Used in the same way as `Browser.application`, but instead creates a `Program`
+where `init` and `update` are based on the `Update` type of this library.
+-}
 application :
     { init : flags -> Url -> Navigation.Key -> Update model msg a
     , onUrlChange : Url -> msg
@@ -26,6 +35,9 @@ application config =
         }
 
 
+{-| Used in the same way as `Browser.document`, but instead creates a `Program`
+where `init` and `update` are based on the `Update` type of this library.
+-}
 document :
     { init : flags -> Update model msg a
     , subscriptions : model -> Sub msg
