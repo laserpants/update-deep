@@ -1,6 +1,6 @@
 # To Do-List App Example
 
-#### Run this example in the browser [here](https://laserpants.github.io/update-deep/examples/todo-list/dist).
+#### Run this example in the browser [here](https://laserpants.github.io/elm-update-deep/examples/todo-list).
 
 The application consists of the following modules:
 
@@ -17,13 +17,13 @@ The application consists of the following modules:
                          └──────────────┘   |
 ```
 
-The `Data.TodoItem` module defines the `TodoItem` type
+On th right, the `Data.TodoItem` module defines the `TodoItem` type
 
 ```elm
 type alias TodoItem = { text : String }
 ```
 
-which is just a description of the anticipated task. `Data.Notification` is similar. It represents a “toast” notification shown on the screen.
+which is just a description of the anticipated task. `Data.Notification` represents a “toast” notification shown on the screen.
 These modules are not so important for this example, so let's concentrate instead on the four modules on the left side of the diagram; `Main`, `Notifications`, `Todos`, and `Todos.Form`.
 Each one of these specifies its own `Msg` and `State` type, as well as `update` and `init` functions. (Subscriptions are not used in this example.)
 
@@ -56,7 +56,7 @@ update msg state =
 view = ...
 ```
 
-The only thing that makes this different is the return types of `update` and `init`.
+So far, the only thing that makes this different is the return types of `update` and `init`.
 Here is the definition of the `Update` type alias:
 
 ```elm
@@ -82,7 +82,7 @@ state
 
 How is this `Update` type useful then? Well, messages move down in the update tree. To pass information in the opposite direction, this library introduces a callback-based event handling mechanism. That is what the third element of the `Update` tuple is for.
 
-In this example, there are three event handlers involved:
+In this example, there are three such event handlers involved:
 
 ```
                ┌────────────┐
@@ -120,9 +120,10 @@ update { onSubmit } msg state =
             -- etc.
 ```
 
-An `onSubmit` callback is 
+An `onSubmit` callback is given as the first argument to the `update` function.
+When the `Submit` message is received, this callback is “invoked” using the `invokeHandler` function, which is part of this library.
 
-Now,
+Moving up in the, in `Todos.elm` 
 
 ```elm
 -- src/Todos.elm (line 52)
