@@ -6,32 +6,100 @@ module Update.Deep exposing
 
 {-|
 
+This library serves a similar purpose to `update-extra`, but
 
-# Types
+Its goals can be summarized as follows:
 
-@docs In, Update
+1) Chain updates using the pipes operator:
+
+```
+    model
+        |> setResource Requested
+        |> andAddCmd (model.request url maybeBody)
+        |> mapCmd toMsg
+```
+
+2) Allow information to be passed up in the update tree:
+
+```
+    model
+        |> setResource (Available resource)
+        |> andInvokeHandler (onSuccess resource)
+```
+
+3) Reduce boilerplate while doing so:
+
+```
+    type Msg
+        = RouterMsg Router.Msg
+        | UiMsg Ui.Msg
+
+    update msg =
+        case msg of
+            RouterMsg routerMsg ->
+                inRouter (Router.update { onRouteChange = handleRouteChange } routerMsg)
+```
+
+Let's look at a minimal example.
 
 
-# Functions
+# The Update Type
 
-@docs addCmd, andMap, andThen, andThenIf, ap, applicationInit, documentInit, foldEvents, foldEventsAndThen, inState, invokeHandler, join, kleisli, map, map2, map3, map4, map5, map6, map7, mapCmd, runUpdate, save, unwrap
+@docs Update, save, addCmd, map, mapCmd, invokeHandler, foldEvents, join, kleisli
 
 
-# Shortcuts
+## Chaining Updates
 
-@docs andAddCmd, andInvokeHandler
+@docs andThen, andThenIf
+
+
+## Applicative Interface
+
+@docs andMap, ap, map2, map3, map4, map5, map6, map7
+
+
+# Nested State
+
+@docs In, inState
+
+
+# Program Integration
+
+@docs runUpdate, applicationInit, documentInit
+
+
+# Helpers
+
+@docs andAddCmd, andInvokeHandler, foldEventsAndThen, unwrap
 
 -}
 
 
 {-| A type alias wrapper for Elm's `( model, Cmd msg )` tuple that introduces a
-third component to allow for callbacks to be passed down in the update hierarchy.
+third component to allow for one or more callbacks to be passed down in the update hierarchy.
+
+Here is a code snippet taken from the [todo-list](https://github.com/laserpants/elm-update-deep/tree/master/examples/todo-list) app example:
+
+    update : { onSubmit : FormData -> a } -> Msg -> State -> Update State msg a
+    update { onSubmit } msg state =
+        case msg of
+            Submit ->
+                state
+                    |> invokeHandler (onSubmit { text = state.text })
+                    |> andThen (setText "")
+
+            Change text ->
+                state
+                    |> setText text
+
+The “event handler” part 
+
 -}
 type alias Update m c e =
     ( m, Cmd c, List e )
 
 
-{-| This function lifts a value into the `Update` context. E.g., `save someState` is the same as `( someState, Cmd.none )` in code that doesn't use this library.
+{-| This function lifts a value into the `Update` context. For example, `save someState` is the same as `( someState, Cmd.none )` in code that doesn't use this library.
 -}
 save : m -> Update m c e
 save model =
@@ -46,6 +114,9 @@ save model =
                 state
                     |> addCmd someCommand
                     |> andThen (addCmd someOtherCommand)
+                    |> andThen (setStatus Done)
+
+See also [`andAddCmd`](#andAddCmd).
 
 -}
 addCmd : Cmd c -> m -> Update m c e
@@ -54,7 +125,16 @@ addCmd cmd state =
 
 
 {-| Apply a function to the command part of the value. This is typically used to lift a
-value returned from a nested update into the caller context.
+value returned from a nested update into the caller context. For example;
+
+    type alias State =
+        { enchilada : String }
+
+    init : (Msg -> msg) -> Update State msg a
+    init toMsg =
+        save State
+            |> andMap (save "")
+            |> mapCmd toMsg
 -}
 mapCmd : (c -> d) -> Update m c e -> Update m d e
 mapCmd f ( model, cmd, events ) =
@@ -82,7 +162,7 @@ andMap a b =
     ap b a
 
 
-{-| Apply a function to the state portion of the value.
+{-| Apply a function to the state portion of a value.
 -}
 map : (a -> b) -> Update a c e -> Update b c e
 map f ( model, cmd, events ) =
@@ -131,7 +211,7 @@ map7 f x y z a b =
     ap << map6 f x y z a b
 
 
-{-| Removes one level of monadic structure. In particular, `andThen f = join << map f`
+{-| Removes one level of monadic structure. Various other functions in this library are implemented in terms of `join`. In particular, `andThen f = join << map f`
 -}
 join : Update (Update a c e) c e -> Update a c e
 join ( ( model, cmda, e ), cmdb, e2 ) =
@@ -139,15 +219,16 @@ join ( ( model, cmda, e ), cmdb, e2 ) =
 
 
 {-| Sequential composition of updates. This function is especially useful in combination
-with the forward pipe operator (|>), for writing code in the style of pipelines. It is
-just like the bind operator in Haskell, but with the arguments interchanged.
+with the forward pipe operator (`|>`), for writing code in the style of pipelines. (`andThen` is
+like the bind operator in Haskell, but with the arguments interchanged.)
 -}
 andThen : (b -> Update a c e) -> Update b c e -> Update a c e
 andThen fun =
     join << map fun
 
 
-{-| TODO
+{-| Like [`andThen`](#andThen) but only runs the function if the predicate, given as 
+the first argument, evaluates to true.
 -}
 andThenIf : (a -> Bool) -> (a -> Update a c e) -> Update a c e -> Update a c e
 andThenIf pred fun upd =
