@@ -12,7 +12,8 @@ var session = sessionStorage.getItem(storageKey) || localStorage.getItem(storage
 var app = Elm.Main.init({
   node: document.getElementById('elm-code'),
   flags: {
-    session: session || ''
+    session: session || '',
+    pathname: location.pathname.replace(/\/$/, "")
   }
 });
 

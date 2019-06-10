@@ -15,6 +15,7 @@ type alias State route =
     { route : Maybe route
     , key : Navigation.Key
     , fromUrl : Url -> Maybe route
+    , pathname : String
     }
 
 
@@ -23,27 +24,35 @@ setRoute route state =
     save { state | route = route }
 
 
-init : (Url -> Maybe route) -> Navigation.Key -> (Msg -> msg) -> Update (State route) msg a
-init fromUrl key toMsg =
+init : (Url -> Maybe route) -> String -> Navigation.Key -> (Msg -> msg) -> Update (State route) msg a
+init fromUrl pathname key toMsg =
     save State
         |> andMap (save Nothing)
         |> andMap (save key)
         |> andMap (save fromUrl)
+        |> andMap (save pathname)
 
 
 redirect : String -> State route -> Update (State route) msg a
 redirect href state =
     state
-        |> addCmd (Navigation.replaceUrl state.key href)
+        |> addCmd (Navigation.replaceUrl state.key (state.pathname ++ href))
 
 
 update : { onRouteChange : Url -> Maybe route -> a } -> Msg -> State route -> Update (State route) msg a
 update { onRouteChange } msg state =
+    let
+        stripPath url =
+            { url | path = String.dropLeft (String.length state.pathname) url.path }
+
+        insertPath url =
+            { url | path = state.pathname ++ url.path }
+    in
     case msg of
         UrlChange url ->
             let
                 route =
-                    state.fromUrl url
+                    state.fromUrl (stripPath url)
             in
             state
                 |> setRoute route
@@ -51,7 +60,7 @@ update { onRouteChange } msg state =
 
         UrlRequest (Browser.Internal url) ->
             state
-                |> addCmd (Navigation.pushUrl state.key (Url.toString url))
+                |> addCmd (Navigation.pushUrl state.key (Url.toString (insertPath url)))
 
         UrlRequest (Browser.External "") ->
             state
