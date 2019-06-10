@@ -15,7 +15,7 @@ type alias State route =
     { route : Maybe route
     , key : Navigation.Key
     , fromUrl : Url -> Maybe route
-    , pathname : String
+    , basePath : String
     }
 
 
@@ -25,47 +25,49 @@ setRoute route state =
 
 
 init : (Url -> Maybe route) -> String -> Navigation.Key -> (Msg -> msg) -> Update (State route) msg a
-init fromUrl pathname key toMsg =
+init fromUrl basePath key toMsg =
     save State
         |> andMap (save Nothing)
         |> andMap (save key)
         |> andMap (save fromUrl)
-        |> andMap (save pathname)
+        |> andMap (save basePath)
 
 
 redirect : String -> State route -> Update (State route) msg a
 redirect href state =
     state
-        |> addCmd (Navigation.replaceUrl state.key (state.pathname ++ href))
+        |> addCmd (Navigation.replaceUrl state.key (state.basePath ++ href))
 
 
 update : { onRouteChange : Url -> Maybe route -> a } -> Msg -> State route -> Update (State route) msg a
 update { onRouteChange } msg state =
-    let
-        stripPath url =
-            { url | path = String.dropLeft (String.length state.pathname) url.path }
 
-        insertPath url =
-            { url | path = state.pathname ++ url.path }
-    in
-    case msg of
-        UrlChange url ->
-            let
-                route =
-                    state.fromUrl (stripPath url)
-            in
-            state
-                |> setRoute route
-                |> andInvokeHandler (onRouteChange url route)
+  let 
+      stripPathPrefix url =
+        { url | path = String.dropLeft (String.length state.basePath) url.path }
 
-        UrlRequest (Browser.Internal url) ->
-            state
-                |> addCmd (Navigation.pushUrl state.key (Url.toString (insertPath url)))
+      insertPathPrefix url =
+        { url | path = state.basePath ++ url.path }
 
-        UrlRequest (Browser.External "") ->
-            state
-                |> save
+  in
+  case msg of
+      UrlChange url ->
+          let
+              route =
+                  state.fromUrl (stripPathPrefix url)
+          in
+          state
+              |> setRoute route
+              |> andInvokeHandler (onRouteChange url route)
 
-        UrlRequest (Browser.External href) ->
-            state
-                |> addCmd (Navigation.load href)
+      UrlRequest (Browser.Internal url) ->
+          state
+              |> addCmd (Navigation.pushUrl state.key (Url.toString (insertPathPrefix url)))
+
+      UrlRequest (Browser.External "") ->
+          state
+              |> save
+
+      UrlRequest (Browser.External href) ->
+          state
+              |> addCmd (Navigation.load href)

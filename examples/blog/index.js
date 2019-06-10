@@ -13,7 +13,7 @@ var app = Elm.Main.init({
   node: document.getElementById('elm-code'),
   flags: {
     session: session || '',
-    pathname: location.pathname.replace(/\/$/, "")
+    basePath: 'laserpants.github.io' == location.hostname ? '/elm-update-deep/examples/blog' : ''
   }
 });
 
