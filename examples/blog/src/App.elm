@@ -44,9 +44,9 @@ type alias State =
     }
 
 
-setRestrictedUrl : String -> State -> Update State msg a
+setRestrictedUrl : Url -> State -> Update State msg a
 setRestrictedUrl url state =
-    save { state | restrictedUrl = Just url }
+    save { state | restrictedUrl = Just (String.dropLeft (String.length state.router.pathname) url.path) }
 
 
 resetRestrictedUrl : State -> Update State msg a
@@ -120,7 +120,7 @@ handleRouteChange url maybeRoute =
                 (\session ->
                     if Nothing == session then
                         -- Redirect and return to this url after successful login
-                        setRestrictedUrl url.path
+                        setRestrictedUrl url
                             >> andThen (redirect "/login")
                             >> andThen (inUi (showToast { message = "You must be logged in to access that page.", color = Warning } UiMsg))
 

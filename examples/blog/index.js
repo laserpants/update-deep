@@ -13,7 +13,7 @@ var app = Elm.Main.init({
   node: document.getElementById('elm-code'),
   flags: {
     session: session || '',
-    pathname: '/test/123' //location.pathname
+    pathname: location.pathname.replace(/\/$/, "")
   }
 });
 
