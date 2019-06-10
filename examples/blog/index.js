@@ -12,7 +12,8 @@ var session = sessionStorage.getItem(storageKey) || localStorage.getItem(storage
 var app = Elm.Main.init({
   node: document.getElementById('elm-code'),
   flags: {
-    session: session || ''
+    session: session || '',
+    basePath: 'laserpants.github.io' == location.hostname ? '/elm-update-deep/examples/blog' : ''
   }
 });
 

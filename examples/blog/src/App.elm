@@ -25,6 +25,7 @@ import Url exposing (Url)
 
 type alias Flags =
     { session : String
+    , basePath : String
     }
 
 
@@ -43,9 +44,9 @@ type alias State =
     }
 
 
-setRestrictedUrl : String -> State -> Update State msg a
+setRestrictedUrl : Url -> State -> Update State msg a
 setRestrictedUrl url state =
-    save { state | restrictedUrl = Just url }
+    save { state | restrictedUrl = Just (String.dropLeft (String.length state.router.basePath) url.path) }
 
 
 resetRestrictedUrl : State -> Update State msg a
@@ -87,7 +88,7 @@ init : Flags -> Url -> Navigation.Key -> Update State Msg a
 init flags url key =
     save State
         |> andMap (initSession flags |> save)
-        |> andMap (Router.init fromUrl key RouterMsg)
+        |> andMap (Router.init fromUrl flags.basePath key RouterMsg)
         |> andMap Ui.init
         |> andMap (save Nothing)
         |> andMap (save Page.NotFoundPage)
@@ -119,7 +120,7 @@ handleRouteChange url maybeRoute =
                 (\session ->
                     if Nothing == session then
                         -- Redirect and return to this url after successful login
-                        setRestrictedUrl url.path
+                        setRestrictedUrl url
                             >> andThen (redirect "/login")
                             >> andThen (inUi (showToast { message = "You must be logged in to access that page.", color = Warning } UiMsg))
 
