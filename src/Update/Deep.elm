@@ -15,12 +15,12 @@ A simple blog application, demonstrating how to use this library to:
   * do URL routing; 
   * manage sessions using localStorage and sessionStorage; 
   * work with 
-    * forms (using elm-form) and 
-    * WebSockets.
+    * forms (wrapping elm-form) and 
+    * WebSockets (see Register page).
 
 ### [Trollo](https://laserpants.github.io/elm-update-deep/examples/todo-list/) 
 
-An even simpler todo-list application, explained in [this README file](https://github.com/laserpants/elm-update-deep/tree/master/examples/todo-list).
+An even simpler todo-list application, explained in more detail in [this README file](https://github.com/laserpants/elm-update-deep/tree/master/examples/todo-list).
 
 # Intro
 

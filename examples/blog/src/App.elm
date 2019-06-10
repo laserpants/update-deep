@@ -17,7 +17,7 @@ import Page.Register
 import Page.ShowPost
 import Ports
 import Route exposing (Route(..), fromUrl)
-import Ui exposing (showInfoToast, showToast)
+import Ui exposing (showInfoToast, showToast, closeBurgerMenu)
 import Update.Deep exposing (..)
 import Update.Deep.Router as Router
 import Url exposing (Url)
@@ -109,7 +109,7 @@ loadPage setPage state =
     state
         |> inPage (always setPage)
         |> andThenIf (not << isLoginRoute) resetRestrictedUrl
-        |> andThen (inUi Ui.closeBurgerMenu)
+        |> andThen (inUi closeBurgerMenu)
 
 
 handleRouteChange : Url -> Maybe Route -> State -> Update State Msg a

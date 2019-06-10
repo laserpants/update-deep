@@ -17,7 +17,7 @@ The application consists of the following modules:
                          └──────────────┘   |
 ```
 
-On th right, the `Data.TodoItem` module defines the `TodoItem` type
+On the right, the `Data.TodoItem` module defines the `TodoItem` type
 
 ```elm
 type alias TodoItem = { text : String }
