@@ -6,11 +6,27 @@ module Update.Deep exposing
 
 {-|
 
-This library serves a similar purpose to `update-extra`, but
+# Examples/Tutorial
 
-Its goals can be summarized as follows:
+### [Facepalm](https://laserpants.github.io/elm-update-deep/examples/blog/)
 
-1) Chain updates using the pipes operator:
+A simple blog application, demonstrating how to use this library to:
+  * fetch remote resources from a (fake) API; 
+  * do URL routing; 
+  * manage sessions using localStorage and sessionStorage; 
+  * work with 
+    * forms (using elm-form) and 
+    * WebSockets.
+
+### [Trollo](https://laserpants.github.io/elm-update-deep/examples/todo-list/) 
+
+An even simpler todo-list application, explained in [this README file](https://github.com/laserpants/elm-update-deep/tree/master/examples/todo-list).
+
+# Intro
+
+In a nutshell, this library let's you do the following:
+
+1) Chain updates using the pipes operator (similar to `update-extra`):
 
 ```
     model
@@ -27,7 +43,7 @@ Its goals can be summarized as follows:
         |> andInvokeHandler (onSuccess resource)
 ```
 
-3) Reduce boilerplate while doing so:
+3) Reduce boilerplate while working with nested updates:
 
 ```
     type Msg
@@ -40,7 +56,127 @@ Its goals can be summarized as follows:
                 inRouter (Router.update { onRouteChange = handleRouteChange } routerMsg)
 ```
 
-Let's look at a minimal example.
+## Hello, world
+
+Let's look at a minimal example:
+
+
+```
+module Main exposing (..)
+
+import Browser exposing (Document)
+import Html exposing (..)
+import Html.Events exposing (..)
+import Update.Deep exposing (..)
+import Update.Deep.Browser as Deep
+
+
+type ButtonMsg
+    = Click
+
+
+type alias ButtonState =
+    { counter : Int }
+
+
+setCounterValue : Int -> ButtonState -> Update ButtonState msg a
+setCounterValue count state =
+    save { state | counter = count }
+
+
+buttonInit : Update ButtonState msg a
+buttonInit =
+    save ButtonState
+        |> andMap (save 0)
+
+
+buttonUpdate : { buttonClicked : Int -> a } -> ButtonMsg -> ButtonState -> Update ButtonState msg a
+buttonUpdate { buttonClicked } msg state =
+    case msg of
+        Click ->
+            let
+                count =
+                    1 + state.counter
+            in
+            state
+                |> setCounterValue count
+                |> andThen (invokeHandler (buttonClicked count))
+
+
+buttonView : (ButtonMsg -> msg) -> Html msg
+buttonView toMsg =
+    div [] [ button [ onClick Click ] [ text "Click me" ] ]
+        |> Html.map toMsg
+
+
+
+-- Main application
+
+
+type Msg
+    = ButtonMsg ButtonMsg
+
+
+type alias State =
+    { button : ButtonState
+    , message : String
+    }
+
+
+init : () -> Update State Msg a
+init () =
+    save State
+        |> andMap buttonInit
+        |> andMap (save "")
+
+
+handleButtonClicked : Int -> State -> Update State msg a
+handleButtonClicked times state =
+    save { state | message = "The button has been clicked " ++ String.fromInt times ++ " time(s)." }
+
+
+inButton : In State ButtonState msg a
+inButton =
+    inState { get = .button, set = \state button -> { state | button = button } }
+
+
+update : Msg -> State -> Update State Msg a
+update msg =
+    case msg of
+        ButtonMsg buttonMsg ->
+            inButton (buttonUpdate { buttonClicked = handleButtonClicked } buttonMsg)
+
+
+view : State -> Document Msg
+view { message } =
+    { title = ""
+    , body = [ buttonView ButtonMsg, text message ]
+    }
+
+
+main : Program () State Msg
+main =
+    Deep.document
+        { init = init
+        , update = update
+        , subscriptions = always Sub.none
+        , view = view
+        }
+```
+
+then
+
+
+```
+update : Msg -> State -> Update State Msg a
+update msg state =
+    case msg of
+        ButtonMsg buttonMsg ->
+            state.button
+                |> buttonUpdate { buttonClicked = handleButtonClicked } buttonMsg
+                |> andThen (\button -> save { state | button = button })
+                |> foldEvents
+```
 
 
 # The Update Type
@@ -77,29 +213,18 @@ Let's look at a minimal example.
 
 {-| A type alias wrapper for Elm's `( model, Cmd msg )` tuple that introduces a
 third component to allow for one or more callbacks to be passed down in the update hierarchy.
-
-Here is a code snippet taken from the [todo-list](https://github.com/laserpants/elm-update-deep/tree/master/examples/todo-list) app example:
-
-    update : { onSubmit : FormData -> a } -> Msg -> State -> Update State msg a
-    update { onSubmit } msg state =
-        case msg of
-            Submit ->
-                state
-                    |> invokeHandler (onSubmit { text = state.text })
-                    |> andThen (setText "")
-
-            Change text ->
-                state
-                    |> setText text
-
-The “event handler” part 
-
 -}
 type alias Update m c e =
     ( m, Cmd c, List e )
 
 
-{-| This function lifts a value into the `Update` context. For example, `save someState` is the same as `( someState, Cmd.none )` in code that doesn't use this library.
+{-| This function lifts a value into the `Update` context. For example, 
+
+```
+save someState
+```
+
+is the same as `( someState, Cmd.none )` in code that doesn't use this library.
 -}
 save : m -> Update m c e
 save model =
@@ -125,7 +250,7 @@ addCmd cmd state =
 
 
 {-| Apply a function to the command part of the value. This is typically used to lift a
-value returned from a nested update into the caller context. For example;
+value returned from a nested update into the caller's context. For example;
 
     type alias State =
         { enchilada : String }
