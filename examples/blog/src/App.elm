@@ -25,6 +25,7 @@ import Url exposing (Url)
 
 type alias Flags =
     { session : String
+    , pathname : String
     }
 
 
@@ -87,7 +88,7 @@ init : Flags -> Url -> Navigation.Key -> Update State Msg a
 init flags url key =
     save State
         |> andMap (initSession flags |> save)
-        |> andMap (Router.init fromUrl key RouterMsg)
+        |> andMap (Router.init fromUrl flags.pathname key RouterMsg)
         |> andMap Ui.init
         |> andMap (save Nothing)
         |> andMap (save Page.NotFoundPage)
