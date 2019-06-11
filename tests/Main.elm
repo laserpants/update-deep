@@ -89,6 +89,23 @@ testMap2 =
 
 
 
+testMap3 : Test
+testMap3 =
+
+    let
+        a = save 5
+        b = save 8
+        c = save 2
+        (d, _, _) = map3 (\x y z -> x + (y - z)) a b c
+
+    in
+    describe "map3"
+        [ test "this" <|
+            \_ -> Expect.equal d 11
+        ]
+
+
+
 testAndMap : Test
 testAndMap =
 
@@ -118,5 +135,6 @@ suite =
         , testJoin
         , testFold
         , testMap2
+        , testMap3
         , testAndMap
         ]

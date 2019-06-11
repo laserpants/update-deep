@@ -6,7 +6,7 @@ module Update.Deep exposing
 
 {-|
 
-TODO
+Utilities for updating nested state with the help of callbacks.
 
 # Update 
 
@@ -114,10 +114,10 @@ mapCmd f ( model, cmd, events ) =
     ( model, Cmd.map f cmd, events )
 
 
-{-| Add a partially applied callback to the list of functions that is applied to 
-the `Update` value returned from a nested call.
+{-| In a nested update call, add a partially applied callback to the list of 
+functions subsequently applied to the returned value.
 
-Refer to the examples and the README file for more on how to use this.
+Refer to the [examples](https://github.com/laserpants/elm-update-deep/tree/master/examples) and the [README](https://github.com/laserpants/elm-update-deep/blob/master/README.md) file for more on how to use this.
 -}
 applyCallback : e -> m -> Update m c e
 applyCallback handler state =
@@ -132,7 +132,7 @@ ap ( f, cmda, e ) ( model, cmdb, e2 ) =
 
 
 {-| 
-Trying to map over a function of more than one argument,
+Trying to map over a function `number -> number -> number`,
 
 ```
 map (+) (save 4)
@@ -144,7 +144,7 @@ we end up with a result of type `Update (number -> number) c e`. To apply the fu
 map (+) (save 4) |> andThen (save 5)
 ```
 
-This pattern scales to functions of any number of arguments:
+This pattern scales in a nice way to functions of any number of arguments:
 
 ```
 let f x y z = x + y + z 
@@ -214,7 +214,7 @@ map7 f x y z a b =
     ap << map6 f x y z a b
 
 
-{-| Removes one level of monadic structure. It may suffice to know that some other functions in this library are implemented in terms of `join`. In particular, `andThen f = join << map f`
+{-| Remove one level of monadic structure. It may suffice to know that some other functions in this library are implemented in terms of `join`. In particular, `andThen f = join << map f`
 -}
 join : Update (Update a c e) c e -> Update a c e
 join ( ( model, cmda, e ), cmdb, e2 ) =
@@ -222,8 +222,19 @@ join ( ( model, cmda, e ), cmdb, e2 ) =
 
 
 {-| Sequential composition of updates. This function is especially useful in combination
-with the forward pipe operator (`|>`), for writing code in the style of pipelines. (`andThen` is
-like the monadic bind operator in Haskell, but with the arguments interchanged.)
+with the forward pipe operator (`|>`), for writing code in the style of pipelines. To chain 
+updates, we compose functions of the form `something -> State -> Update State msg a`:
+
+```elm
+say : String -> State -> Update State msg a
+say what state = ...
+
+save state
+    |> andThen (say "hello")
+    |> andThen doSomethingElse
+```
+
+*Aside:* `andThen` is like the monadic bind operator in Haskell, but with the arguments interchanged.
 -}
 andThen : (b -> Update a c e) -> Update b c e -> Update a c e
 andThen fun =
@@ -269,7 +280,7 @@ andApplyCallback =
 
 
 {-| Collapse the list of monadic functions (callbacks) produced by a nested update
-call, sequentially composing them together.
+call, and sequentially compose them together.
 -}
 fold : Update a c (a -> Update a c e) -> Update a c e
 fold ( m, cmd, events ) =
@@ -284,7 +295,7 @@ foldAndThen fun =
     fold << andThen fun
 
 
-{-| Combinator that is useful for pointfree code. For example, if we want to make the `state` argument implicit in the following code;
+{-| Combinator useful for pointfree style. For example, if we want to make the `state` argument implicit in the following code;
 
 ```
 update msg state =
@@ -314,7 +325,18 @@ type alias In state slice msg a =
     (slice -> Update slice msg (state -> Update state msg a)) -> state -> Update state msg a
 
 
-{-| TODO
+{-| The idea here is that you provide an `inX` for each nested `XState` that needs to be updated.
+
+```
+type State =
+  { x : XState }
+```
+
+Partially applying `inState`, you need to specify a getter and setter to access `x` within the parent record:
+
+```
+inX = inState { get = .x, set = \state newX -> { state | x = newX } }
+```
 -}
 inState : { get : b -> d, set : b -> m -> a } -> (d -> Update m c (a -> Update a c e)) -> b -> Update a c e
 inState { get, set } fun state =

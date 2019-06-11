@@ -17,7 +17,7 @@ This is a simple single-page (SPA) blog app, showing how to use this library to:
 
 ### [Trollo](https://laserpants.github.io/elm-update-deep/examples/todo-list/) 
 
-An even simpler todo-list application, explained in more detail in [this README file](https://github.com/laserpants/elm-update-deep/tree/master/examples/todo-list).
+An even simpler todo-list application, explained in more detail in [this accompanying README](https://github.com/laserpants/elm-update-deep/tree/master/examples/todo-list) file.
 
 ## Intro
 
@@ -58,22 +58,23 @@ In a nutshell, this library let's you do the following:
 
 ## Hello, world
 
-Let's look at an example:
+Let's look at an example. We have a button and as much as possible, we'd like 
+to encapsulate the button functionality in a stand-alone *component* 
+(&hellip; reusability and all that). 
 
 ```
-        ┌───────────┐    
-        │   State   │    
-        └──┬─── ▲ ──┘    
-           │    │        
- ButtonMsg │    │--- buttonClicked
-           │    │        
-      ┌─── ▼ ───┴─────┐   
-      │  ButtonState  │   
-      └───────────────┘   
+        ┌──────────┐                │  
+        │  update  │                │   
+        └──┬── ▲ ──┘                │   ┌─────────────────┐
+           │   │                    │   │      State      │
+ ButtonMsg │   │─── buttonClicked   │   │ ┌─────────────┐ │
+           │   │                    │   │ │ ButtonState │ │
+      ┌─── ▼ ──┴─────┐              │   │ └─────────────┘ │
+      │ updateButton │              │   └─────────────────┘
+      └──────────────┘              │
 ```
 
-As much as possible, we'd like to encapsulate the button functionality in a 
-stand-alone *component* (reusability and all that).
+The button passes information to the main `update` call via the `updateButton` callback.
 
 ```elm
 module Main exposing (..)
@@ -204,18 +205,7 @@ update msg state =
                 |> fold
 ```
 
-The idea here is that you provide an `inX` for each nested `XState` that needs to be updated.
-
-```
-type State =
-  { x : XState }
-```
-
-Partially applying `inState`, you need to specify a getter and setter to access `x` within the parent record:
-
-```
-inX = inState { get = .x, set = \state newX -> { state | x = newX } }
-```
+See the docs for [`inState`](Update.Deep#inState) for more information.
 
 ## Hello, HTTP world
 
