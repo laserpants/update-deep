@@ -32,7 +32,7 @@ update { onSubmit } msg state =
     case msg of
         Submit ->
             state
-                |> invokeHandler (onSubmit { text = state.text })
+                |> applyCallback (onSubmit { text = state.text })
                 |> andThen (setText "")
 
         Focus ->

@@ -1,187 +1,16 @@
 module Update.Deep exposing
     ( In, Update
-    , addCmd, andMap, andThen, andThenIf, ap, applicationInit, documentInit, foldEvents, foldEventsAndThen, inState, invokeHandler, join, kleisli, map, map2, map3, map4, map5, map6, map7, mapCmd, runUpdate, save, unwrap
-    , andAddCmd, andInvokeHandler
+    , addCmd, andMap, andThen, andThenIf, ap, applicationInit, documentInit, fold, foldAndThen, inState, applyCallback, join, kleisli, map, map2, map3, map4, map5, map6, map7, mapCmd, runUpdate, save, unwrap
+    , andAddCmd, andApplyCallback
     )
 
 {-|
 
-# Examples/Tutorial
+TODO
 
-### [Facepalm](https://laserpants.github.io/elm-update-deep/examples/blog/)
+# Update 
 
-A simple blog application, demonstrating how to use this library to:
-  * fetch remote resources from a (fake) API; 
-  * do URL routing; 
-  * manage sessions using localStorage and sessionStorage; 
-  * work with 
-    * forms (wrapping elm-form) and 
-    * WebSockets (see Register page).
-
-### [Trollo](https://laserpants.github.io/elm-update-deep/examples/todo-list/) 
-
-An even simpler todo-list application, explained in more detail in [this README file](https://github.com/laserpants/elm-update-deep/tree/master/examples/todo-list).
-
-# Intro
-
-In a nutshell, this library let's you do the following:
-
-1) Chain updates using the pipes operator (similar to `update-extra`):
-
-```
-    model
-        |> setResource Requested
-        |> andAddCmd (model.request url maybeBody)
-        |> mapCmd toMsg
-```
-
-2) Allow information to be passed up in the update tree:
-
-```
-    model
-        |> setResource (Available resource)
-        |> andInvokeHandler (onSuccess resource)
-```
-
-3) Reduce boilerplate while working with nested updates:
-
-```
-    type Msg
-        = RouterMsg Router.Msg
-        | UiMsg Ui.Msg
-
-    update msg =
-        case msg of
-            RouterMsg routerMsg ->
-                inRouter (Router.update { onRouteChange = handleRouteChange } routerMsg)
-```
-
-## Hello, world
-
-Let's look at a minimal example:
-
-
-```
-module Main exposing (..)
-
-import Browser exposing (Document)
-import Html exposing (..)
-import Html.Events exposing (..)
-import Update.Deep exposing (..)
-import Update.Deep.Browser as Deep
-
-
-type ButtonMsg
-    = Click
-
-
-type alias ButtonState =
-    { counter : Int }
-
-
-setCounterValue : Int -> ButtonState -> Update ButtonState msg a
-setCounterValue count state =
-    save { state | counter = count }
-
-
-buttonInit : Update ButtonState msg a
-buttonInit =
-    save ButtonState
-        |> andMap (save 0)
-
-
-buttonUpdate : { buttonClicked : Int -> a } -> ButtonMsg -> ButtonState -> Update ButtonState msg a
-buttonUpdate { buttonClicked } msg state =
-    case msg of
-        Click ->
-            let
-                count =
-                    1 + state.counter
-            in
-            state
-                |> setCounterValue count
-                |> andThen (invokeHandler (buttonClicked count))
-
-
-buttonView : (ButtonMsg -> msg) -> Html msg
-buttonView toMsg =
-    div [] [ button [ onClick Click ] [ text "Click me" ] ]
-        |> Html.map toMsg
-
-
-
--- Main application
-
-
-type Msg
-    = ButtonMsg ButtonMsg
-
-
-type alias State =
-    { button : ButtonState
-    , message : String
-    }
-
-
-init : () -> Update State Msg a
-init () =
-    save State
-        |> andMap buttonInit
-        |> andMap (save "")
-
-
-handleButtonClicked : Int -> State -> Update State msg a
-handleButtonClicked times state =
-    save { state | message = "The button has been clicked " ++ String.fromInt times ++ " time(s)." }
-
-
-inButton : In State ButtonState msg a
-inButton =
-    inState { get = .button, set = \state button -> { state | button = button } }
-
-
-update : Msg -> State -> Update State Msg a
-update msg =
-    case msg of
-        ButtonMsg buttonMsg ->
-            inButton (buttonUpdate { buttonClicked = handleButtonClicked } buttonMsg)
-
-
-view : State -> Document Msg
-view { message } =
-    { title = ""
-    , body = [ buttonView ButtonMsg, text message ]
-    }
-
-
-main : Program () State Msg
-main =
-    Deep.document
-        { init = init
-        , update = update
-        , subscriptions = always Sub.none
-        , view = view
-        }
-```
-
-then
-
-
-```
-update : Msg -> State -> Update State Msg a
-update msg state =
-    case msg of
-        ButtonMsg buttonMsg ->
-            state.button
-                |> buttonUpdate { buttonClicked = handleButtonClicked } buttonMsg
-                |> andThen (\button -> save { state | button = button })
-                |> foldEvents
-```
-
-
-# The Update Type
-
-@docs Update, save, addCmd, map, mapCmd, invokeHandler, foldEvents, join, kleisli
+@docs Update, save, addCmd, map, mapCmd, applyCallback, fold, join, kleisli
 
 
 ## Chaining Updates
@@ -206,13 +35,13 @@ update msg state =
 
 # Helpers
 
-@docs andAddCmd, andInvokeHandler, foldEventsAndThen, unwrap
+@docs andAddCmd, andApplyCallback, foldAndThen, unwrap
 
 -}
 
 
-{-| A type alias wrapper for Elm's `( model, Cmd msg )` tuple that introduces a
-third component to allow for one or more callbacks to be passed down in the update hierarchy.
+{-| A type alias wrapper for Elm's `( model, Cmd msg )` tuple which introduces a
+third component to allow for one or more *callbacks* to be passed down in the update hierarchy.
 -}
 type alias Update m c e =
     ( m, Cmd c, List e )
@@ -221,10 +50,12 @@ type alias Update m c e =
 {-| This function lifts a value into the `Update` context. For example, 
 
 ```
-save someState
+save model
 ```
 
-is the same as `( someState, Cmd.none )` in code that doesn't use this library.
+corresponds to `( model, Cmd.none )` in code that doesn't use this library. Note that the `Update` 
+type alias introduces a third element to this tuple, so if you want to construct a return value 
+without relying on any of the library utilities, you'd have to write `( model, Cmd.none, [] )`.
 -}
 save : m -> Update m c e
 save model =
@@ -241,7 +72,8 @@ save model =
                     |> andThen (addCmd someOtherCommand)
                     |> andThen (setStatus Done)
 
-See also [`andAddCmd`](#andAddCmd).
+In this example, `andThen (addCmd someOtherCommand)` can also be written as
+[`andAddCmd`](#andAddCmd)` someOtherCommand`.
 
 -}
 addCmd : Cmd c -> m -> Update m c e
@@ -249,27 +81,20 @@ addCmd cmd state =
     ( state, cmd, [] )
 
 
-{-| Apply a function to the command part of the value. This is typically used to lift a
-value returned from a nested update into the caller's context. For example;
+{-| Apply a function to the command part of the value. This can be used to lift a
+value returned from a nested update into the caller context. For example;
 
-    type alias State =
-        { enchilada : String }
-
-    init : (Msg -> msg) -> Update State msg a
-    init toMsg =
-        save State
-            |> andMap (save "")
-            |> mapCmd toMsg
 -}
 mapCmd : (c -> d) -> Update m c e -> Update m d e
 mapCmd f ( model, cmd, events ) =
     ( model, Cmd.map f cmd, events )
 
 
-{-| TODO
+{-| Add a partially applied callback to the list of functions that is applied to 
+the `Update` value returned from a nested call.
 -}
-invokeHandler : e -> m -> Update m c e
-invokeHandler handler state =
+applyCallback : e -> m -> Update m c e
+applyCallback handler state =
     ( state, Cmd.none, [ handler ] )
 
 
@@ -336,7 +161,7 @@ map7 f x y z a b =
     ap << map6 f x y z a b
 
 
-{-| Removes one level of monadic structure. Various other functions in this library are implemented in terms of `join`. In particular, `andThen f = join << map f`
+{-| Removes one level of monadic structure. Some other functions in this library are implemented in terms of `join`. In particular, `andThen f = join << map f`
 -}
 join : Update (Update a c e) c e -> Update a c e
 join ( ( model, cmda, e ), cmdb, e2 ) =
@@ -383,29 +208,30 @@ andAddCmd =
     andThen << addCmd
 
 
-{-| Shortcut for `andThen << invokeHandler`
+{-| Shortcut for `andThen << applyCallback`
 -}
-andInvokeHandler : e -> Update a c e -> Update a c e
-andInvokeHandler =
-    andThen << invokeHandler
+andApplyCallback : e -> Update a c e -> Update a c e
+andApplyCallback =
+    andThen << applyCallback
 
 
-{-| Collapse the list of monadic functions (events) produced by a nested update
-call, and merge them into the current context.
+{-| Collapse the list of monadic functions (callbacks) produced by a nested update
+call, sequentially composing one after another.
 -}
-foldEvents : Update a c (a -> Update a c e) -> Update a c e
-foldEvents ( m, cmd, events ) =
+fold : Update a c (a -> Update a c e) -> Update a c e
+fold ( m, cmd, events ) =
     List.foldr andThen ( m, cmd, [] ) events
 
 
-{-| Shortcut for `\f -> foldEvents << andThen f`
+{-| Shortcut for `\f -> fold << andThen f`
 -}
-foldEventsAndThen : (m -> Update a c (a -> Update a c e)) -> Update m c (a -> Update a c e) -> Update a c e
-foldEventsAndThen fun =
-    foldEvents << andThen fun
+
+foldAndThen : (m -> Update a c (a -> Update a c e)) -> Update m c (a -> Update a c e) -> Update a c e
+foldAndThen fun =
+    fold << andThen fun
 
 
-{-| TODO
+{-| TODO rename?
 -}
 unwrap : (a -> b) -> (b -> a -> c) -> a -> c
 unwrap get some state =
@@ -422,10 +248,11 @@ type alias In state slice msg a =
 -}
 inState : { get : b -> d, set : b -> m -> a } -> (d -> Update m c (a -> Update a c e)) -> b -> Update a c e
 inState { get, set } fun state =
-    get state |> fun |> foldEventsAndThen (set state >> save)
+    get state |> fun |> foldAndThen (set state >> save)
 
 
-{-| TODO
+{-| Normally you shouldn't need to use this function directly in client code.
+Instead, see the [`Update.Deep.Browser`](Update-Deep-Browser) module.
 -}
 applicationInit : (d -> e -> f -> Update a b c) -> d -> e -> f -> ( a, Cmd b )
 applicationInit f a b c =
@@ -436,7 +263,8 @@ applicationInit f a b c =
     ( model, cmd )
 
 
-{-| TODO
+{-| Normally you shouldn't need to use this function directly in client code.
+Instead, see the [`Update.Deep.Browser`](Update-Deep-Browser) module.
 -}
 documentInit : (f -> Update a b c) -> f -> ( a, Cmd b )
 documentInit f a =
@@ -447,7 +275,7 @@ documentInit f a =
     ( model, cmd )
 
 
-{-| TODO
+{-| Turn an update into a plain `( model, cmd )` pair, disregarding any callbacks.
 -}
 runUpdate : (d -> e -> Update a b c) -> d -> e -> ( a, Cmd b )
 runUpdate f a b =

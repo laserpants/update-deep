@@ -36,7 +36,7 @@ buttonUpdate { buttonClicked } msg state =
             in
             state
                 |> setCounterValue count
-                |> andThen (invokeHandler (buttonClicked count))
+                |> andThen (applyCallback (buttonClicked count))
 
 
 buttonView : (ButtonMsg -> msg) -> Html msg

@@ -103,11 +103,11 @@ update { onSuccess, onError } msg toMsg =
     case msg of
         Response (Ok resource) ->
             setResource (Available resource)
-                >> andInvokeHandler (onSuccess resource)
+                >> andApplyCallback (onSuccess resource)
 
         Response (Err error) ->
             setResource (Error error)
-                >> andInvokeHandler (onError error)
+                >> andApplyCallback (onError error)
 
         Reset ->
             resetResource

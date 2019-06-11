@@ -68,7 +68,7 @@ update { onAuthResponse } msg toMsg =
     let
         handleApiResponse maybeSession =
             inForm (Form.reset [])
-                >> andInvokeHandler (onAuthResponse maybeSession)
+                >> andApplyCallback (onAuthResponse maybeSession)
     in
     case msg of
         ApiMsg apiMsg ->

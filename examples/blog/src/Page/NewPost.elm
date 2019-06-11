@@ -67,7 +67,7 @@ update : { onPostAdded : Post -> a } -> Msg -> (Msg -> msg) -> State -> Update S
 update { onPostAdded } msg toMsg =
     case msg of
         ApiMsg apiMsg ->
-            inApi (Api.update { onSuccess = invokeHandler << onPostAdded, onError = always save } apiMsg (toMsg << ApiMsg))
+            inApi (Api.update { onSuccess = applyCallback << onPostAdded, onError = always save } apiMsg (toMsg << ApiMsg))
 
         FormMsg formMsg ->
             inForm (Form.update { onSubmit = handleSubmit toMsg } formMsg)

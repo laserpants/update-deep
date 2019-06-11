@@ -48,7 +48,7 @@ update { onSubmit } msg model =
         ( Form.Submit, Just form ) ->
             model
                 |> setDisabled True
-                |> andInvokeHandler (onSubmit form)
+                |> andApplyCallback (onSubmit form)
 
         _ ->
             model.form

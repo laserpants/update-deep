@@ -56,7 +56,7 @@ update { onTaskAdded, onTaskDone } msg =
                     { text = data.text }
             in
             addItem item
-                >> andInvokeHandler (onTaskAdded item)
+                >> andApplyCallback (onTaskAdded item)
 
         removeItem ix flags state =
             state
@@ -66,7 +66,7 @@ update { onTaskAdded, onTaskDone } msg =
 
                         item :: rest ->
                             setItems (List.take ix state.items ++ rest)
-                                >> andThenIf (always flags.notify) (invokeHandler <| onTaskDone item)
+                                >> andThenIf (always flags.notify) (applyCallback <| onTaskDone item)
                    )
     in
     case msg of

@@ -92,7 +92,7 @@ update { onCommentCreated } msg toMsg =
         commentCreated comment =
             inCommentForm (Form.reset [])
                 >> andThen (inPostApi (Api.sendSimpleRequest toApiMsg))
-                >> andInvokeHandler (onCommentCreated comment)
+                >> andApplyCallback (onCommentCreated comment)
     in
     case msg of
         PostApiMsg apiMsg ->

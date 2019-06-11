@@ -56,7 +56,7 @@ update { onRouteChange } msg state =
             in
             state
                 |> setRoute route
-                |> andInvokeHandler (onRouteChange url route)
+                |> andApplyCallback (onRouteChange url route)
 
         UrlRequest (Browser.Internal url) ->
             state
