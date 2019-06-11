@@ -206,4 +206,4 @@ This is a simple single-page (SPA) blog app, showing how to use this library to:
 
 ### [Trollo](https://laserpants.github.io/elm-update-deep/examples/todo-list/) 
 
-An even simpler todo-list application, explained in more detail in [this accompanying README](https://github.com/laserpants/elm-update-deep/tree/master/examples/todo-list) file.
+An even simpler todo-list application, explained in more detail in [the accompanying README](https://github.com/laserpants/elm-update-deep/tree/master/examples/todo-list) file.

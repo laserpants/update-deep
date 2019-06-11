@@ -17,7 +17,7 @@ import Page.Register
 import Page.ShowPost
 import Ports
 import Route exposing (Route(..), fromUrl)
-import Ui exposing (showInfoToast, showToast, closeBurgerMenu)
+import Ui exposing (closeBurgerMenu, showInfoToast, showToast)
 import Update.Deep exposing (..)
 import Update.Deep.Router as Router
 import Url exposing (Url)
