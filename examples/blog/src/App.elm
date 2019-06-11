@@ -116,7 +116,7 @@ handleRouteChange : Url -> Maybe Route -> State -> Update State Msg a
 handleRouteChange url maybeRoute =
     let
         ifAuthenticated gotoPage =
-            unwrap .session
+            with .session
                 (\session ->
                     if Nothing == session then
                         -- Redirect and return to this url after successful login
@@ -129,7 +129,7 @@ handleRouteChange url maybeRoute =
                 )
 
         unlessAuthenticated gotoPage =
-            unwrap .session
+            with .session
                 (\session ->
                     if Nothing /= session then
                         redirect "/"
@@ -206,7 +206,7 @@ updateSessionStorage maybeSession =
 
 returnToRestrictedUrl : State -> Update State Msg a
 returnToRestrictedUrl =
-    unwrap .restrictedUrl (redirect << Maybe.withDefault "/")
+    with .restrictedUrl (redirect << Maybe.withDefault "/")
 
 
 handleAuthResponse : Maybe Session -> State -> Update State Msg a

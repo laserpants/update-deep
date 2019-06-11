@@ -164,7 +164,7 @@ update msg toMsg =
         WebsocketMsg websocketMsg ->
             case Json.decodeString websocketMessageDecoder websocketMsg of
                 Ok (WebSocketUsernameIsAvailableResponse { username, available }) ->
-                    unwrap .formModel
+                    with .formModel
                         (\model ->
                             let
                                 usernameField =

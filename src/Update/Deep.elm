@@ -1,6 +1,6 @@
 module Update.Deep exposing
     ( In, Update
-    , addCmd, andMap, andThen, andThenIf, ap, applicationInit, documentInit, fold, foldAndThen, inState, applyCallback, join, kleisli, map, map2, map3, map4, map5, map6, map7, mapCmd, runUpdate, save, unwrap
+    , addCmd, andMap, andThen, andThenIf, ap, applicationInit, documentInit, fold, foldAndThen, inState, applyCallback, join, kleisli, map, map2, map3, map4, map5, map6, map7, mapCmd, runUpdate, save, with
     , andAddCmd, andApplyCallback
     )
 
@@ -20,6 +20,8 @@ TODO
 
 ## Applicative Interface
 
+These functions address the need to map over functions of more than one argument.
+
 @docs andMap, ap, map2, map3, map4, map5, map6, map7
 
 
@@ -35,7 +37,7 @@ TODO
 
 # Helpers
 
-@docs andAddCmd, andApplyCallback, foldAndThen, unwrap
+@docs andAddCmd, andApplyCallback, foldAndThen, with
 
 -}
 
@@ -62,7 +64,7 @@ save model =
     ( model, Cmd.none, [] )
 
 
-{-| Add a command to the `Update` pipeline. For example;
+{-| Add a command to an `Update` pipeline. For example;
 
     update msg state =
         case msg of
@@ -81,9 +83,31 @@ addCmd cmd state =
     ( state, cmd, [] )
 
 
-{-| Apply a function to the command part of the value. This can be used to lift a
+{-| Map over the Cmd contained in the Update. This can be used to lift a
 value returned from a nested update into the caller context. For example;
 
+```
+buttonUpdate : ButtonMsg -> ButtonState -> Update ButtonState ButtonMsg a
+buttonUpdate buttonMsg buttonState = ...
+
+type Msg
+    = ButtonMsg ButtonMsg
+
+type alias State =
+    { button : ButtonState }
+
+inButton : In State ButtonState msg a
+inButton =
+    inState { get = .button, set = \state button -> { state | button = button } }
+
+update : Msg -> State -> Update ButtonState ButtonMsg a
+update msg state =
+    case msg of
+        ButtonMsg buttonMsg ->
+            state
+                |> inButton (buttonUpdate buttonMsg)
+                |> mapCmd ButtonMsg
+```
 -}
 mapCmd : (c -> d) -> Update m c e -> Update m d e
 mapCmd f ( model, cmd, events ) =
@@ -92,20 +116,47 @@ mapCmd f ( model, cmd, events ) =
 
 {-| Add a partially applied callback to the list of functions that is applied to 
 the `Update` value returned from a nested call.
+
+Refer to the examples and the README file for more on how to use this.
 -}
 applyCallback : e -> m -> Update m c e
 applyCallback handler state =
     ( state, Cmd.none, [ handler ] )
 
 
-{-| TODO
+{-| See [`andMap`](#andMap). This function is the same but with the arguments interchanged.
 -}
 ap : Update (a -> b) c e -> Update a c e -> Update b c e
 ap ( f, cmda, e ) ( model, cmdb, e2 ) =
     ( f model, Cmd.batch [ cmda, cmdb ], e ++ e2 )
 
 
-{-| TODO
+{-| 
+Trying to map over a function of more than one argument,
+
+```
+map (+) (save 4)
+```
+
+we end up with a result of type `Update (number -> number) c e`. To apply the function inside this value to another `Update number c e` value, we can write&hellip;
+
+```
+map (+) (save 4) |> andThen (save 5)
+```
+
+This pattern scales to functions of any number of arguments:
+
+```
+let f x y z = x + y + z 
+in 
+map f (save 1) 
+        |> andMap (save 1) 
+        |> andMap (save 1)
+```
+
+If not sooner, you'll need this when you want to `mapN` and N > 7.
+
+See also [`map2`](#map2), [`map3`](#map3), etc.
 -}
 andMap : Update a c e -> Update (a -> b) c e -> Update b c e
 andMap a b =
@@ -119,49 +170,51 @@ map f ( model, cmd, events ) =
     ( f model, cmd, events )
 
 
-{-| TODO
+{-| Apply a function of two arguments to the state portion of a value. 
+Equivalently, we can think of this as taking a function `a -> b -> c` and 
+transforming it into a “lifted” function of type `Update a msg e -> Update b msg e -> Update c msg e`.
 -}
 map2 : (a -> b -> p) -> Update a c e -> Update b c e -> Update p c e
 map2 f =
     ap << map f
 
 
-{-| TODO
+{-| Apply a function of three arguments to the state portion of a value. 
 -}
 map3 : (a -> b -> p -> q) -> Update a c e -> Update b c e -> Update p c e -> Update q c e
 map3 f x =
     ap << map2 f x
 
 
-{-| TODO
+{-| Apply a function of four arguments to the state portion of a value. 
 -}
 map4 : (a -> b -> p -> q -> r) -> Update a c e -> Update b c e -> Update p c e -> Update q c e -> Update r c e
 map4 f x y =
     ap << map3 f x y
 
 
-{-| TODO
+{-| Apply a function of five arguments to the state portion of a value. 
 -}
 map5 : (a -> b -> p -> q -> r -> s) -> Update a c e -> Update b c e -> Update p c e -> Update q c e -> Update r c e -> Update s c e
 map5 f x y z =
     ap << map4 f x y z
 
 
-{-| TODO
+{-| Apply a function of six arguments to the state portion of a value. 
 -}
 map6 : (a -> b -> p -> q -> r -> s -> t) -> Update a c e -> Update b c e -> Update p c e -> Update q c e -> Update r c e -> Update s c e -> Update t c e
 map6 f x y z a =
     ap << map5 f x y z a
 
 
-{-| TODO
+{-| Apply a function of seven arguments to the state portion of a value. 
 -}
 map7 : (a -> b -> p -> q -> r -> s -> t -> u) -> Update a c e -> Update b c e -> Update p c e -> Update q c e -> Update r c e -> Update s c e -> Update t c e -> Update u c e
 map7 f x y z a b =
     ap << map6 f x y z a b
 
 
-{-| Removes one level of monadic structure. Some other functions in this library are implemented in terms of `join`. In particular, `andThen f = join << map f`
+{-| Removes one level of monadic structure. It may suffice to know that some other functions in this library are implemented in terms of `join`. In particular, `andThen f = join << map f`
 -}
 join : Update (Update a c e) c e -> Update a c e
 join ( ( model, cmda, e ), cmdb, e2 ) =
@@ -170,7 +223,7 @@ join ( ( model, cmda, e ), cmdb, e2 ) =
 
 {-| Sequential composition of updates. This function is especially useful in combination
 with the forward pipe operator (`|>`), for writing code in the style of pipelines. (`andThen` is
-like the bind operator in Haskell, but with the arguments interchanged.)
+like the monadic bind operator in Haskell, but with the arguments interchanged.)
 -}
 andThen : (b -> Update a c e) -> Update b c e -> Update a c e
 andThen fun =
@@ -216,7 +269,7 @@ andApplyCallback =
 
 
 {-| Collapse the list of monadic functions (callbacks) produced by a nested update
-call, sequentially composing one after another.
+call, sequentially composing them together.
 -}
 fold : Update a c (a -> Update a c e) -> Update a c e
 fold ( m, cmd, events ) =
@@ -231,10 +284,27 @@ foldAndThen fun =
     fold << andThen fun
 
 
-{-| TODO rename?
+{-| Combinator that is useful for pointfree code. For example, if we want to make the `state` argument implicit in the following code;
+
+```
+update msg state =
+    case msg of
+        Click ->
+            setCounterValue (state.counter + 1) state
+```
+
+we can write:
+
+```
+buttonUpdate msg =
+    case msg of
+        Click ->
+            with .counter (setCounterValue << (+) 1)
+```
+
 -}
-unwrap : (a -> b) -> (b -> a -> c) -> a -> c
-unwrap get some state =
+with : (a -> b) -> (b -> a -> c) -> a -> c
+with get some state =
     some (get state) state
 
 
@@ -275,7 +345,7 @@ documentInit f a =
     ( model, cmd )
 
 
-{-| Turn an update into a plain `( model, cmd )` pair, disregarding any callbacks.
+{-| Turn an update into a plain `( model, cmd )` pair, canceling any callbacks.
 -}
 runUpdate : (d -> e -> Update a b c) -> d -> e -> ( a, Cmd b )
 runUpdate f a b =

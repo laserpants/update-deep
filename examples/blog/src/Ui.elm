@@ -86,7 +86,7 @@ update msg toMsg =
             toggleMenuOpen
 
         CloseToast id ->
-            unwrap .toast
+            with .toast
                 (\toast ->
                     case toast of
                         Nothing ->

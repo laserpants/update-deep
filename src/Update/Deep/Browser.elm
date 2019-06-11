@@ -12,8 +12,13 @@ import Update.Deep exposing (Update, applicationInit, documentInit, runUpdate)
 import Url exposing (Url)
 
 
-{-| Used as a drop-in replacement for `Browser.application`, but instead creates a `Program`
+{-| Used as a replacement for `Browser.application`, but instead creates a `Program`
 where `init` and `update` are based on the `Update` type of this library.
+
+```
+init : flags -> Url -> Navigation.Key -> Update model msg a
+update : msg -> model -> Update model msg a
+```
 
 See the [blog application](https://github.com/laserpants/elm-update-deep/tree/master/examples/blog) for an example of how to use this in a program.
 -}
@@ -37,8 +42,13 @@ application config =
         }
 
 
-{-| Used as a drop-in replacement for `Browser.document`, but instead creates a `Program`
+{-| Used as a replacement for `Browser.document`, but instead creates a `Program`
 where `init` and `update` are based on the `Update` type of this library.
+
+```
+init : flags -> Update model msg a
+update : msg -> model -> Update model msg a
+```
 
 See the [todo-list application](https://github.com/laserpants/elm-update-deep/tree/master/examples/todo-list) for an example of how to use this in a program.
 -}

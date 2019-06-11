@@ -2,14 +2,14 @@
 
 ## Examples
 
-You may find the following examples useful:
+You may find the following examples enlightening:
 
 ### [Facepalm](https://laserpants.github.io/elm-update-deep/examples/blog/)
 
-A simple SPA, showing how to use this library to:
+This is a simple single-page (SPA) blog app, showing how to use this library to:
   * Fetch remote resources from an API; 
-  * Do URL routing; 
-  * Implement authentication and manage sessions using localStorage/sessionStorage; 
+  * Implement URL routing; 
+  * Do authentication and manage sessions using localStorage/sessionStorage; 
   * Display “toast” notifications; and
   * Work with 
     * forms (wrapping [elm-form](https://package.elm-lang.org/packages/etaque/elm-form/latest)) and 
@@ -72,7 +72,8 @@ Let's look at an example:
       └───────────────┘   
 ```
 
-and...
+As much as possible, we'd like to encapsulate the button functionality in a 
+stand-alone *component* (reusability and all that).
 
 ```elm
 module Main exposing (..)
@@ -177,11 +178,9 @@ main =
         }
 ```
 
-A reasonable next step here would be to break this up into separate modules, so that `ButtonMsg` becomes `Button.Msg`, etc. Look at the other two [example applications](https://github.com/laserpants/elm-update-deep/tree/master/examples) to see what that looks like.
+A reasonable next step here is to break this up into separate modules, so that `ButtonMsg` becomes `Button.Msg`, etc. Look at the other two [example applications](https://github.com/laserpants/elm-update-deep/tree/master/examples) to see how that can be done.
 
-The `inButton` takes care of 
-
-pointfree
+Note that the `update` function is written in pointfree style. Making the `state` argument explicit, the same code translates to:
 
 ```elm
 update : Msg -> State -> Update State Msg a
@@ -192,7 +191,7 @@ update msg state =
                 |> inButton (buttonUpdate { buttonClicked = handleButtonClicked } buttonMsg)
 ```
 
-To see what `inButton` ... we could expand this even further, into the following code:
+The `inButton` function takes care of some wrapping and unwrapping of the record for us. To examine what it does, we could expand this even further, into the following:
 
 ```elm
 update : Msg -> State -> Update State Msg a
@@ -203,6 +202,19 @@ update msg state =
                 |> buttonUpdate { buttonClicked = handleButtonClicked } buttonMsg
                 |> andThen (\button -> save { state | button = button })
                 |> fold
+```
+
+The idea here is that you provide an `inX` for each nested `XState` that needs to be updated.
+
+```
+type State =
+  { x : XState }
+```
+
+Partially applying `inState`, you need to specify a getter and setter to access `x` within the parent record:
+
+```
+inX = inState { get = .x, set = \state newX -> { state | x = newX } }
 ```
 
 ## Hello, HTTP world
