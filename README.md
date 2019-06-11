@@ -1,24 +1,5 @@
 # Update Deep
 
-## Examples
-
-You may find the following examples enlightening:
-
-### [Facepalm](https://laserpants.github.io/elm-update-deep/examples/blog/)
-
-This is a simple single-page (SPA) blog app, showing how to use this library to:
-  * Fetch remote resources from an API; 
-  * Implement URL routing; 
-  * Do authentication and manage sessions using localStorage/sessionStorage; 
-  * Display “toast” notifications; and
-  * Work with 
-    * forms (wrapping [elm-form](https://package.elm-lang.org/packages/etaque/elm-form/latest)) and 
-    * WebSockets (see Register page).
-
-### [Trollo](https://laserpants.github.io/elm-update-deep/examples/todo-list/) 
-
-An even simpler todo-list application, explained in more detail in [this accompanying README](https://github.com/laserpants/elm-update-deep/tree/master/examples/todo-list) file.
-
 ## Intro
 
 In a nutshell, this library let's you do the following:
@@ -58,23 +39,24 @@ In a nutshell, this library let's you do the following:
 
 ## Hello, world
 
-Let's look at an example. We have a button and as much as possible, we'd like 
-to encapsulate the button functionality in a stand-alone *component* 
-(&hellip; reusability and all that). 
+Let's go through an example. We have a button with some extra state to keep track 
+of. **Going against the advice in the official guide**, we'd like to encapsulate this 
+functionality, as much as possible, in its own stand-alone *component* 
+(reusability and all that)&hellip;
 
 ```
         ┌──────────┐                │  
         │  update  │                │   
-        └──┬── ▲ ──┘                │   ┌─────────────────┐
-           │   │                    │   │      State      │
- ButtonMsg │   │─── buttonClicked   │   │ ┌─────────────┐ │
-           │   │                    │   │ │ ButtonState │ │
-      ┌─── ▼ ──┴─────┐              │   │ └─────────────┘ │
-      │ updateButton │              │   └─────────────────┘
+        └──┬── ▲ ──┘                │   type alias State =
+           │   │                    │       { button : ButtonState
+ ButtonMsg │   │─── buttonClicked   │       , ... 
+           │   │                    │       } 
+      ┌─── ▼ ──┴─────┐              │        
+      │ updateButton │              │   
       └──────────────┘              │
 ```
 
-The button passes information to the main `update` call via the `updateButton` callback.
+The main point here is that `updateButton` passes information to the main `update` call via the `buttonClicked` callback.
 
 ```elm
 module Main exposing (..)
@@ -207,5 +189,21 @@ update msg state =
 
 See the docs for [`inState`](Update.Deep#inState) for more information.
 
-## Hello, HTTP world
+## More examples
 
+You may find the following examples enlightening:
+
+### [Facepalm](https://laserpants.github.io/elm-update-deep/examples/blog/)
+
+This is a simple single-page (SPA) blog app, showing how to use this library to:
+  * Fetch remote resources from an API; 
+  * Implement URL routing; 
+  * Do authentication and manage sessions using localStorage/sessionStorage; 
+  * Display “toast” notifications; and
+  * Work with 
+    * forms (wrapping [elm-form](https://package.elm-lang.org/packages/etaque/elm-form/latest)) and 
+    * WebSockets (see Register page).
+
+### [Trollo](https://laserpants.github.io/elm-update-deep/examples/todo-list/) 
+
+An even simpler todo-list application, explained in more detail in [this accompanying README](https://github.com/laserpants/elm-update-deep/tree/master/examples/todo-list) file.

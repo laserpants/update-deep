@@ -71,8 +71,6 @@ testFold =
 
 
 
-
-
 testMap2 : Test
 testMap2 =
 
@@ -126,6 +124,33 @@ testAndMap =
         ]
 
 
+testAddCmd : Test
+testAddCmd =
+
+    let 
+        myCmd1 = Cmd.map (always 1) Cmd.none
+        myCmd2 = Cmd.map (always 2) Cmd.none
+
+        x = Cmd.batch [ myCmd1, myCmd2 ]
+
+        ( _, b, _ ) =
+            save 5
+                |> addCmd myCmd1
+
+        ( _, c, _ ) =
+            save 5
+                |> addCmd myCmd1
+                |> andThen (addCmd myCmd2)
+
+    in
+    describe "addCmd"
+        [ test "one" <|
+            \_ -> Expect.equal b myCmd1 
+--        , test "two" <|
+--            \_ -> Expect.equal c x
+        ]
+
+
 
 suite : Test
 suite =
@@ -137,4 +162,5 @@ suite =
         , testMap2
         , testMap3
         , testAndMap
+        , testAddCmd
         ]

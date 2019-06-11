@@ -74,7 +74,7 @@ save model =
                     |> andThen (addCmd someOtherCommand)
                     |> andThen (setStatus Done)
 
-In this example, `andThen (addCmd someOtherCommand)` can also be written as
+In this example, `andThen (addCmd someOtherCommand)` can also be shortened to
 [`andAddCmd`](#andAddCmd)` someOtherCommand`.
 
 -}
@@ -83,7 +83,7 @@ addCmd cmd state =
     ( state, cmd, [] )
 
 
-{-| Map over the Cmd contained in the Update. This can be used to lift a
+{-| Map over the Cmd contained in the provided `Update`. This can be used to lift a
 value returned from a nested update into the caller context. For example;
 
 ```
@@ -114,7 +114,7 @@ mapCmd f ( model, cmd, events ) =
     ( model, Cmd.map f cmd, events )
 
 
-{-| In a nested update call, add a partially applied callback to the list of 
+{-| In a nested update call, append a partially applied callback to the list of 
 functions subsequently applied to the returned value.
 
 Refer to the [examples](https://github.com/laserpants/elm-update-deep/tree/master/examples) and the [README](https://github.com/laserpants/elm-update-deep/blob/master/README.md) file for more on how to use this.
@@ -141,7 +141,7 @@ map (+) (save 4)
 we end up with a result of type `Update (number -> number) c e`. To apply the function inside this value to another `Update number c e` value, we can write&hellip;
 
 ```
-map (+) (save 4) |> andThen (save 5)
+map (+) (save 4) |> andMap (save 5)
 ```
 
 This pattern scales in a nice way to functions of any number of arguments:
@@ -329,13 +329,14 @@ type alias In state slice msg a =
 
 ```
 type State =
-  { x : XState }
+    { x : XState }
 ```
 
 Partially applying `inState`, you need to specify a getter and setter to access `x` within the parent record:
 
 ```
-inX = inState { get = .x, set = \state newX -> { state | x = newX } }
+inX = 
+    inState { get = .x, set = \state newX -> { state | x = newX } }
 ```
 -}
 inState : { get : b -> d, set : b -> m -> a } -> (d -> Update m c (a -> Update a c e)) -> b -> Update a c e
