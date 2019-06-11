@@ -131,23 +131,14 @@ testAddCmd =
         myCmd1 = Cmd.map (always 1) Cmd.none
         myCmd2 = Cmd.map (always 2) Cmd.none
 
-        x = Cmd.batch [ myCmd1, myCmd2 ]
-
-        ( _, b, _ ) =
+        ( _, cmds1, _ ) =
             save 5
                 |> addCmd myCmd1
-
-        ( _, c, _ ) =
-            save 5
-                |> addCmd myCmd1
-                |> andThen (addCmd myCmd2)
 
     in
     describe "addCmd"
         [ test "one" <|
-            \_ -> Expect.equal b myCmd1 
---        , test "two" <|
---            \_ -> Expect.equal c x
+            \_ -> Expect.equal cmds1 [ myCmd1 ]
         ]
 
 

@@ -46,7 +46,7 @@ These functions address the need to map over functions of more than one argument
 third component to allow for one or more *callbacks* to be passed down in the update hierarchy.
 -}
 type alias Update m c e =
-    ( m, Cmd c, List e )
+    ( m, List (Cmd c), List e )
 
 
 {-| This function lifts a value into the `Update` context. For example, 
@@ -61,7 +61,7 @@ without relying on any of the library utilities, you'd have to write `( model, C
 -}
 save : m -> Update m c e
 save model =
-    ( model, Cmd.none, [] )
+    ( model, [], [] )
 
 
 {-| Add a command to an `Update` pipeline. For example;
@@ -80,7 +80,7 @@ In this example, `andThen (addCmd someOtherCommand)` can also be shortened to
 -}
 addCmd : Cmd c -> m -> Update m c e
 addCmd cmd state =
-    ( state, cmd, [] )
+    ( state, [ cmd ], [] )
 
 
 {-| Map over the Cmd contained in the provided `Update`. This can be used to lift a
@@ -110,8 +110,8 @@ update msg state =
 ```
 -}
 mapCmd : (c -> d) -> Update m c e -> Update m d e
-mapCmd f ( model, cmd, events ) =
-    ( model, Cmd.map f cmd, events )
+mapCmd f ( model, cmds, events ) =
+    ( model, List.map (Cmd.map f) cmds, events )
 
 
 {-| In a nested update call, append a partially applied callback to the list of 
@@ -121,14 +121,14 @@ Refer to the [examples](https://github.com/laserpants/elm-update-deep/tree/maste
 -}
 applyCallback : e -> m -> Update m c e
 applyCallback handler state =
-    ( state, Cmd.none, [ handler ] )
+    ( state, [], [ handler ] )
 
 
 {-| See [`andMap`](#andMap). This function is the same but with the arguments interchanged.
 -}
 ap : Update (a -> b) c e -> Update a c e -> Update b c e
-ap ( f, cmda, e ) ( model, cmdb, e2 ) =
-    ( f model, Cmd.batch [ cmda, cmdb ], e ++ e2 )
+ap ( f, cmds1, e ) ( model, cmds2, e2 ) =
+    ( f model, cmds1 ++ cmds2, e ++ e2 )
 
 
 {-| 
@@ -142,6 +142,13 @@ we end up with a result of type `Update (number -> number) c e`. To apply the fu
 
 ```
 map (+) (save 4) |> andMap (save 5)
+```
+
+in `elm repl`, we can verify that the result is what we expect:
+
+```
+> (map (+) (save 4) |> andMap (save 5)) == save 9
+True : Bool
 ```
 
 This pattern scales in a nice way to functions of any number of arguments:
@@ -217,8 +224,8 @@ map7 f x y z a b =
 {-| Remove one level of monadic structure. It may suffice to know that some other functions in this library are implemented in terms of `join`. In particular, `andThen f = join << map f`
 -}
 join : Update (Update a c e) c e -> Update a c e
-join ( ( model, cmda, e ), cmdb, e2 ) =
-    ( model, Cmd.batch [ cmda, cmdb ], e ++ e2 )
+join ( ( model, cmds1, e ), cmds2, e2 ) =
+    ( model, cmds1 ++ cmds2, e ++ e2 )
 
 
 {-| Sequential composition of updates. This function is especially useful in combination
@@ -319,25 +326,38 @@ with get some state =
     some (get state) state
 
 
-{-| TODO
+{-| See [`inState`](#inState) for how to work with this type.
 -}
 type alias In state slice msg a =
     (slice -> Update slice msg (state -> Update state msg a)) -> state -> Update state msg a
 
 
-{-| The idea here is that you provide an `inX` for each nested `XState` that needs to be updated.
+{-| The idea here is that you provide an `inX` for each nested `XState` that needs to be updated in your main `State`.
+For instance, let's say this looks as follows;
 
 ```
 type State =
-    { x : XState }
+    { blob : Blob.State }
 ```
 
-Partially applying `inState`, you need to specify a getter and setter to access `x` within the parent record:
+Then, partially applying this function, you specify a getter and setter to access `blob` within its parent record:
 
 ```
-inX = 
-    inState { get = .x, set = \state newX -> { state | x = newX } }
+inBlob : In State Blob.State msg a
+inBlob = 
+    inState { get = .blob, set = \state newBlob -> { state | blob = newBlob } }
 ```
+
+Here is the `update` function 
+
+```
+update msg state =
+    case msg of
+        BlobMsg blobMsg ->
+            inBlob (Blob.update blobMsg)
+```
+
+See the [README](https://github.com/laserpants/elm-update-deep/blob/master/README.md) file for a more thorough explanation.
 -}
 inState : { get : b -> d, set : b -> m -> a } -> (d -> Update m c (a -> Update a c e)) -> b -> Update a c e
 inState { get, set } fun state =
@@ -350,10 +370,10 @@ Instead, see the [`Update.Deep.Browser`](Update-Deep-Browser) module.
 applicationInit : (d -> e -> f -> Update a b c) -> d -> e -> f -> ( a, Cmd b )
 applicationInit f a b c =
     let
-        ( model, cmd, _ ) =
+        ( model, cmds, _ ) =
             f a b c
     in
-    ( model, cmd )
+    ( model, Cmd.batch cmds )
 
 
 {-| Normally you shouldn't need to use this function directly in client code.
@@ -362,10 +382,10 @@ Instead, see the [`Update.Deep.Browser`](Update-Deep-Browser) module.
 documentInit : (f -> Update a b c) -> f -> ( a, Cmd b )
 documentInit f a =
     let
-        ( model, cmd, _ ) =
+        ( model, cmds, _ ) =
             f a
     in
-    ( model, cmd )
+    ( model, Cmd.batch cmds )
 
 
 {-| Turn an update into a plain `( model, cmd )` pair, canceling any callbacks.
@@ -373,7 +393,7 @@ documentInit f a =
 runUpdate : (d -> e -> Update a b c) -> d -> e -> ( a, Cmd b )
 runUpdate f a b =
     let
-        ( model, cmd, _ ) =
+        ( model, cmds, _ ) =
             f a b
     in
-    ( model, cmd )
+    ( model, Cmd.batch cmds )
