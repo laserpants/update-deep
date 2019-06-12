@@ -36,30 +36,30 @@ type Page
 current : Page -> { isHomePage : Bool, isNewPostPage : Bool, isShowPostPage : Bool, isLoginPage : Bool, isRegisterPage : Bool, isAboutPage : Bool, isNotFoundPage : Bool }
 current page =
     let
-        default =
+        none =
             { isHomePage = False, isNewPostPage = False, isShowPostPage = False, isLoginPage = False, isRegisterPage = False, isAboutPage = False, isNotFoundPage = False }
     in
     case page of
         HomePage _ ->
-            { default | isHomePage = True }
+            { none | isHomePage = True }
 
         NewPostPage _ ->
-            { default | isNewPostPage = True }
+            { none | isNewPostPage = True }
 
         ShowPostPage _ ->
-            { default | isShowPostPage = True }
+            { none | isShowPostPage = True }
 
         LoginPage _ ->
-            { default | isLoginPage = True }
+            { none | isLoginPage = True }
 
         RegisterPage _ ->
-            { default | isRegisterPage = True }
+            { none | isRegisterPage = True }
 
         AboutPage ->
-            { default | isAboutPage = True }
+            { none | isAboutPage = True }
 
         NotFoundPage ->
-            { default | isNotFoundPage = True }
+            { none | isNotFoundPage = True }
 
 
 update : { onAuthResponse : Maybe Session -> a, onPostAdded : Post -> a, onCommentCreated : Comment -> a } -> Msg -> (Msg -> msg) -> Page -> Update Page msg a

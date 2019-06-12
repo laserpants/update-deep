@@ -41,8 +41,8 @@ In a nutshell, this library let's you do the following:
 
 Let's go through an example. We have a button with some extra state to keep track 
 of. **Going against the advice in the official guide**, we'd like to encapsulate this 
-functionality, as much as possible, in its own stand-alone *component* 
-(reusability and all that)&hellip;
+functionality, as much as possible, as its own stand-alone *component*.
+(Reusability and all that&hellip;)
 
 ```
         ┌──────────┐                │  
@@ -174,7 +174,7 @@ update msg state =
                 |> inButton (buttonUpdate { buttonClicked = handleButtonClicked } buttonMsg)
 ```
 
-The `inButton` function takes care of some wrapping and unwrapping of the record for us. To examine what it does, we could expand this even further, into the following:
+The `inButton` function takes care of some wrapping and unwrapping of the record for us. To see what it would look like without this helper, we could expand the code even further, into the following:
 
 ```elm
 update : Msg -> State -> Update State Msg a
@@ -198,7 +198,7 @@ You may find the following examples enlightening:
 This is a simple single-page (SPA) blog app, showing how to use this library to:
   * Fetch remote resources from an API; 
   * Implement URL routing; 
-  * Do authentication and manage sessions using localStorage/sessionStorage; 
+  * Do authentication and manage sessions using localStorage/sessionStorage (via ports); 
   * Display “toast” notifications; and
   * Work with 
     * forms (wrapping [elm-form](https://package.elm-lang.org/packages/etaque/elm-form/latest)) and 
