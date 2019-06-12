@@ -1,5 +1,7 @@
 # To Do-List App Example
 
+THIS GUIDE IS STILL WORK IN PROGRESS
+
 #### Run this example in the browser [here](https://laserpants.github.io/elm-update-deep/examples/todo-list).
 
 The application consists of the following modules:
@@ -147,7 +149,7 @@ Moving up in the, in `Todos.elm`
         -- etc.
 ```
 
-`addItem` (lo and behold) adds the `TodoItem` to the list of tasks.
+`addItem` adds the `TodoItem` to the list of tasks.
 
 Finally, in `Main.elm`
 
