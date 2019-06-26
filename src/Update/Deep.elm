@@ -258,10 +258,11 @@ andThenIf pred fun upd =
             )
 
 
-{-| TODO 
+{-| TODO
 -}
 andWhen : Bool -> (a -> Update a c e) -> Update a c e -> Update a c e
-andWhen check = andThenIf (always check)
+andWhen check =
+    andThenIf (always check)
 
 
 {-| Right-to-left (Kleisli) composition of two functions that return `Update` values,
