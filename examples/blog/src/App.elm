@@ -254,7 +254,6 @@ update msg =
                     , onCommentCreated = handleCommentCreated
                     }
                     pageMsg
-                    PageMsg
                 )
 
         UiMsg uiMsg ->

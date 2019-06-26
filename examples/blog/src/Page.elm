@@ -68,10 +68,9 @@ update :
     , onCommentCreated : Comment -> a
     }
     -> Msg
-    -> (Msg -> msg)
     -> Page
     -> Update Page Msg a
-update { onAuthResponse, onPostAdded, onCommentCreated } msg toMsg page =
+update { onAuthResponse, onPostAdded, onCommentCreated } msg page =
     case page of
         HomePage homePageState ->
             case msg of
