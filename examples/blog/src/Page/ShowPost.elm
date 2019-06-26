@@ -60,8 +60,8 @@ inCommentForm =
         }
 
 
-init : Int -> (Msg -> msg) -> Update State msg a
-init id toMsg =
+init : Int -> Update State Msg a
+init id =
     let
         post =
             Api.init
@@ -82,7 +82,6 @@ init id toMsg =
         |> andMap post
         |> andMap comment
         |> andMap (Form.init [] Form.Comment.validate)
-        |> mapCmd toMsg
 
 
 handleSubmit : Form.Comment.Fields -> State -> Update State Msg a

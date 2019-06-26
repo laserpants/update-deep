@@ -32,8 +32,8 @@ inPosts =
         }
 
 
-init : (Msg -> msg) -> Update State msg a
-init toMsg =
+init : Update State Msg a
+init =
     let
         api =
             Api.init
@@ -44,7 +44,6 @@ init toMsg =
     in
     save State
         |> andMap api
-        |> mapCmd toMsg
 
 
 update : Msg -> State -> Update State Msg a

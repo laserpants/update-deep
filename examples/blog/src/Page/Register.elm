@@ -96,8 +96,8 @@ setUsernameStatus status state =
     save { state | usernameStatus = status }
 
 
-init : (Msg -> msg) -> Update State msg a
-init toMsg =
+init : Update State Msg a
+init =
     let
         api =
             Api.init
@@ -111,7 +111,6 @@ init toMsg =
         |> andMap (Form.init [] Form.Register.validate)
         |> andMap (save Dict.empty)
         |> andMap (save Blank)
-        |> mapCmd toMsg
 
 
 websocketIsAvailableQuery : String -> Json.Value

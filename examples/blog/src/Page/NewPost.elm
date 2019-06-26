@@ -46,8 +46,8 @@ inForm =
         }
 
 
-init : (Msg -> msg) -> Update State msg a
-init toMsg =
+init : Update State Msg a
+init =
     let
         api =
             Api.init
@@ -59,7 +59,6 @@ init toMsg =
     save State
         |> andMap api
         |> andMap (Form.init [] Form.NewPost.validate)
-        |> mapCmd toMsg
 
 
 handleSubmit : Form.NewPost.Fields -> State -> Update State Msg a

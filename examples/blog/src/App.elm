@@ -143,7 +143,7 @@ handleRouteChange url maybeRoute =
         unlessAuthenticated gotoPage =
             with .session
                 (\session ->
-                    if Nothing /= session then
+                    if Maybe.isJust session then
                         redirect "/"
 
                     else
@@ -158,38 +158,43 @@ handleRouteChange url maybeRoute =
         -- Authenticated only
         Just NewPost ->
             ifAuthenticated
-                (Page.NewPost.init Page.NewPostPageMsg
+                (Page.NewPost.init
                     |> Update.Deep.map Page.NewPostPage
+                    |> mapCmd Page.NewPostPageMsg
                     |> loadPage
                 )
 
         -- Redirect if already authenticated
         Just Login ->
             unlessAuthenticated
-                (Page.Login.init Page.LoginPageMsg
+                (Page.Login.init
                     |> Update.Deep.map Page.LoginPage
+                    |> mapCmd Page.LoginPageMsg
                     |> loadPage
                 )
 
         -- Redirect if already authenticated
         Just Register ->
             unlessAuthenticated
-                (Page.Register.init Page.RegisterPageMsg
+                (Page.Register.init
                     |> Update.Deep.map Page.RegisterPage
+                    |> mapCmd Page.RegisterPageMsg
                     |> loadPage
                 )
 
         -- Other
         Just (ShowPost id) ->
-            (Page.ShowPost.init id Page.ShowPostPageMsg
+            (Page.ShowPost.init id
                 |> Update.Deep.map Page.ShowPostPage
+                |> mapCmd Page.ShowPostPageMsg
                 |> loadPage
             )
                 >> andThen (update (PageMsg (Page.ShowPostPageMsg Page.ShowPost.FetchPost)))
 
         Just Home ->
-            (Page.Home.init Page.HomePageMsg
+            (Page.Home.init
                 |> Update.Deep.map Page.HomePage
+                |> mapCmd Page.HomePageMsg
                 |> loadPage
             )
                 >> andThen (update (PageMsg (Page.HomePageMsg Page.Home.FetchPosts)))
