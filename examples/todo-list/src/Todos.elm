@@ -70,7 +70,7 @@ update { onTaskAdded, onTaskDone } msg =
 
                         item :: rest ->
                             setItems (List.take ix state.items ++ rest)
-                                >> andThenIf (always flags.notify) (applyCallback <| onTaskDone item)
+                                >> andWhen flags.notify (applyCallback <| onTaskDone item)
                    )
     in
     case msg of

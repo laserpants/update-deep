@@ -1,6 +1,6 @@
 module Update.Deep exposing
     ( Update, save, addCmd, map, mapCmd, applyCallback, fold, join, kleisli
-    , andThen, andThenIf
+    , andThen, andThenIf, andWhen
     , andMap, ap, map2, map3, map4, map5, map6, map7
     , In, Wrap, inState, wrapState
     , runUpdate, applicationInit, documentInit
@@ -17,7 +17,7 @@ module Update.Deep exposing
 
 ## Chaining Updates
 
-@docs andThen, andThenIf
+@docs andThen, andThenIf, andWhen
 
 
 ## Applicative Interface
@@ -256,6 +256,12 @@ andThenIf pred fun upd =
                 else
                     upd
             )
+
+
+{-| TODO 
+-}
+andWhen : Bool -> (a -> Update a c e) -> Update a c e -> Update a c e
+andWhen check = andThenIf (always check)
 
 
 {-| Right-to-left (Kleisli) composition of two functions that return `Update` values,

@@ -71,66 +71,38 @@ update :
     -> Page
     -> Update Page Msg a
 update { onAuthResponse, onPostAdded, onCommentCreated } msg page =
-    case page of
-        HomePage homePageState ->
-            case msg of
-                HomePageMsg homeMsg ->
-                    homePageState
-                        |> Page.Home.update homeMsg
-                        |> Update.Deep.map HomePage
-                        |> mapCmd HomePageMsg
+    case ( page , msg ) of
+        ( HomePage homePageState, HomePageMsg homeMsg ) ->
+            homePageState
+                |> Page.Home.update homeMsg
+                |> Update.Deep.map HomePage
+                |> mapCmd HomePageMsg
 
-                _ ->
-                    save page
+        ( NewPostPage newPostPageState, NewPostPageMsg newPostMsg ) ->
+            newPostPageState
+                |> Page.NewPost.update { onPostAdded = onPostAdded } newPostMsg
+                |> Update.Deep.map NewPostPage
+                |> mapCmd NewPostPageMsg
 
-        NewPostPage newPostPageState ->
-            case msg of
-                NewPostPageMsg newPostMsg ->
-                    newPostPageState
-                        |> Page.NewPost.update { onPostAdded = onPostAdded } newPostMsg
-                        |> Update.Deep.map NewPostPage
-                        |> mapCmd NewPostPageMsg
+        ( ShowPostPage showPostPageState, ShowPostPageMsg showPostMsg ) ->
+            showPostPageState
+                |> Page.ShowPost.update { onCommentCreated = onCommentCreated } showPostMsg
+                |> Update.Deep.map ShowPostPage
+                |> mapCmd ShowPostPageMsg
 
-                _ ->
-                    save page
+        ( LoginPage loginPageState, LoginPageMsg loginMsg ) ->
+            loginPageState
+                |> Page.Login.update { onAuthResponse = onAuthResponse } loginMsg
+                |> Update.Deep.map LoginPage
+                |> mapCmd LoginPageMsg
 
-        ShowPostPage showPostPageState ->
-            case msg of
-                ShowPostPageMsg showPostMsg ->
-                    showPostPageState
-                        |> Page.ShowPost.update { onCommentCreated = onCommentCreated } showPostMsg
-                        |> Update.Deep.map ShowPostPage
-                        |> mapCmd ShowPostPageMsg
+        ( RegisterPage registerPageState, RegisterPageMsg registerMsg ) ->
+            registerPageState
+                |> Page.Register.update registerMsg
+                |> Update.Deep.map RegisterPage
+                |> mapCmd RegisterPageMsg
 
-                _ ->
-                    save page
-
-        LoginPage loginPageState ->
-            case msg of
-                LoginPageMsg loginMsg ->
-                    loginPageState
-                        |> Page.Login.update { onAuthResponse = onAuthResponse } loginMsg
-                        |> Update.Deep.map LoginPage
-                        |> mapCmd LoginPageMsg
-
-                _ ->
-                    save page
-
-        RegisterPage registerPageState ->
-            case msg of
-                RegisterPageMsg registerMsg ->
-                    registerPageState
-                        |> Page.Register.update registerMsg
-                        |> Update.Deep.map RegisterPage
-                        |> mapCmd RegisterPageMsg
-
-                _ ->
-                    save page
-
-        AboutPage ->
-            save page
-
-        NotFoundPage ->
+        _ ->
             save page
 
 
