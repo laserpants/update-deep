@@ -1,4 +1,4 @@
-module Main exposing (ButtonMsg(..), ButtonState, Msg(..), State, buttonInit, buttonUpdate, buttonView, handleButtonClicked, init, main, setCounterValue, update, view)
+module Main exposing (main)
 
 import Browser exposing (Document)
 import Html exposing (..)
@@ -15,7 +15,7 @@ type alias ButtonState =
     { counter : Int }
 
 
-setCounterValue : Int -> ButtonState -> Update ButtonState msg a
+setCounterValue : Int -> ButtonState -> Update ButtonState ButtonMsg a
 setCounterValue count state =
     save { state | counter = count }
 
@@ -26,7 +26,7 @@ buttonInit =
         |> andMap (save 0)
 
 
-buttonUpdate : { buttonClicked : Int -> a } -> ButtonMsg -> ButtonState -> Update ButtonState msg a
+buttonUpdate : { buttonClicked : Int -> a } -> ButtonMsg -> ButtonState -> Update ButtonState ButtonMsg a
 buttonUpdate { buttonClicked } msg state =
     case msg of
         Click ->
@@ -66,14 +66,18 @@ init () =
         |> andMap (save "")
 
 
-handleButtonClicked : Int -> State -> Update State msg a
+handleButtonClicked : Int -> State -> Update State Msg a
 handleButtonClicked times state =
     save { state | message = "The button has been clicked " ++ String.fromInt times ++ " time(s)." }
 
 
-inButton : In State ButtonState msg a
+inButton : Wrap State Msg ButtonState ButtonMsg a
 inButton =
-    inState { get = .button, set = \state button -> { state | button = button } }
+    wrapState 
+      { get = .button
+      , set = \state button -> { state | button = button } 
+      , msg = ButtonMsg
+      }
 
 
 update : Msg -> State -> Update State Msg a
