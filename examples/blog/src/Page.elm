@@ -62,15 +62,24 @@ current page =
             { none | isNotFoundPage = True }
 
 
-update : { onAuthResponse : Maybe Session -> a, onPostAdded : Post -> a, onCommentCreated : Comment -> a } -> Msg -> (Msg -> msg) -> Page -> Update Page msg a
+update :
+    { onAuthResponse : Maybe Session -> a
+    , onPostAdded : Post -> a
+    , onCommentCreated : Comment -> a
+    }
+    -> Msg
+    -> (Msg -> msg)
+    -> Page
+    -> Update Page Msg a
 update { onAuthResponse, onPostAdded, onCommentCreated } msg toMsg page =
     case page of
         HomePage homePageState ->
             case msg of
                 HomePageMsg homeMsg ->
                     homePageState
-                        |> Page.Home.update homeMsg (toMsg << HomePageMsg)
+                        |> Page.Home.update homeMsg
                         |> Update.Deep.map HomePage
+                        |> mapCmd HomePageMsg
 
                 _ ->
                     save page
@@ -79,8 +88,9 @@ update { onAuthResponse, onPostAdded, onCommentCreated } msg toMsg page =
             case msg of
                 NewPostPageMsg newPostMsg ->
                     newPostPageState
-                        |> Page.NewPost.update { onPostAdded = onPostAdded } newPostMsg (toMsg << NewPostPageMsg)
+                        |> Page.NewPost.update { onPostAdded = onPostAdded } newPostMsg
                         |> Update.Deep.map NewPostPage
+                        |> mapCmd NewPostPageMsg
 
                 _ ->
                     save page
@@ -89,8 +99,9 @@ update { onAuthResponse, onPostAdded, onCommentCreated } msg toMsg page =
             case msg of
                 ShowPostPageMsg showPostMsg ->
                     showPostPageState
-                        |> Page.ShowPost.update { onCommentCreated = onCommentCreated } showPostMsg (toMsg << ShowPostPageMsg)
+                        |> Page.ShowPost.update { onCommentCreated = onCommentCreated } showPostMsg
                         |> Update.Deep.map ShowPostPage
+                        |> mapCmd ShowPostPageMsg
 
                 _ ->
                     save page
@@ -99,8 +110,9 @@ update { onAuthResponse, onPostAdded, onCommentCreated } msg toMsg page =
             case msg of
                 LoginPageMsg loginMsg ->
                     loginPageState
-                        |> Page.Login.update { onAuthResponse = onAuthResponse } loginMsg (toMsg << LoginPageMsg)
+                        |> Page.Login.update { onAuthResponse = onAuthResponse } loginMsg
                         |> Update.Deep.map LoginPage
+                        |> mapCmd LoginPageMsg
 
                 _ ->
                     save page
@@ -109,8 +121,9 @@ update { onAuthResponse, onPostAdded, onCommentCreated } msg toMsg page =
             case msg of
                 RegisterPageMsg registerMsg ->
                     registerPageState
-                        |> Page.Register.update registerMsg (toMsg << RegisterPageMsg)
+                        |> Page.Register.update registerMsg
                         |> Update.Deep.map RegisterPage
+                        |> mapCmd RegisterPageMsg
 
                 _ ->
                     save page

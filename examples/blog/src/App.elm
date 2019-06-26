@@ -44,34 +44,46 @@ type alias State =
     }
 
 
-setRestrictedUrl : Url -> State -> Update State msg a
+setRestrictedUrl : Url -> State -> Update State Msg a
 setRestrictedUrl url state =
     save { state | restrictedUrl = Just (String.dropLeft (String.length state.router.basePath) url.path) }
 
 
-resetRestrictedUrl : State -> Update State msg a
+resetRestrictedUrl : State -> Update State Msg a
 resetRestrictedUrl state =
     save { state | restrictedUrl = Nothing }
 
 
-setSession : Maybe Session -> State -> Update State msg a
+setSession : Maybe Session -> State -> Update State Msg a
 setSession session state =
     save { state | session = session }
 
 
-inRouter : In State (Router.State Route) msg a
+inRouter : Wrap State Msg (Router.State Route) Router.Msg a
 inRouter =
-    inState { get = .router, set = \state router -> { state | router = router } }
+    wrapState
+        { get = .router
+        , set = \state router -> { state | router = router }
+        , msg = RouterMsg
+        }
 
 
-inUi : In State Ui.State msg a
+inUi : Wrap State Msg Ui.State Ui.Msg a
 inUi =
-    inState { get = .ui, set = \state ui -> { state | ui = ui } }
+    wrapState
+        { get = .ui
+        , set = \state ui -> { state | ui = ui }
+        , msg = UiMsg
+        }
 
 
-inPage : In State Page msg a
+inPage : Wrap State Msg Page Page.Msg a
 inPage =
-    inState { get = .page, set = \state page -> { state | page = page } }
+    wrapState
+        { get = .page
+        , set = \state page -> { state | page = page }
+        , msg = PageMsg
+        }
 
 
 initSession : Flags -> Maybe Session
@@ -95,12 +107,12 @@ init flags url key =
         |> andThen (update (RouterMsg (Router.UrlChange url)))
 
 
-redirect : String -> State -> Update State msg a
+redirect : String -> State -> Update State Msg a
 redirect =
     inRouter << Router.redirect
 
 
-loadPage : Update Page msg (State -> Update State msg a) -> State -> Update State msg a
+loadPage : Update Page Page.Msg (State -> Update State Msg a) -> State -> Update State Msg a
 loadPage setPage state =
     let
         isLoginRoute =
@@ -122,10 +134,10 @@ handleRouteChange url maybeRoute =
                         -- Redirect and return to this url after successful login
                         setRestrictedUrl url
                             >> andThen (redirect "/login")
-                            >> andThen (inUi (showToast { message = "You must be logged in to access that page.", color = Warning } UiMsg))
+                            >> andThen (inUi (showToast { message = "You must be logged in to access that page.", color = Warning }))
 
                     else
-                        gotoPage >> mapCmd PageMsg
+                        gotoPage
                 )
 
         unlessAuthenticated gotoPage =
@@ -135,13 +147,13 @@ handleRouteChange url maybeRoute =
                         redirect "/"
 
                     else
-                        gotoPage >> mapCmd PageMsg
+                        gotoPage
                 )
     in
     case maybeRoute of
         -- No route
         Nothing ->
-            loadPage (save Page.NotFoundPage) >> mapCmd PageMsg
+            loadPage (save Page.NotFoundPage)
 
         -- Authenticated only
         Just NewPost ->
@@ -169,32 +181,30 @@ handleRouteChange url maybeRoute =
 
         -- Other
         Just (ShowPost id) ->
-            mapCmd PageMsg
-                << (Page.ShowPost.init id Page.ShowPostPageMsg
-                        |> andThen (Page.ShowPost.update { onCommentCreated = always save } Page.ShowPost.FetchPost Page.ShowPostPageMsg)
-                        |> Update.Deep.map Page.ShowPostPage
-                        |> loadPage
-                   )
+            (Page.ShowPost.init id Page.ShowPostPageMsg
+                |> Update.Deep.map Page.ShowPostPage
+                |> loadPage
+            )
+                >> andThen (update (PageMsg (Page.ShowPostPageMsg Page.ShowPost.FetchPost)))
 
         Just Home ->
-            mapCmd PageMsg
-                << (Page.Home.init Page.HomePageMsg
-                        |> andThen (Page.Home.update Page.Home.FetchPosts Page.HomePageMsg)
-                        |> Update.Deep.map Page.HomePage
-                        |> loadPage
-                   )
+            (Page.Home.init Page.HomePageMsg
+                |> Update.Deep.map Page.HomePage
+                |> loadPage
+            )
+                >> andThen (update (PageMsg (Page.HomePageMsg Page.Home.FetchPosts)))
 
         Just Logout ->
             setSession Nothing
                 >> andThen (updateSessionStorage Nothing)
                 >> andThen (redirect "/")
-                >> andThen (inUi (showInfoToast "You have been logged out" UiMsg))
+                >> andThen (inUi (showInfoToast "You have been logged out"))
 
         Just About ->
-            loadPage (save Page.AboutPage) >> mapCmd PageMsg
+            loadPage (save Page.AboutPage)
 
 
-updateSessionStorage : Maybe Session -> State -> Update State msg a
+updateSessionStorage : Maybe Session -> State -> Update State Msg a
 updateSessionStorage maybeSession =
     case maybeSession of
         Nothing ->
@@ -222,12 +232,12 @@ handleAuthResponse maybeSession =
 
 handlePostAdded : Post -> State -> Update State Msg a
 handlePostAdded post =
-    redirect "/" >> andThen (inUi (showInfoToast "Your post was published" UiMsg))
+    redirect "/" >> andThen (inUi (showInfoToast "Your post was published"))
 
 
 handleCommentCreated : Comment -> State -> Update State Msg a
 handleCommentCreated comment =
-    inUi (showInfoToast "Your comment was successfully received" UiMsg)
+    inUi (showInfoToast "Your comment was successfully received")
 
 
 update : Msg -> State -> Update State Msg a
@@ -248,7 +258,7 @@ update msg =
                 )
 
         UiMsg uiMsg ->
-            inUi (Ui.update uiMsg UiMsg)
+            inUi (Ui.update uiMsg)
 
 
 subscriptions : State -> Sub Msg

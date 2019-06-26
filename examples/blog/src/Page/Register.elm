@@ -73,17 +73,25 @@ saveUsernameStatus username available state =
     save { state | usernames = Dict.insert username available state.usernames }
 
 
-inApi : In State (Api.Model User) msg a
+inApi : Wrap State Msg (Api.Model User) (Api.Msg User) a
 inApi =
-    inState { get = .api, set = \state api -> { state | api = api } }
+    wrapState
+        { get = .api
+        , set = \state api -> { state | api = api }
+        , msg = ApiMsg
+        }
 
 
-inForm : In State (Form.Model Form.Register.Custom.Error Form.Register.Fields) msg a
+inForm : Wrap State Msg (Form.Model Form.Register.Custom.Error Form.Register.Fields) Form.Msg a
 inForm =
-    inState { get = .formModel, set = \state form -> { state | formModel = form } }
+    wrapState
+        { get = .formModel
+        , set = \state form -> { state | formModel = form }
+        , msg = FormMsg
+        }
 
 
-setUsernameStatus : UsernameStatus -> State -> Update State msg a
+setUsernameStatus : UsernameStatus -> State -> Update State Msg a
 setUsernameStatus status state =
     save { state | usernameStatus = status }
 
@@ -114,7 +122,7 @@ websocketIsAvailableQuery username =
         ]
 
 
-checkIfIsAvailable : String -> State -> Update State msg a
+checkIfIsAvailable : String -> State -> Update State Msg a
 checkIfIsAvailable username ({ usernames } as state) =
     if String.isEmpty username then
         state
@@ -132,7 +140,7 @@ checkIfIsAvailable username ({ usernames } as state) =
                     |> andAddCmd (Ports.websocketOut (Encode.encode 0 (websocketIsAvailableQuery username)))
 
 
-usernameFieldSpy : F.Msg -> State -> Update State msg a
+usernameFieldSpy : F.Msg -> State -> Update State Msg a
 usernameFieldSpy formMsg =
     case formMsg of
         F.Input "username" F.Text (String username) ->
@@ -142,23 +150,23 @@ usernameFieldSpy formMsg =
             save
 
 
-handleSubmit : (Msg -> msg) -> Form.Register.Fields -> State -> Update State msg a
-handleSubmit toMsg form =
+handleSubmit : Form.Register.Fields -> State -> Update State Msg a
+handleSubmit form =
     let
         json =
             form |> Form.Register.toJson |> Http.jsonBody
     in
-    inApi (Api.sendRequest "" (Just json) (toMsg << ApiMsg))
+    inApi (Api.sendRequest "" (Just json))
 
 
-update : Msg -> (Msg -> msg) -> State -> Update State msg a
-update msg toMsg =
+update : Msg -> State -> Update State Msg a
+update msg =
     case msg of
         ApiMsg apiMsg ->
-            inApi (Api.update { onSuccess = always save, onError = always save } apiMsg (toMsg << ApiMsg))
+            inApi (Api.update { onSuccess = always save, onError = always save } apiMsg)
 
         FormMsg formMsg ->
-            inForm (Form.update { onSubmit = handleSubmit toMsg } formMsg)
+            inForm (Form.update { onSubmit = handleSubmit } formMsg)
                 >> andThen (usernameFieldSpy formMsg)
 
         WebsocketMsg websocketMsg ->

@@ -28,14 +28,22 @@ type alias State =
     }
 
 
-inApi : In State (Api.Model Post) msg a
+inApi : Wrap State Msg (Api.Model Post) (Api.Msg Post) a
 inApi =
-    inState { get = .api, set = \state api -> { state | api = api } }
+    wrapState
+        { get = .api
+        , set = \state api -> { state | api = api }
+        , msg = ApiMsg
+        }
 
 
-inForm : In State (Form.Model Never Form.NewPost.Fields) msg a
+inForm : Wrap State Msg (Form.Model Never Form.NewPost.Fields) Form.Msg a
 inForm =
-    inState { get = .formModel, set = \state form -> { state | formModel = form } }
+    wrapState
+        { get = .formModel
+        , set = \state form -> { state | formModel = form }
+        , msg = FormMsg
+        }
 
 
 init : (Msg -> msg) -> Update State msg a
@@ -54,23 +62,23 @@ init toMsg =
         |> mapCmd toMsg
 
 
-handleSubmit : (Msg -> msg) -> Form.NewPost.Fields -> State -> Update State msg a
-handleSubmit toMsg form =
+handleSubmit : Form.NewPost.Fields -> State -> Update State Msg a
+handleSubmit form =
     let
         json =
             form |> Form.NewPost.toJson |> Http.jsonBody
     in
-    inApi (Api.sendRequest "" (Just json) (toMsg << ApiMsg))
+    inApi (Api.sendRequest "" (Just json))
 
 
-update : { onPostAdded : Post -> a } -> Msg -> (Msg -> msg) -> State -> Update State msg a
-update { onPostAdded } msg toMsg =
+update : { onPostAdded : Post -> a } -> Msg -> State -> Update State Msg a
+update { onPostAdded } msg =
     case msg of
         ApiMsg apiMsg ->
-            inApi (Api.update { onSuccess = applyCallback << onPostAdded, onError = always save } apiMsg (toMsg << ApiMsg))
+            inApi (Api.update { onSuccess = applyCallback << onPostAdded, onError = always save } apiMsg)
 
         FormMsg formMsg ->
-            inForm (Form.update { onSubmit = handleSubmit toMsg } formMsg)
+            inForm (Form.update { onSubmit = handleSubmit } formMsg)
 
 
 subscriptions : State -> (Msg -> msg) -> Sub msg

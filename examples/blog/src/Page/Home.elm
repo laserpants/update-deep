@@ -23,9 +23,13 @@ type alias State =
     { posts : Api.Model (List Post) }
 
 
-inPosts : In State (Api.Model (List Post)) msg a
+inPosts : Wrap State Msg (Api.Model (List Post)) (Api.Msg (List Post)) a
 inPosts =
-    inState { get = .posts, set = \state posts -> { state | posts = posts } }
+    wrapState
+        { get = .posts
+        , set = \state posts -> { state | posts = posts }
+        , msg = ApiMsg
+        }
 
 
 init : (Msg -> msg) -> Update State msg a
@@ -43,14 +47,14 @@ init toMsg =
         |> mapCmd toMsg
 
 
-update : Msg -> (Msg -> msg) -> State -> Update State msg a
-update msg toMsg =
+update : Msg -> State -> Update State Msg a
+update msg =
     case msg of
         ApiMsg apiMsg ->
-            inPosts (Api.update { onSuccess = always save, onError = always save } apiMsg (toMsg << ApiMsg))
+            inPosts (Api.update { onSuccess = always save, onError = always save } apiMsg)
 
         FetchPosts ->
-            inPosts (Api.sendSimpleRequest (toMsg << ApiMsg))
+            inPosts Api.sendSimpleRequest
 
 
 subscriptions : State -> (Msg -> msg) -> Sub msg

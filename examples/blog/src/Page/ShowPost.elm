@@ -33,19 +33,31 @@ type alias State =
     }
 
 
-inPostApi : In State (Api.Model Post) msg a
+inPostApi : Wrap State Msg (Api.Model Post) (Api.Msg Post) a
 inPostApi =
-    inState { get = .post, set = \state post -> { state | post = post } }
+    wrapState
+        { get = .post
+        , set = \state post -> { state | post = post }
+        , msg = PostApiMsg
+        }
 
 
-inCommentApi : In State (Api.Model Comment) msg a
+inCommentApi : Wrap State Msg (Api.Model Comment) (Api.Msg Comment) a
 inCommentApi =
-    inState { get = .comment, set = \state comment -> { state | comment = comment } }
+    wrapState
+        { get = .comment
+        , set = \state comment -> { state | comment = comment }
+        , msg = CommentApiMsg
+        }
 
 
-inCommentForm : In State (Form.Model Never Form.Comment.Fields) msg a
+inCommentForm : Wrap State Msg (Form.Model Never Form.Comment.Fields) Form.Msg a
 inCommentForm =
-    inState { get = .commentForm, set = \state form -> { state | commentForm = form } }
+    wrapState
+        { get = .commentForm
+        , set = \state form -> { state | commentForm = form }
+        , msg = CommentFormMsg
+        }
 
 
 init : Int -> (Msg -> msg) -> Update State msg a
@@ -73,39 +85,36 @@ init id toMsg =
         |> mapCmd toMsg
 
 
-handleSubmit : (Msg -> msg) -> Form.Comment.Fields -> State -> Update State msg a
-handleSubmit toMsg form state =
+handleSubmit : Form.Comment.Fields -> State -> Update State Msg a
+handleSubmit form state =
     let
         json =
             form |> Form.Comment.toJson state.id |> Http.jsonBody
     in
     state
-        |> inCommentApi (Api.sendRequest "" (Just json) (toMsg << CommentApiMsg))
+        |> inCommentApi (Api.sendRequest "" (Just json))
 
 
-update : { onCommentCreated : Comment -> a } -> Msg -> (Msg -> msg) -> State -> Update State msg a
-update { onCommentCreated } msg toMsg =
+update : { onCommentCreated : Comment -> a } -> Msg -> State -> Update State Msg a
+update { onCommentCreated } msg =
     let
-        toApiMsg =
-            toMsg << PostApiMsg
-
         commentCreated comment =
             inCommentForm (Form.reset [])
-                >> andThen (inPostApi (Api.sendSimpleRequest toApiMsg))
+                >> andThen (inPostApi Api.sendSimpleRequest)
                 >> andApplyCallback (onCommentCreated comment)
     in
     case msg of
         PostApiMsg apiMsg ->
-            inPostApi (Api.update { onSuccess = always save, onError = always save } apiMsg toApiMsg)
+            inPostApi (Api.update { onSuccess = always save, onError = always save } apiMsg)
 
         FetchPost ->
-            inPostApi (Api.sendSimpleRequest toApiMsg)
+            inPostApi Api.sendSimpleRequest
 
         CommentFormMsg formMsg ->
-            inCommentForm (Form.update { onSubmit = handleSubmit toMsg } formMsg)
+            inCommentForm (Form.update { onSubmit = handleSubmit } formMsg)
 
         CommentApiMsg apiMsg ->
-            inCommentApi (Api.update { onSuccess = commentCreated, onError = always save } apiMsg (toMsg << CommentApiMsg))
+            inCommentApi (Api.update { onSuccess = commentCreated, onError = always save } apiMsg)
 
 
 subscriptions : State -> (Msg -> msg) -> Sub msg

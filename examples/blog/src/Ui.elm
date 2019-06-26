@@ -32,41 +32,40 @@ type alias State =
     }
 
 
-incrementToastCounter : State -> Update State msg a
+incrementToastCounter : State -> Update State Msg a
 incrementToastCounter state =
     save { state | toastCounter = 1 + state.toastCounter }
 
 
-toggleMenuOpen : State -> Update State msg a
+toggleMenuOpen : State -> Update State Msg a
 toggleMenuOpen state =
     save { state | menuOpen = not state.menuOpen }
 
 
-closeBurgerMenu : State -> Update State msg a
+closeBurgerMenu : State -> Update State Msg a
 closeBurgerMenu state =
     save { state | menuOpen = False }
 
 
-setToast : Toast -> State -> Update State msg a
+setToast : Toast -> State -> Update State Msg a
 setToast toast state =
     save { state | toast = Just ( state.toastCounter, toast ) }
 
 
-showToast : Toast -> (Msg -> msg) -> State -> Update State msg a
-showToast toast toMsg state =
+showToast : Toast -> State -> Update State Msg a
+showToast toast state =
     state
         |> setToast toast
         |> andAddCmd (Task.perform (CloseToast state.toastCounter |> always) (Process.sleep 4000))
         |> andThen incrementToastCounter
-        |> mapCmd toMsg
 
 
-showInfoToast : String -> (Msg -> msg) -> State -> Update State msg a
+showInfoToast : String -> State -> Update State Msg a
 showInfoToast message =
     showToast { message = message, color = Info }
 
 
-closeToast : State -> Update State msg a
+closeToast : State -> Update State Msg a
 closeToast state =
     save { state | toast = Nothing }
 
@@ -79,8 +78,8 @@ init =
         |> andMap (save 1)
 
 
-update : Msg -> (Msg -> msg) -> State -> Update State msg a
-update msg toMsg =
+update : Msg -> State -> Update State Msg a
+update msg =
     case msg of
         ToggleBurgerMenu ->
             toggleMenuOpen

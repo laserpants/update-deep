@@ -74,15 +74,14 @@ init { endpoint, method, decoder } =
     save { resource = NotRequested, request = request }
 
 
-sendRequest : String -> Maybe Http.Body -> (Msg a -> msg) -> Model a -> Update (Model a) msg b
-sendRequest url maybeBody toMsg model =
+sendRequest : String -> Maybe Http.Body -> Model a -> Update (Model a) (Msg a) b
+sendRequest url maybeBody model =
     model
         |> setResource Requested
         |> andAddCmd (model.request url maybeBody)
-        |> mapCmd toMsg
 
 
-sendSimpleRequest : (Msg a -> msg) -> Model a -> Update (Model a) msg b
+sendSimpleRequest : Model a -> Update (Model a) (Msg a) b
 sendSimpleRequest =
     sendRequest "" Nothing
 
@@ -98,8 +97,8 @@ type alias ApiEventHandlers a b =
     }
 
 
-update : ApiEventHandlers a b -> Msg a -> (Msg a -> msg) -> Model a -> Update (Model a) msg b
-update { onSuccess, onError } msg toMsg =
+update : ApiEventHandlers a b -> Msg a -> Model a -> Update (Model a) (Msg a) b
+update { onSuccess, onError } msg =
     case msg of
         Response (Ok resource) ->
             setResource (Available resource)
