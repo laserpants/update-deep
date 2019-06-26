@@ -26,18 +26,18 @@ type alias State =
     }
 
 
-inTodos : WrapIn State Msg Todos.State Todos.Msg a
+inTodos : Wrap State Msg Todos.State Todos.Msg a
 inTodos =
-    wrapInState
+    wrapState
         { get = .todos
         , set = \state todos -> { state | todos = todos }
         , msg = TodosMsg
         }
 
 
-inNotifications : WrapIn State Msg Notifications.State Notifications.Msg a
+inNotifications : Wrap State Msg Notifications.State Notifications.Msg a
 inNotifications =
-    wrapInState
+    wrapState
         { get = .notifications
         , set = \state notifs -> { state | notifications = notifs }
         , msg = NotificationsMsg
@@ -65,10 +65,10 @@ update : Msg -> State -> Update State Msg a
 update msg =
     case msg of
         TodosMsg todosMsg ->
-            inTodos (Todos.update { onTaskAdded = always save, onTaskDone = always save } todosMsg)
+            inTodos (Todos.update { onTaskAdded = handleTaskDone, onTaskDone = handleItemAdded } todosMsg) 
 
         NotificationsMsg notificationsMsg ->
-            inNotifications (Notifications.update notificationsMsg)
+            inNotifications (Notifications.update notificationsMsg) 
 
 
 view : State -> Document Msg

@@ -34,9 +34,9 @@ addItem item state =
     save { state | items = item :: state.items }
 
 
-inForm : WrapIn State Msg Form.State Form.Msg a
+inForm : Wrap State Msg Form.State Form.Msg a
 inForm =
-    wrapInState
+    wrapState
         { get = .form
         , set = \state form -> { state | form = form }
         , msg = TodosFormMsg
