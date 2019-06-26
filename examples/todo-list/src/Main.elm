@@ -65,10 +65,10 @@ update : Msg -> State -> Update State Msg a
 update msg =
     case msg of
         TodosMsg todosMsg ->
-            inTodos (Todos.update { onTaskAdded = handleTaskDone, onTaskDone = handleItemAdded } todosMsg) 
+            inTodos (Todos.update { onTaskAdded = handleTaskDone, onTaskDone = handleItemAdded } todosMsg)
 
         NotificationsMsg notificationsMsg ->
-            inNotifications (Notifications.update notificationsMsg) 
+            inNotifications (Notifications.update notificationsMsg)
 
 
 view : State -> Document Msg
