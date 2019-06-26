@@ -34,9 +34,13 @@ addItem item state =
     save { state | items = item :: state.items }
 
 
-inForm : In State Form.State msg a
+inForm : WrapIn State Msg Form.State Form.Msg a
 inForm =
-    inState { get = .form, set = \state form -> { state | form = form } }
+    wrapInState
+        { get = .form
+        , set = \state form -> { state | form = form }
+        , msg = TodosFormMsg
+        }
 
 
 init : (Msg -> msg) -> Update State msg a
@@ -47,7 +51,7 @@ init toMsg =
         |> mapCmd toMsg
 
 
-update : { onTaskAdded : TodoItem -> a, onTaskDone : TodoItem -> a } -> Msg -> State -> Update State msg a
+update : { onTaskAdded : TodoItem -> a, onTaskDone : TodoItem -> a } -> Msg -> State -> Update State Msg a
 update { onTaskAdded, onTaskDone } msg =
     let
         handleSubmit data =

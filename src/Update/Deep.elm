@@ -2,7 +2,7 @@ module Update.Deep exposing
     ( Update, save, addCmd, map, mapCmd, applyCallback, fold, join, kleisli
     , andThen, andThenIf
     , andMap, ap, map2, map3, map4, map5, map6, map7
-    , In, inState
+    , In, WrapIn, inState, wrapInState
     , runUpdate, applicationInit, documentInit
     , andAddCmd, andApplyCallback, foldAndThen, with
     )
@@ -29,7 +29,7 @@ These functions address the need to map over functions of more than one argument
 
 # Nested State
 
-@docs In, inState
+@docs In, WrapIn, inState, wrapInState
 
 
 # Program Integration
@@ -315,10 +315,23 @@ with get some state =
     some (get state) state
 
 
+{-| See [`wrapInState`](#wrapInState) for how to work with this type.
+-}
+type alias WrapIn state msg state2 msg2 a =
+    (state2 -> Update state2 msg2 (state -> Update state msg2 a)) -> state -> Update state msg a
+
+
 {-| See [`inState`](#inState) for how to work with this type.
 -}
-type alias In state slice msg a =
-    (slice -> Update slice msg (state -> Update state msg a)) -> state -> Update state msg a
+type alias In state state2 msg a =
+    WrapIn state state2 msg msg a
+
+
+{-| TODO
+-}
+wrapInState : { get : b -> d, set : b -> m -> a, msg : c -> f } -> (d -> Update m c (a -> Update a c e)) -> b -> Update a f e
+wrapInState { get, set, msg } fun state =
+    get state |> fun |> foldAndThen (set state >> save) |> mapCmd msg
 
 
 {-| The idea here is that you provide an `inX` for each nested `XState` that needs to be updated in your main `State`.
@@ -344,8 +357,8 @@ See the [README](https://github.com/laserpants/elm-update-deep/blob/master/READM
 
 -}
 inState : { get : b -> d, set : b -> m -> a } -> (d -> Update m c (a -> Update a c e)) -> b -> Update a c e
-inState { get, set } fun state =
-    get state |> fun |> foldAndThen (set state >> save)
+inState { get, set } =
+    wrapInState { get = get, set = set, msg = identity }
 
 
 {-| Normally you shouldn't need to use this function directly in client code.

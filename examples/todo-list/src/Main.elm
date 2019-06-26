@@ -1,4 +1,4 @@
-module Main exposing (Flags, Msg(..), State, handleItemAdded, handleTaskDone, inNotifications, inTodos, init, main, update, view)
+module Main exposing (Flags, Msg(..), State, init, main, update, view)
 
 import Browser exposing (Document)
 import Data.TodoItem exposing (TodoItem)
@@ -26,14 +26,22 @@ type alias State =
     }
 
 
-inTodos : In State Todos.State msg a
+inTodos : WrapIn State Msg Todos.State Todos.Msg a
 inTodos =
-    inState { get = .todos, set = \state todos -> { state | todos = todos } }
+    wrapInState
+        { get = .todos
+        , set = \state todos -> { state | todos = todos }
+        , msg = TodosMsg
+        }
 
 
-inNotifications : In State Notifications.State msg a
+inNotifications : WrapIn State Msg Notifications.State Notifications.Msg a
 inNotifications =
-    inState { get = .notifications, set = \state notifs -> { state | notifications = notifs } }
+    wrapInState
+        { get = .notifications
+        , set = \state notifs -> { state | notifications = notifs }
+        , msg = NotificationsMsg
+        }
 
 
 init : Flags -> Update State Msg a
@@ -45,24 +53,22 @@ init flags =
 
 handleItemAdded : TodoItem -> State -> Update State Msg a
 handleItemAdded _ =
-    Notifications.addNotification "A new task was added to your list." NotificationsMsg
-        |> inNotifications
+    inNotifications (Notifications.addNotification "A new task was added to your list.")
 
 
 handleTaskDone : TodoItem -> State -> Update State Msg a
 handleTaskDone item =
-    Notifications.addNotification ("The following task was completed: " ++ item.text) NotificationsMsg
-        |> inNotifications
+    inNotifications (Notifications.addNotification ("The following task was completed: " ++ item.text))
 
 
 update : Msg -> State -> Update State Msg a
 update msg =
     case msg of
         TodosMsg todosMsg ->
-            inTodos (Todos.update { onTaskAdded = handleItemAdded, onTaskDone = handleTaskDone } todosMsg)
+            inTodos (Todos.update { onTaskAdded = always save, onTaskDone = always save } todosMsg)
 
         NotificationsMsg notificationsMsg ->
-            inNotifications (Notifications.update notificationsMsg NotificationsMsg)
+            inNotifications (Notifications.update notificationsMsg)
 
 
 view : State -> Document Msg

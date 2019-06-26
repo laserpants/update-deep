@@ -57,8 +57,8 @@ dismissAfterSeconds n { id } =
     addCmd (Task.perform (always <| DismissOne id) (Process.sleep (secs * 1000)))
 
 
-addNotification : String -> (Msg -> msg) -> State -> Update State msg a
-addNotification text toMsg state =
+addNotification : String -> State -> Update State Msg a
+addNotification text state =
     let
         notification =
             { id = Id state.counter, text = text }
@@ -67,17 +67,16 @@ addNotification text toMsg state =
         |> enqueuNotification notification
         |> andThen (notification |> dismissAfterSeconds 10)
         |> andThen incrementCounter
-        |> mapCmd toMsg
 
 
-update : Msg -> (Msg -> msg) -> State -> Update State msg a
-update msg toMsg =
+update : Msg -> State -> Update State Msg a
+update msg =
     case msg of
         DismissOne notificationId ->
-            removeWithId notificationId >> mapCmd toMsg
+            removeWithId notificationId
 
         DismissAll ->
-            resetQueue >> mapCmd toMsg
+            resetQueue
 
 
 view : State -> (Msg -> msg) -> Html msg
