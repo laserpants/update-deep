@@ -323,8 +323,8 @@ type alias Wrap state msg state2 msg2 a =
 
 {-| See [`inState`](#inState) for how to work with this type.
 -}
-type alias In state state2 msg a =
-    Wrap state state2 msg msg a
+type alias In state state2 msg e =
+    (state2 -> Update state2 msg (state -> Update state msg e)) -> state -> Update state msg e
 
 
 {-| TODO
