@@ -73,11 +73,11 @@ handleButtonClicked times state =
 
 inButton : Wrap State Msg ButtonState ButtonMsg a
 inButton =
-    wrapState 
-      { get = .button
-      , set = \state button -> { state | button = button } 
-      , msg = ButtonMsg
-      }
+    wrapState
+        { get = .button
+        , set = \state button -> { state | button = button }
+        , msg = ButtonMsg
+        }
 
 
 update : Msg -> State -> Update State Msg a
