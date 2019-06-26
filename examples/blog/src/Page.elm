@@ -71,7 +71,7 @@ update :
     -> Page
     -> Update Page Msg a
 update { onAuthResponse, onPostAdded, onCommentCreated } msg page =
-    case ( page , msg ) of
+    case ( page, msg ) of
         ( HomePage homePageState, HomePageMsg homeMsg ) ->
             homePageState
                 |> Page.Home.update homeMsg

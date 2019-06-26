@@ -223,11 +223,11 @@ handleAuthResponse : Maybe Session -> State -> Update State Msg a
 handleAuthResponse maybeSession =
     let
         authenticated =
-            always (Maybe.isJust maybeSession)
+            Maybe.isJust maybeSession
     in
     setSession maybeSession
         >> andThen (updateSessionStorage maybeSession)
-        >> andThenIf authenticated returnToRestrictedUrl
+        >> andWhen authenticated returnToRestrictedUrl
 
 
 handlePostAdded : Post -> State -> Update State Msg a
