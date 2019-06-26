@@ -331,7 +331,10 @@ type alias In state state2 msg a =
 -}
 wrapInState : { get : b -> d, set : b -> m -> a, msg : c -> f } -> (d -> Update m c (a -> Update a c e)) -> b -> Update a f e
 wrapInState { get, set, msg } fun state =
-    get state |> fun |> foldAndThen (set state >> save) |> mapCmd msg
+    get state
+        |> fun
+        |> foldAndThen (set state >> save)
+        |> mapCmd msg
 
 
 {-| The idea here is that you provide an `inX` for each nested `XState` that needs to be updated in your main `State`.
