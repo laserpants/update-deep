@@ -116,11 +116,11 @@ loadPage : Update Page Page.Msg (State -> Update State Msg a) -> State -> Update
 loadPage setPage state =
     let
         isLoginRoute =
-            always (Just Login == state.router.route)
+            Just Login == state.router.route
     in
     state
         |> inPage (always setPage)
-        |> andThenIf (not << isLoginRoute) resetRestrictedUrl
+        |> andWhen (not isLoginRoute) resetRestrictedUrl
         |> andThen (inUi closeBurgerMenu)
 
 
